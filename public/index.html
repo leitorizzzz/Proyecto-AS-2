@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Farmacia - Asilo Cabeza de Algodón</title>
+<style>
+  :root {
+    --bg: #F6F5F1;
+    --card: #FFFFFF;
+    --ink: #1E2A24;
+    --muted: #6B7570;
+    --line: #DEDBD1;
+    --accent: #0F6E56;
+    --accent-light: #E1F5EE;
+    --danger: #A32D2D;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    margin: 0;
+    padding: 32px 20px 60px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  header { margin-bottom: 28px; }
+  header .eyebrow {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--accent); font-weight: 600;
+  }
+  h1 { font-size: 26px; margin: 4px 0 4px; font-weight: 600; }
+  header p { color: var(--muted); margin: 0; font-size: 14px; }
+  .grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 20px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 20px;
+  }
+  .card h2 { font-size: 15px; margin: 0 0 14px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; }
+  .stock-bajo { color: var(--danger); font-weight: 600; }
+  form { display: flex; flex-direction: column; gap: 10px; }
+  label { font-size: 12px; color: var(--muted); }
+  input, select {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px;
+    font-size: 14px; background: var(--bg);
+  }
+  button {
+    background: var(--accent); color: #fff; border: none; border-radius: 6px;
+    padding: 10px 14px; font-size: 14px; cursor: pointer; font-weight: 500;
+  }
+  button:hover { opacity: 0.92; }
+  .msg { font-size: 13px; margin-top: 8px; padding: 8px 10px; border-radius: 6px; display: none; }
+  .msg.ok { background: var(--accent-light); color: var(--accent); display: block; }
+  .msg.err { background: #FCEBEB; color: var(--danger); display: block; }
+  .total { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 14px; }
+  .total strong { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Microservicio · Farmacia</div>
+    <h1>Asilo Cabeza de Algodón</h1>
+    <p>Aplicación base para probar el microservicio de farmacia (inventario y dispensación).</p>
+  </header>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Inventario de medicamentos</h2>
+      <table id="tabla-medicamentos">
+        <thead>
+          <tr><th>ID</th><th>Nombre</th><th>Presentación</th><th>Stock</th><th>Precio</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Dispensar medicamento a paciente</h2>
+      <form id="form-dispensar">
+        <div>
+          <label>ID de paciente</label>
+          <input type="number" id="idPaciente" required>
+        </div>
+        <div>
+          <label>Medicamento</label>
+          <select id="idMedicamento" required></select>
+        </div>
+        <div>
+          <label>Cantidad</label>
+          <input type="number" id="cantidad" min="1" required>
+        </div>
+        <button type="submit">Dispensar (aplica 20% descuento fundación)</button>
+        <div class="msg" id="mensaje"></div>
+      </form>
+    </div>
+
+    <div class="card" style="grid-column: 1 / -1;">
+      <h2>Historial de gasto en farmacia por paciente</h2>
+      <form id="form-historial" style="flex-direction: row; align-items: flex-end; gap: 10px;">
+        <div style="flex:1">
+          <label>ID de paciente</label>
+          <input type="number" id="idPacienteHistorial" required>
+        </div>
+        <button type="submit" style="width: 160px;">Consultar</button>
+      </form>
+      <table id="tabla-historial" style="margin-top: 14px;">
+        <thead>
+          <tr><th>Fecha</th><th>ID Medicamento</th><th>Cantidad</th><th>Costo</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="total" id="total-historial"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api';
+
+async function cargarMedicamentos() {
+  const res = await fetch(`${API}/medicamentos`);
+  const medicamentos = await res.json();
+
+  const tbody = document.querySelector('#tabla-medicamentos tbody');
+  tbody.innerHTML = medicamentos.map(m => `
+    <tr>
+      <td>${m.id}</td>
+      <td>${m.nombre}</td>
+      <td>${m.presentacion}</td>
+      <td class="${m.stock < 20 ? 'stock-bajo' : ''}">${m.stock}</td>
+      <td>Q${m.precioUnitario.toFixed(2)}</td>
+    </tr>
+  `).join('');
+
+  const select = document.getElementById('idMedicamento');
+  select.innerHTML = medicamentos.map(m => `<option value="${m.id}">${m.nombre} (${m.presentacion})</option>`).join('');
+}
+
+document.getElementById('form-dispensar').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const idPaciente = Number(document.getElementById('idPaciente').value);
+  const idMedicamento = Number(document.getElementById('idMedicamento').value);
+  const cantidad = Number(document.getElementById('cantidad').value);
+  const msg = document.getElementById('mensaje');
+
+  try {
+    const res = await fetch(`${API}/dispensaciones`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idPaciente, idMedicamento, cantidad })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    msg.className = 'msg ok';
+    msg.textContent = `Dispensado correctamente. Costo con descuento: Q${data.costoTotal.toFixed(2)}`;
+    cargarMedicamentos();
+  } catch (err) {
+    msg.className = 'msg err';
+    msg.textContent = err.message;
+  }
+});
+
+document.getElementById('form-historial').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const idPaciente = document.getElementById('idPacienteHistorial').value;
+  const res = await fetch(`${API}/dispensaciones/paciente/${idPaciente}`);
+  const data = await res.json();
+
+  const tbody = document.querySelector('#tabla-historial tbody');
+  tbody.innerHTML = data.dispensaciones.map(d => `
+    <tr>
+      <td>${new Date(d.fecha).toLocaleString()}</td>
+      <td>${d.idMedicamento}</td>
+      <td>${d.cantidad}</td>
+      <td>Q${d.costoTotal.toFixed(2)}</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('total-historial').innerHTML =
+    `Total gastado en farmacia: <strong>Q${data.totalGastado.toFixed(2)}</strong>`;
+});
+
+cargarMedicamentos();
+</script>
+</body>
+</html>
