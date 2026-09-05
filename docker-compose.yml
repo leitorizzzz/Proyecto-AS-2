@@ -122,5 +122,15 @@ services:
       - "3002:3002"
     restart: unless-stopped
 
+  # Frontend estatico (HTML/CSS/JS plano) servido por nginx.
+  # No necesita depends_on: el navegador llama a los microservicios por su
+  # puerto publicado, no a traves de la red interna de compose.
+  frontend:
+    build: ./frontend
+    container_name: asilo-frontend
+    ports:
+      - "8090:80"
+    restart: unless-stopped
+
 volumes:
   sqlserver-data:
