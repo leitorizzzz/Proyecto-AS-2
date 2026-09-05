@@ -4,3 +4,4 @@ farmacia.db
 farmacia.db-*
 .git
 .gitignore
+.env

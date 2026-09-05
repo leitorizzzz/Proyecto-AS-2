@@ -1,15 +1,16 @@
-# Infraestructura local de desarrollo — Sistema Asilo "Cabeza de Algodon"
+# Infraestructura completa — Sistema Asilo "Cabeza de Algodon"
 #
-# Por ahora solo levanta SQL Server. Los tres microservicios se agregaran
-# aqui mas adelante (ya tienen su Dockerfile individual).
+# Levanta SQL Server + los tres microservicios.
 #
 # Uso:
-#   docker compose up -d
+#   docker compose up -d --build
+#   docker compose ps
+#   docker compose logs -f auth-service
 #   docker compose down          (conserva los datos)
 #   docker compose down -v       (BORRA la base de datos)
 #
-# La password de SA se lee del archivo .env de esta misma carpeta (no
-# versionado). Debe coincidir con DB_PASSWORD en el .env de cada microservicio.
+# Las variables MSSQL_SA_PASSWORD y JWT_SECRET se leen del archivo .env de
+# esta misma carpeta (no versionado). Ver .env.example.
 
 services:
   sqlserver:
@@ -31,6 +32,94 @@ services:
       timeout: 5s
       retries: 12
       start_period: 30s
+    restart: unless-stopped
+
+  # Crea la base de datos compartida y termina. Los microservicios crean sus
+  # propias TABLAS al arrancar (inicializarEsquema), pero ninguno crea la
+  # BASE, y app.js hace process.exit(1) si no puede conectarse. Sin este paso
+  # un servidor limpio nunca arranca.
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: asilo-db-init
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    environment:
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+    entrypoint:
+      - /bin/bash
+      - -c
+      - >
+        /opt/mssql-tools18/bin/sqlcmd -S sqlserver -U sa -P "$$MSSQL_SA_PASSWORD" -C
+        -Q "IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name='AsiloCabezaAlgodon')
+        CREATE DATABASE AsiloCabezaAlgodon;"
+    restart: "no"
+
+  auth-service:
+    build: ./auth-service
+    container_name: asilo-auth-service
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      PORT: 3000
+      DB_SERVER: sqlserver
+      DB_PORT: 1433
+      DB_NAME: AsiloCabezaAlgodon
+      DB_USER: sa
+      DB_PASSWORD: ${MSSQL_SA_PASSWORD}
+      DB_ENCRYPT: "false"
+      DB_TRUST_SERVER_CERTIFICATE: "true"
+      JWT_SECRET: ${JWT_SECRET:?falta JWT_SECRET en el .env de la raiz}
+      JWT_EXPIRES_IN: 8h
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  farmacia-service:
+    build: ./farmacia-service
+    container_name: asilo-farmacia-service
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      PORT: 3001
+      DB_SERVER: sqlserver
+      DB_PORT: 1433
+      DB_NAME: AsiloCabezaAlgodon
+      DB_USER: sa
+      DB_PASSWORD: ${MSSQL_SA_PASSWORD}
+      DB_ENCRYPT: "false"
+      DB_TRUST_SERVER_CERTIFICATE: "true"
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+
+  pacientes-service:
+    build: ./pacientes-service
+    container_name: asilo-pacientes-service
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      PORT: 3002
+      DB_SERVER: sqlserver
+      DB_PORT: 1433
+      DB_NAME: AsiloCabezaAlgodon
+      DB_USER: sa
+      DB_PASSWORD: ${MSSQL_SA_PASSWORD}
+      DB_ENCRYPT: "false"
+      DB_TRUST_SERVER_CERTIFICATE: "true"
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "3002:3002"
     restart: unless-stopped
 
 volumes:
