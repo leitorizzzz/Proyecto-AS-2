@@ -1,0 +1,37 @@
+# Infraestructura local de desarrollo — Sistema Asilo "Cabeza de Algodon"
+#
+# Por ahora solo levanta SQL Server. Los tres microservicios se agregaran
+# aqui mas adelante (ya tienen su Dockerfile individual).
+#
+# Uso:
+#   docker compose up -d
+#   docker compose down          (conserva los datos)
+#   docker compose down -v       (BORRA la base de datos)
+#
+# La password de SA se lee del archivo .env de esta misma carpeta (no
+# versionado). Debe coincidir con DB_PASSWORD en el .env de cada microservicio.
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: asilo-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?falta MSSQL_SA_PASSWORD en el .env de la raiz}
+      MSSQL_PID: Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  sqlserver-data:
