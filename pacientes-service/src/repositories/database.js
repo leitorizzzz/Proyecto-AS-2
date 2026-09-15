@@ -1,7 +1,12 @@
 /**
  * CAPA DE ACCESO A DATOS
  * Conexion a SQL Server (BD compartida AsiloCabezaAlgodon) y bootstrap
- * de la tabla propia de Pacientes.
+ * de las tablas propias del servicio de pacientes:
+ *   - pacientes
+ *   - solicitudes_referencia
+ *   - visitas_medicas
+ *   - visita_examenes
+ *   - visita_prescripciones
  */
 const sql = require('mssql');
 
@@ -49,6 +54,80 @@ async function inicializarEsquema() {
       contactoEmergencia NVARCHAR(200) NULL,
       padecimientos NVARCHAR(MAX) NULL,
       fechaIngreso DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+    );
+  `);
+
+  await pool.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'solicitudes_referencia')
+    CREATE TABLE solicitudes_referencia (
+      id INT IDENTITY(1,1) PRIMARY KEY,
+      idPaciente INT NOT NULL,
+      idMedicoGeneral INT NOT NULL,
+      especialidad NVARCHAR(100) NOT NULL,
+      motivo NVARCHAR(1000) NOT NULL,
+      estado NVARCHAR(30) NOT NULL DEFAULT 'pendiente_asignacion',
+      fechaCita DATE NULL,
+      horaCita TIME NULL,
+      idMedicoEspecialista INT NULL,
+      fechaCreacion DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+      fechaActualizacion DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+      CONSTRAINT FK_solicitudes_paciente
+        FOREIGN KEY (idPaciente) REFERENCES pacientes(id)
+    );
+  `);
+
+  await pool.request().query(`
+    IF NOT EXISTS (
+      SELECT 1 FROM sys.indexes
+      WHERE name = 'IX_solicitudes_paciente_especialidad_activa'
+    )
+    CREATE INDEX IX_solicitudes_paciente_especialidad_activa
+      ON solicitudes_referencia (idPaciente, especialidad, estado);
+  `);
+
+  await pool.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'visitas_medicas')
+    CREATE TABLE visitas_medicas (
+      id INT IDENTITY(1,1) PRIMARY KEY,
+      idSolicitudReferencia INT NOT NULL UNIQUE,
+      idPaciente INT NOT NULL,
+      idMedicoEspecialista INT NOT NULL,
+      fecha DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+      diagnostico NVARCHAR(MAX) NULL,
+      observaciones NVARCHAR(MAX) NULL,
+      estado NVARCHAR(30) NOT NULL DEFAULT 'en_atencion',
+      fechaCompletada DATETIME2 NULL,
+      CONSTRAINT FK_visitas_solicitud
+        FOREIGN KEY (idSolicitudReferencia) REFERENCES solicitudes_referencia(id),
+      CONSTRAINT FK_visitas_paciente
+        FOREIGN KEY (idPaciente) REFERENCES pacientes(id)
+    );
+  `);
+
+  await pool.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'visita_examenes')
+    CREATE TABLE visita_examenes (
+      id INT IDENTITY(1,1) PRIMARY KEY,
+      idVisita INT NOT NULL,
+      tipo NVARCHAR(200) NOT NULL,
+      estado NVARCHAR(30) NOT NULL DEFAULT 'pendiente',
+      fechaSolicitud DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+      CONSTRAINT FK_examenes_visita
+        FOREIGN KEY (idVisita) REFERENCES visitas_medicas(id)
+    );
+  `);
+
+  await pool.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'visita_prescripciones')
+    CREATE TABLE visita_prescripciones (
+      id INT IDENTITY(1,1) PRIMARY KEY,
+      idVisita INT NOT NULL,
+      medicamento NVARCHAR(200) NOT NULL,
+      dosis NVARCHAR(200) NULL,
+      indicaciones NVARCHAR(500) NULL,
+      fechaPrescripcion DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+      CONSTRAINT FK_prescripciones_visita
+        FOREIGN KEY (idVisita) REFERENCES visitas_medicas(id)
     );
   `);
 }

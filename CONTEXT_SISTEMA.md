@@ -67,14 +67,91 @@ todo el sistema sea consistente.
 
 | Módulo | Descripción | Estado |
 |---|---|---|
-| **Pacientes / Fichas médicas** | Registro de internos, historial médico, padecimientos | ⏳ Pendiente de construir |
-| **Solicitudes a especialista** | Médico general refiere a especialidad; fundación asigna horario y médico | ⏳ Pendiente |
-| **Visita médica** | Registro de fecha, motivo, médico, exámenes, diagnóstico, medicamento, observaciones | ⏳ Pendiente |
-| **Laboratorio** | Recepción de órdenes, registro de resultados | ⏳ Pendiente |
-| **Farmacia** | Inventario y dispensación de medicamentos con descuento fundación | ✅ Microservicio construido (`farmacia-service/`) |
+| **Autenticación** | JWT centralizado, registro (solo admin), login, RBAC | ✅ `auth-service/` |
+| **Pacientes / Fichas médicas** | Registro de internos, historial médico, padecimientos | ✅ Dentro de `pacientes-service/` (dominio Paciente) |
+| **Solicitudes a especialista** | Médico general refiere a especialidad; fundación asigna horario y médico | ✅ Dentro de `pacientes-service/` (dominio SolicitudReferencia) |
+| **Visita médica** | Registro de fecha, motivo, médico, exámenes, diagnóstico, medicamento, observaciones | ✅ Dentro de `pacientes-service/` (dominio VisitaMedica) |
+| **Laboratorio** | Recepción de órdenes, registro de resultados | ⏳ Pendiente (exámenes hoy se registran localmente en la visita, sin conexión al servicio) |
+| **Farmacia** | Inventario y dispensación de medicamentos con descuento fundación | ✅ `farmacia-service/` (prescripciones hoy se registran localmente en la visita, sin conexión al servicio) |
 | **Entradas, Salidas y Caja** | Donaciones, cobros a familiares, gastos, pagos a fundación | ⏳ Pendiente |
 | **Reportes** | Costos por cita, análisis médicos, cobros por rango de fecha, pagos a fundación, entradas, exámenes, medicamentos aplicados | ⏳ Pendiente |
 | **Notificaciones** | Correo automático al familiar cuando se crea una solicitud médica | ⏳ Pendiente |
+
+### 3.1 Nota sobre agrupación en `pacientes-service`
+
+Solicitudes de Referencia y Visita Médica **no** viven en microservicios
+separados: van dentro de `pacientes-service` como dominios adicionales
+porque dependen directamente del Paciente y comparten el mismo agregado
+transaccional (crear visita ⇒ transicionar solicitud). Esto sigue siendo
+arquitectura de microservicios; lo que se agrupa es lo fuertemente
+acoplado. Cada dominio conserva sus propias 4 capas dentro del servicio:
+
+```
+pacientes-service/src/
+├── controllers/  PacienteController · SolicitudController · VisitaMedicaController
+├── routes/       pacientesRoutes    · solicitudRoutes     · visitaMedicaRoutes
+├── services/     PacienteService    · SolicitudService    · VisitaMedicaService
+├── repositories/ PacienteRepository · SolicitudRepository · VisitaMedicaRepository
+├── models/       Paciente           · SolicitudReferencia · VisitaMedica
+└── middleware/   authMiddleware · autorizarRoles (copiados desde auth-service)
+```
+
+### 3.2 Flujo Solicitud → Visita (RF-08 a RF-16)
+
+```
+[medico_general]           [coordinador_fundacion | admin]      [medico_especialista]
+POST /api/solicitudes  →   PATCH .../asignar-cita           →   POST .../convertir-a-visita
+pendiente_asignacion       cita_asignada                        en_atencion
+                                                                   │
+                                                                   ├─ PATCH /api/visitas/:id  (diagnóstico + observaciones)
+                                                                   ├─ POST  /api/visitas/:id/examenes
+                                                                   ├─ POST  /api/visitas/:id/prescripciones
+                                                                   └─ POST  /api/visitas/:id/completar
+                                                                                                        │
+                                                                                                        ▼
+                                                                                                    completada
+Cancelación (medico_general | admin) desde cualquier estado previo a completada → cancelada.
+```
+
+**Reglas de negocio implementadas:**
+
+- **RN-02**: Un paciente no puede tener dos solicitudes activas
+  (`pendiente_asignacion`, `cita_asignada`, `en_atencion`) para la misma
+  especialidad simultáneamente. Duplicado → `409`.
+- Completar visita exige `diagnostico` y `observaciones` no vacíos → `400` si faltan.
+- Al completar la visita, la solicitud enlazada se marca `completada`.
+- Estado inmutable una vez `completada` o `cancelada`.
+
+**Tablas SQL Server añadidas a `AsiloCabezaAlgodon`** (bootstrap
+idempotente al arrancar `pacientes-service`):
+
+- `solicitudes_referencia` (id, idPaciente, idMedicoGeneral, especialidad,
+  motivo, estado, fechaCita, horaCita, idMedicoEspecialista, fechaCreacion,
+  fechaActualizacion) + índice `IX_solicitudes_paciente_especialidad_activa`
+  usado por RN-02.
+- `visitas_medicas` (id, idSolicitudReferencia UNIQUE, idPaciente,
+  idMedicoEspecialista, fecha, diagnostico, observaciones, estado,
+  fechaCompletada).
+- `visita_examenes` (id, idVisita, tipo, estado='pendiente', fechaSolicitud).
+- `visita_prescripciones` (id, idVisita, medicamento, dosis, indicaciones,
+  fechaPrescripcion).
+
+### 3.3 Roles
+
+`ROLES_VALIDOS` en `auth-service`:
+`enfermero, medico, medico_general, especialista, medico_especialista,
+farmacia, laboratorio, admin, fundacion, coordinador_fundacion`.
+
+RBAC por endpoint (aplicado con `autorizarRoles(...)`):
+
+| Acción | Roles permitidos |
+|---|---|
+| `POST /api/solicitudes` | `medico_general` |
+| `PATCH /api/solicitudes/:id/asignar-cita` | `coordinador_fundacion`, `admin` |
+| `POST /api/solicitudes/:id/convertir-a-visita` | `medico_especialista` |
+| `PATCH /api/solicitudes/:id/cancelar` | `medico_general`, `admin` |
+| `PATCH /api/visitas/:id`, `POST /api/visitas/:id/{examenes,prescripciones,completar}` | `medico_especialista` |
+| Listar / obtener (`GET`) | cualquier usuario autenticado |
 
 ---
 
@@ -146,19 +223,22 @@ proyecto/
       acepta URL de repositorio.
 
 ### Desarrollo (módulos por construir)
-- [ ] Módulo de Pacientes / Ficha médica.
-- [ ] Módulo de Solicitudes a especialista + asignación de horario
-      (fundación).
-- [ ] Módulo de Visita médica.
-- [ ] Módulo de Laboratorio.
+- [x] Módulo de Pacientes / Ficha médica (dentro de `pacientes-service/`).
+- [x] Módulo de Solicitudes a especialista + asignación de horario
+      (fundación) (dentro de `pacientes-service/`).
+- [x] Módulo de Visita médica (dentro de `pacientes-service/`).
+- [x] Autenticación/autorización unificada por roles en todo el sistema
+      (`auth-service/` con JWT + `autorizarRoles`).
+- [x] Migrar Farmacia de SQLite a la base de datos definitiva
+      (SQL Server en `AsiloCabezaAlgodon`).
+- [ ] Módulo de Laboratorio (hoy: exámenes se registran locales en visita).
+- [ ] Conectar prescripciones de visita a `farmacia-service`
+      (hoy: registro local dentro de la visita).
 - [ ] Módulo de Entradas, Salidas y Caja (donaciones, cobros, gastos).
 - [ ] Módulo de Reportes (los 7 reportes listados en el enunciado).
 - [ ] Servicio de notificaciones por correo a familiares.
 - [ ] Definir cómo se comunican los microservicios entre sí (API Gateway,
       llamadas directas, cola de mensajes, etc.) — aún no decidido.
-- [ ] Autenticación/autorización unificada por roles en todo el sistema.
-- [ ] Migrar Farmacia de SQLite a la base de datos definitiva
-      (MySQL/SQL Server/Oracle).
 
 ### Infraestructura
 - [ ] Resolver instalación de Docker Desktop en la máquina de desarrollo

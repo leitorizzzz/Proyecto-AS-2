@@ -2,7 +2,18 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Usuario = require('../models/Usuario');
 
-const ROLES_VALIDOS = ['enfermero', 'medico', 'especialista', 'farmacia', 'laboratorio', 'admin', 'fundacion'];
+const ROLES_VALIDOS = [
+  'enfermero',
+  'medico',
+  'medico_general',
+  'especialista',
+  'medico_especialista',
+  'farmacia',
+  'laboratorio',
+  'admin',
+  'fundacion',
+  'coordinador_fundacion'
+];
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**

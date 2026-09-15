@@ -4,15 +4,37 @@ const express = require('express');
 const cors = require('cors');
 
 const { inicializarEsquema } = require('./repositories/database');
+
 const PacienteRepository = require('./repositories/PacienteRepository');
+const SolicitudRepository = require('./repositories/SolicitudRepository');
+const VisitaMedicaRepository = require('./repositories/VisitaMedicaRepository');
+
 const PacienteService = require('./services/PacienteService');
+const SolicitudService = require('./services/SolicitudService');
+const VisitaMedicaService = require('./services/VisitaMedicaService');
+
 const PacienteController = require('./controllers/PacienteController');
+const SolicitudController = require('./controllers/SolicitudController');
+const VisitaMedicaController = require('./controllers/VisitaMedicaController');
+
 const crearRutasPacientes = require('./routes/pacientesRoutes');
+const crearRutasSolicitudes = require('./routes/solicitudRoutes');
+const crearRutasVisitas = require('./routes/visitaMedicaRoutes');
 
 // --- Ensamblado de capas ---
+// El servicio de Pacientes agrupa 3 dominios relacionados: Paciente,
+// Solicitud de Referencia y Visita Medica.
 const pacienteRepository = new PacienteRepository();
+const solicitudRepository = new SolicitudRepository();
+const visitaRepository = new VisitaMedicaRepository();
+
 const pacienteService = new PacienteService(pacienteRepository);
+const solicitudService = new SolicitudService(solicitudRepository, pacienteRepository);
+const visitaService = new VisitaMedicaService(visitaRepository, solicitudService);
+
 const pacienteController = new PacienteController(pacienteService);
+const solicitudController = new SolicitudController(solicitudService);
+const visitaController = new VisitaMedicaController(visitaService);
 
 const app = express();
 app.use(cors());
@@ -23,6 +45,8 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api/pacientes', crearRutasPacientes(pacienteController));
+app.use('/api/solicitudes', crearRutasSolicitudes(solicitudController, visitaController));
+app.use('/api/visitas', crearRutasVisitas(visitaController));
 
 const PORT = process.env.PORT || 3002;
 
