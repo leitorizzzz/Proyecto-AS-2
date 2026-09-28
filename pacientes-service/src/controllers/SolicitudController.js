@@ -36,7 +36,9 @@ class SolicitudController {
   crear = async (req, res) => {
     try {
       const idMedicoGeneral = Number(req.usuario.sub);
-      const nueva = await this.service.crear(req.body, idMedicoGeneral);
+      // Pasamos el Authorization al service para que el cliente HTTP hacia
+      // notificaciones-service pueda reusar el JWT del solicitante.
+      const nueva = await this.service.crear(req.body, idMedicoGeneral, req.headers.authorization);
       res.status(201).json(nueva);
     } catch (error) { this._fallo(res, error); }
   };

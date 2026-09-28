@@ -52,9 +52,20 @@ async function inicializarEsquema() {
       direccion NVARCHAR(300) NULL,
       telefono NVARCHAR(30) NULL,
       contactoEmergencia NVARCHAR(200) NULL,
+      familiarEmail NVARCHAR(200) NULL,
       padecimientos NVARCHAR(MAX) NULL,
       fechaIngreso DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
     );
+  `);
+
+  // Evolucion de esquema: agregar familiarEmail a tablas ya creadas
+  // sin dropear datos. Idempotente.
+  await pool.request().query(`
+    IF NOT EXISTS (
+      SELECT 1 FROM sys.columns
+      WHERE object_id = OBJECT_ID('pacientes') AND name = 'familiarEmail'
+    )
+    ALTER TABLE pacientes ADD familiarEmail NVARCHAR(200) NULL;
   `);
 
   await pool.request().query(`

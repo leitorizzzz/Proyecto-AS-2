@@ -12,9 +12,10 @@ const HORA_REGEX = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
  * especialidad simultaneamente.
  */
 class SolicitudService {
-  constructor(solicitudRepository, pacienteRepository) {
+  constructor(solicitudRepository, pacienteRepository, notificacionesClient) {
     this.repo = solicitudRepository;
     this.pacienteRepo = pacienteRepository;
+    this.notificacionesClient = notificacionesClient; // opcional
   }
 
   listar() {
@@ -35,7 +36,7 @@ class SolicitudService {
     return this.repo.obtenerPorPaciente(idPaciente);
   }
 
-  async crear({ idPaciente, especialidad, motivo }, idMedicoGeneral) {
+  async crear({ idPaciente, especialidad, motivo }, idMedicoGeneral, authHeader) {
     if (!idPaciente || Number.isNaN(Number(idPaciente))) {
       throw Object.assign(new Error('idPaciente es requerido'), { status: 400 });
     }
@@ -73,7 +74,15 @@ class SolicitudService {
       motivo: motivo.trim(),
       estado: SolicitudReferencia.ESTADOS.PENDIENTE_ASIGNACION
     });
-    return this.repo.guardar(solicitud);
+    const guardada = await this.repo.guardar(solicitud);
+
+    // Fire-and-forget: notificar al familiar. Errores no bloquean la creacion.
+    if (this.notificacionesClient) {
+      this.notificacionesClient
+        .enviarSolicitud({ paciente, especialidad: guardada.especialidad, motivo: guardada.motivo }, authHeader)
+        .catch(err => console.warn(`[notificaciones] ${err.message}`));
+    }
+    return guardada;
   }
 
   async asignarCita(id, { fechaCita, horaCita, idMedicoEspecialista }) {

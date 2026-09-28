@@ -12,6 +12,7 @@ const VisitaMedicaRepository = require('./repositories/VisitaMedicaRepository');
 const PacienteService = require('./services/PacienteService');
 const SolicitudService = require('./services/SolicitudService');
 const VisitaMedicaService = require('./services/VisitaMedicaService');
+const NotificacionesClient = require('./services/NotificacionesClient');
 
 const PacienteController = require('./controllers/PacienteController');
 const SolicitudController = require('./controllers/SolicitudController');
@@ -28,8 +29,12 @@ const pacienteRepository = new PacienteRepository();
 const solicitudRepository = new SolicitudRepository();
 const visitaRepository = new VisitaMedicaRepository();
 
+const notificacionesClient = new NotificacionesClient({
+  baseUrl: process.env.NOTIFICACIONES_URL
+});
+
 const pacienteService = new PacienteService(pacienteRepository);
-const solicitudService = new SolicitudService(solicitudRepository, pacienteRepository);
+const solicitudService = new SolicitudService(solicitudRepository, pacienteRepository, notificacionesClient);
 const visitaService = new VisitaMedicaService(visitaRepository, solicitudService);
 
 const pacienteController = new PacienteController(pacienteService);

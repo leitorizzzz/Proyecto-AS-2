@@ -14,6 +14,7 @@ class Paciente {
     direccion,
     telefono,
     contactoEmergencia,
+    familiarEmail,
     padecimientos,
     fechaIngreso
   }) {
@@ -26,6 +27,7 @@ class Paciente {
     this.direccion = direccion || null;
     this.telefono = telefono || null;
     this.contactoEmergencia = contactoEmergencia || null;
+    this.familiarEmail = familiarEmail || null;
     this.padecimientos = padecimientos || null;
     this.fechaIngreso = fechaIngreso || new Date().toISOString();
   }

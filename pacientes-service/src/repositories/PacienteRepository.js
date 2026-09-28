@@ -17,6 +17,7 @@ class PacienteRepository {
       .input('direccion', sql.NVarChar(300), p.direccion)
       .input('telefono', sql.NVarChar(30), p.telefono)
       .input('contactoEmergencia', sql.NVarChar(200), p.contactoEmergencia)
+      .input('familiarEmail', sql.NVarChar(200), p.familiarEmail)
       .input('padecimientos', sql.NVarChar(sql.MAX), p.padecimientos);
   }
 
@@ -49,11 +50,11 @@ class PacienteRepository {
       .query(`
         INSERT INTO pacientes
           (nombres, apellidos, fechaNacimiento, genero, dpi,
-           direccion, telefono, contactoEmergencia, padecimientos)
+           direccion, telefono, contactoEmergencia, familiarEmail, padecimientos)
         OUTPUT INSERTED.id
         VALUES
           (@nombres, @apellidos, @fechaNacimiento, @genero, @dpi,
-           @direccion, @telefono, @contactoEmergencia, @padecimientos)
+           @direccion, @telefono, @contactoEmergencia, @familiarEmail, @padecimientos)
       `);
     return this.obtenerPorId(result.recordset[0].id);
   }
@@ -72,6 +73,7 @@ class PacienteRepository {
           direccion = @direccion,
           telefono = @telefono,
           contactoEmergencia = @contactoEmergencia,
+          familiarEmail = @familiarEmail,
           padecimientos = @padecimientos
         WHERE id = @id
       `);

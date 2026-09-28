@@ -4,194 +4,132 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Asilo Cabeza de Algodón — Sistema</title>
-<style>
-  :root {
-    --bg: #F6F5F1;
-    --card: #FFFFFF;
-    --ink: #1E2A24;
-    --muted: #6B7570;
-    --line: #DEDBD1;
-    --accent: #0F6E56;
-    --accent-dark: #0B5643;
-    --accent-light: #E1F5EE;
-    --danger: #A32D2D;
-    --danger-light: #FBEAEA;
-    --ok: #2F7D32;
-    --ok-light: #E8F5E9;
-  }
-  * { box-sizing: border-box; }
-  body {
-    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-    background: var(--bg);
-    color: var(--ink);
-    margin: 0;
-    font-size: 14px;
-  }
-  .hidden { display: none !important; }
-
-  /* ---------- Login ---------- */
-  #vistaLogin {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-  }
-  .login-card {
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 32px;
-    width: 100%;
-    max-width: 380px;
-    box-shadow: 0 2px 12px rgba(30,42,36,0.06);
-  }
-  .login-card .eyebrow {
-    font-size: 11px; text-transform: uppercase; letter-spacing: 0.09em;
-    color: var(--accent); font-weight: 700; margin-bottom: 6px;
-  }
-  .login-card h1 { font-size: 21px; margin: 0 0 4px; font-weight: 600; }
-  .login-card p.sub { color: var(--muted); margin: 0 0 24px; font-size: 13px; }
-
-  /* ---------- Layout app ---------- */
-  header.topbar {
-    background: var(--card);
-    border-bottom: 1px solid var(--line);
-    padding: 14px 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-  .topbar .marca { font-weight: 600; font-size: 15px; }
-  .topbar .marca span { color: var(--accent); }
-  .usuario-box { display: flex; align-items: center; gap: 12px; font-size: 13px; }
-  .usuario-box .nombre { font-weight: 600; }
-  .badge {
-    background: var(--accent-light); color: var(--accent-dark);
-    border-radius: 20px; padding: 3px 10px; font-size: 11px;
-    font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
-  }
-
-  nav.tabs {
-    display: flex; gap: 4px; padding: 0 24px;
-    background: var(--card); border-bottom: 1px solid var(--line);
-  }
-  nav.tabs button {
-    background: none; border: none; border-bottom: 2px solid transparent;
-    padding: 12px 16px; font-size: 14px; font-family: inherit;
-    color: var(--muted); cursor: pointer; font-weight: 500;
-  }
-  nav.tabs button:hover { color: var(--ink); }
-  nav.tabs button.activo { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
-
-  main { max-width: 1080px; margin: 0 auto; padding: 24px 20px 60px; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
-  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
-
-  .card {
-    background: var(--card); border: 1px solid var(--line);
-    border-radius: 10px; padding: 20px;
-  }
-  .card h2 {
-    font-size: 14px; margin: 0 0 16px; font-weight: 600;
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  }
-  .card h2 .contador { color: var(--muted); font-weight: 500; font-size: 12px; }
-
-  label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 4px; font-weight: 500; }
-  input, select, textarea {
-    width: 100%; padding: 9px 11px; font-size: 14px; font-family: inherit;
-    border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink);
-  }
-  input:focus, select:focus, textarea:focus {
-    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light);
-  }
-  .fila { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-
-  button.btn {
-    background: var(--accent); color: #fff; border: none; border-radius: 6px;
-    padding: 10px 18px; font-size: 14px; font-family: inherit; font-weight: 600;
-    cursor: pointer; margin-top: 18px;
-  }
-  button.btn:hover { background: var(--accent-dark); }
-  button.btn:disabled { opacity: 0.55; cursor: not-allowed; }
-  button.btn.ancho { width: 100%; }
-  button.link {
-    background: none; border: none; color: var(--muted); font-family: inherit;
-    font-size: 13px; cursor: pointer; text-decoration: underline; padding: 0;
-  }
-  button.link:hover { color: var(--danger); }
-
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th {
-    text-align: left; font-size: 11px; text-transform: uppercase;
-    letter-spacing: 0.05em; color: var(--muted); font-weight: 600;
-    padding: 8px 10px; border-bottom: 1px solid var(--line);
-  }
-  td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  tr:last-child td { border-bottom: none; }
-  .tabla-wrap { overflow-x: auto; }
-  .vacio { color: var(--muted); font-style: italic; padding: 16px 10px; font-size: 13px; }
-
-  .msg { padding: 10px 12px; border-radius: 6px; font-size: 13px; margin-top: 14px; }
-  .msg.error { background: var(--danger-light); color: var(--danger); border: 1px solid #EBC7C7; }
-  .msg.ok { background: var(--ok-light); color: var(--ok); border: 1px solid #C6E3C8; }
-  .pill-stock { font-weight: 600; }
-  .pill-stock.bajo { color: var(--danger); }
-  .nota {
-    font-size: 12px; color: var(--muted); margin-top: 14px;
-    padding-top: 14px; border-top: 1px solid var(--line);
-  }
-</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
 <!-- ==================== LOGIN ==================== -->
-<div id="vistaLogin">
-  <form class="login-card" id="formLogin">
-    <div class="eyebrow">Asilo Cabeza de Algodón</div>
-    <h1>Iniciar sesión</h1>
-    <p class="sub">Sistema de administración del asilo</p>
+<div id="vistaLogin" class="login-page">
+  <form class="login-card" id="formLogin" autocomplete="on">
+    <div class="brand-mark">Cabeza de Algodón &middot; Asilo</div>
+    <h1>Bienvenido de vuelta</h1>
+    <p class="sub">Sistema de administración interna. Este acceso es solo para personal autorizado.</p>
 
-    <label for="email">Correo electrónico</label>
+    <label for="email">Correo</label>
     <input type="email" id="email" value="admin@asilo.gt" required autocomplete="username">
 
     <label for="password">Contraseña</label>
-    <input type="password" id="password" required autocomplete="current-password">
+    <input type="password" id="password" required autocomplete="current-password" placeholder="Escriba su contraseña">
 
-    <button type="submit" class="btn ancho" id="btnLogin">Entrar</button>
+    <button type="submit" class="btn wide" id="btnLogin">Entrar</button>
     <div id="msgLogin"></div>
   </form>
 </div>
 
 <!-- ==================== APP ==================== -->
-<div id="vistaApp" class="hidden">
-  <header class="topbar">
-    <div class="marca">Asilo <span>Cabeza de Algodón</span></div>
-    <div class="usuario-box">
-      <span class="nombre" id="usuarioNombre"></span>
-      <span class="badge" id="usuarioRol"></span>
-      <button class="link" id="btnSalir">Cerrar sesión</button>
+<div id="vistaApp" class="app-shell hidden">
+
+  <aside class="sidebar">
+    <div class="brand">
+      Cabeza de Algodón
+      <small>Sistema de administración del asilo</small>
     </div>
-  </header>
 
-  <nav class="tabs">
-    <button data-tab="pacientes" class="activo">Pacientes</button>
-    <button data-tab="farmacia">Farmacia</button>
-  </nav>
+    <nav class="side">
+      <div class="section-label">Cuidado</div>
+      <ul>
+        <li><button class="tab activo" data-tab="dashboard">Panel</button></li>
+        <li><button class="tab" data-tab="pacientes">Pacientes</button></li>
+        <li><button class="tab" data-tab="solicitudes">Solicitudes</button></li>
+        <li><button class="tab" data-tab="visitas">Visitas</button></li>
+      </ul>
 
-  <main>
-    <!-- ---------- PACIENTES ---------- -->
-    <section id="tabPacientes">
-      <div class="grid">
+      <div class="section-label">Servicios</div>
+      <ul>
+        <li><button class="tab" data-tab="farmacia">Farmacia</button></li>
+        <li><button class="tab" data-tab="laboratorio">Laboratorio</button></li>
+      </ul>
+
+      <div class="section-label">Administración</div>
+      <ul>
+        <li><button class="tab" data-tab="financiero">Financiero</button></li>
+        <li><button class="tab" data-tab="reportes">Reportes</button></li>
+      </ul>
+    </nav>
+
+    <div class="user-block">
+      <div class="who" id="usuarioNombre">—</div>
+      <div class="rol" id="usuarioRol">—</div>
+      <div style="margin-top:14px">
+        <button class="btn-link" id="btnSalir">Cerrar sesión</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="stage">
+
+    <!-- ================ DASHBOARD ================ -->
+    <section id="tabDashboard">
+      <header class="stage-head">
+        <div>
+          <div class="eyebrow">Panel general</div>
+          <h1>Buenas, <span id="saludoNombre">personal</span>.</h1>
+          <p class="lede">Un resumen del estado del asilo hoy: los residentes que ya están registrados, las solicitudes médicas pendientes y las visitas de especialistas activas.</p>
+        </div>
+      </header>
+
+      <div class="grid-3">
+        <div class="kpi">
+          <div class="kpi-label">Pacientes registrados</div>
+          <div class="kpi-value num" id="kpiPacientes">—</div>
+          <div class="kpi-hint">personas bajo cuidado del asilo</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Solicitudes activas</div>
+          <div class="kpi-value num" id="kpiSolicitudesActivas">—</div>
+          <div class="kpi-hint">pendientes de asignación o en atención</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Visitas en atención</div>
+          <div class="kpi-value num" id="kpiVisitasActivas">—</div>
+          <div class="kpi-hint">consultas de especialista en curso</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:22px">
+        <h3>Solicitudes recientes</h3>
+        <p class="hint">Últimas ocho solicitudes de referencia a especialista, sin importar su estado.</p>
+        <div class="tabla-wrap">
+          <table>
+            <thead>
+              <tr><th>Paciente</th><th>Especialidad</th><th>Estado</th><th>Creada</th></tr>
+            </thead>
+            <tbody id="tbodyDashSolic"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================ PACIENTES ================ -->
+    <section id="tabPacientes" class="hidden">
+      <header class="stage-head">
+        <div>
+          <div class="eyebrow">Fichas médicas</div>
+          <h1>Pacientes</h1>
+          <p class="lede">Residentes bajo cuidado del asilo. El DPI se usa como identificador único y el correo del familiar recibe los avisos automáticos.</p>
+        </div>
+      </header>
+
+      <div class="grid-split">
         <div class="card">
-          <h2>Pacientes registrados <span class="contador" id="contadorPacientes"></span></h2>
+          <h3>Personas registradas <span class="contador" id="contadorPacientes"></span></h3>
           <div class="tabla-wrap">
             <table>
               <thead>
-                <tr><th>#</th><th>Nombre</th><th>DPI</th><th>Género</th><th>Padecimientos</th></tr>
+                <tr><th>Paciente</th><th>DPI</th><th>Nacimiento</th><th>Ingreso</th></tr>
               </thead>
               <tbody id="tbodyPacientes"></tbody>
             </table>
@@ -200,9 +138,10 @@
         </div>
 
         <div class="card">
-          <h2>Registrar paciente</h2>
+          <h3>Registrar paciente</h3>
+          <p class="hint">Los datos personales del paciente y el correo del familiar responsable.</p>
           <form id="formPaciente">
-            <div class="fila">
+            <div class="fila-2">
               <div>
                 <label for="pNombres">Nombres</label>
                 <input id="pNombres" required>
@@ -212,7 +151,7 @@
                 <input id="pApellidos" required>
               </div>
             </div>
-            <div class="fila">
+            <div class="fila-2">
               <div>
                 <label for="pFechaNac">Fecha de nacimiento</label>
                 <input type="date" id="pFechaNac" required>
@@ -229,22 +168,25 @@
             <label for="pDpi">DPI (13 dígitos)</label>
             <input id="pDpi" inputmode="numeric" maxlength="13" placeholder="1234567890123" required>
 
-            <div class="fila">
+            <div class="fila-2">
               <div>
                 <label for="pTelefono">Teléfono</label>
                 <input id="pTelefono">
               </div>
               <div>
                 <label for="pContacto">Contacto de emergencia</label>
-                <input id="pContacto">
+                <input id="pContacto" placeholder="Nombre y teléfono del familiar">
               </div>
             </div>
+
+            <label for="pFamiliarEmail">Correo del familiar</label>
+            <input id="pFamiliarEmail" type="email" placeholder="familiar@correo.com">
 
             <label for="pDireccion">Dirección</label>
             <input id="pDireccion">
 
-            <label for="pPadecimientos">Padecimientos</label>
-            <textarea id="pPadecimientos" rows="2"></textarea>
+            <label for="pPadecimientos">Padecimientos conocidos</label>
+            <textarea id="pPadecimientos" rows="2" placeholder="Hipertensión, diabetes, artritis..."></textarea>
 
             <button type="submit" class="btn" id="btnCrearPaciente">Registrar paciente</button>
             <div id="msgPaciente"></div>
@@ -253,24 +195,170 @@
       </div>
     </section>
 
-    <!-- ---------- FARMACIA ---------- -->
-    <section id="tabFarmacia" class="hidden">
-      <div class="grid">
+    <!-- ================ SOLICITUDES ================ -->
+    <section id="tabSolicitudes" class="hidden">
+      <header class="stage-head">
+        <div>
+          <div class="eyebrow">Referencia a especialista</div>
+          <h1>Solicitudes médicas</h1>
+          <p class="lede">Trazabilidad completa de cada solicitud: creación por el médico general, asignación de cita por la fundación, conversión a visita, cierre.</p>
+        </div>
+      </header>
+
+      <div class="grid-split">
         <div class="card">
-          <h2>Inventario de medicamentos <span class="contador" id="contadorMedicamentos"></span></h2>
+          <h3>Bandeja <span class="contador" id="contadorSolicitudes"></span></h3>
+          <p class="hint">Todas las solicitudes ordenadas por creación más reciente. Los estados coloreados indican en qué etapa se encuentran.</p>
           <div class="tabla-wrap">
             <table>
               <thead>
-                <tr><th>#</th><th>Medicamento</th><th>Presentación</th><th>Stock</th><th>Precio</th></tr>
+                <tr>
+                  <th>Paciente</th>
+                  <th>Especialidad</th>
+                  <th>Estado</th>
+                  <th>Cita</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tbodySolicitudes"></tbody>
+            </table>
+          </div>
+          <div id="vacioSolicitudes" class="vacio hidden">Aún no hay solicitudes registradas.</div>
+        </div>
+
+        <div class="card">
+          <h3>Nueva solicitud</h3>
+          <p class="hint">Solo el médico general puede crear una nueva referencia. La fundación asignará luego médico y horario.</p>
+          <form id="formSolicitud">
+            <label for="sPaciente">Paciente</label>
+            <select id="sPaciente" required></select>
+
+            <label for="sEspecialidad">Especialidad</label>
+            <input id="sEspecialidad" list="listaEspecialidades" placeholder="cardiologia, neurologia, geriatria..." required>
+            <datalist id="listaEspecialidades">
+              <option value="cardiologia">
+              <option value="neurologia">
+              <option value="geriatria">
+              <option value="oftalmologia">
+              <option value="traumatologia">
+              <option value="dermatologia">
+              <option value="endocrinologia">
+            </datalist>
+
+            <label for="sMotivo">Motivo</label>
+            <textarea id="sMotivo" rows="3" required placeholder="Descripción del motivo de la referencia"></textarea>
+
+            <button type="submit" class="btn" id="btnCrearSolicitud">Crear solicitud</button>
+            <div id="msgSolicitud"></div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================ VISITAS ================ -->
+    <section id="tabVisitas" class="hidden">
+      <header class="stage-head">
+        <div>
+          <div class="eyebrow">Consulta con especialista</div>
+          <h1>Visitas médicas</h1>
+          <p class="lede">Registro clínico de cada visita. Solo el médico especialista puede escribir el diagnóstico, agregar exámenes, prescribir medicamentos y cerrar la visita.</p>
+        </div>
+      </header>
+
+      <div class="card">
+        <h3>Elegir visita</h3>
+        <p class="hint">Selecciona una visita activa para trabajar sobre ella. Las visitas se crean al convertir una solicitud con cita asignada desde la bandeja de solicitudes.</p>
+        <label for="selectorVisita">Visita</label>
+        <select id="selectorVisita"></select>
+      </div>
+
+      <div id="detalleVisita" class="card hidden" style="margin-top:18px">
+        <h3>
+          <span id="visitaTitulo">Visita</span>
+          <span class="chip" id="visitaEstadoChip">—</span>
+        </h3>
+        <p class="hint" id="visitaMeta"></p>
+
+        <div class="visita-panel" style="margin-top:14px">
+          <div>
+            <div class="subcard">
+              <h4>Notas clínicas</h4>
+              <label for="vDiagnostico">Diagnóstico</label>
+              <textarea id="vDiagnostico" rows="3"></textarea>
+              <label for="vObservaciones">Observaciones</label>
+              <textarea id="vObservaciones" rows="3"></textarea>
+              <button class="btn" id="btnGuardarClinico">Guardar cambios</button>
+              <div id="msgClinico"></div>
+            </div>
+
+            <div class="subcard" style="margin-top:16px">
+              <h4>Cerrar visita</h4>
+              <p class="tiny">Para marcar la visita como completa hay que tener diagnóstico y observaciones registrados. Al completarla, la solicitud enlazada también pasa a completada.</p>
+              <button class="btn sage" id="btnCompletarVisita">Marcar visita como completa</button>
+              <div id="msgCompletar"></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="subcard">
+              <h4>Exámenes solicitados</h4>
+              <ul id="listaExamenes"></ul>
+              <label for="exTipo">Nuevo examen</label>
+              <input id="exTipo" placeholder="Hematología completa, EKG, uroanálisis...">
+              <button class="btn ghost small" id="btnAgregarExamen" style="margin-top:10px">Agregar examen</button>
+              <div id="msgExamen"></div>
+            </div>
+
+            <div class="subcard" style="margin-top:16px">
+              <h4>Prescripciones</h4>
+              <ul id="listaPrescripciones"></ul>
+              <label for="rxMedicamento">Medicamento</label>
+              <input id="rxMedicamento" placeholder="Losartán 50mg">
+              <div class="fila-2">
+                <div>
+                  <label for="rxDosis">Dosis</label>
+                  <input id="rxDosis" placeholder="1 tab / 24h">
+                </div>
+                <div>
+                  <label for="rxIndicaciones">Indicaciones</label>
+                  <input id="rxIndicaciones" placeholder="Con agua, en ayunas">
+                </div>
+              </div>
+              <button class="btn ghost small" id="btnAgregarPrescripcion" style="margin-top:10px">Agregar prescripción</button>
+              <div id="msgRx"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================ FARMACIA ================ -->
+    <section id="tabFarmacia" class="hidden">
+      <header class="stage-head">
+        <div>
+          <div class="eyebrow">Inventario y dispensación</div>
+          <h1>Farmacia</h1>
+          <p class="lede">Control de medicamentos y dispensación con el descuento del 20% que la fundación otorga a los residentes.</p>
+        </div>
+      </header>
+
+      <div class="grid-split">
+        <div class="card">
+          <h3>Inventario <span class="contador" id="contadorMedicamentos"></span></h3>
+          <div class="tabla-wrap">
+            <table>
+              <thead>
+                <tr><th>Medicamento</th><th>Presentación</th><th>Stock</th><th class="right">Precio (Q)</th></tr>
               </thead>
               <tbody id="tbodyMedicamentos"></tbody>
             </table>
           </div>
-          <div id="vacioMedicamentos" class="vacio hidden">No hay medicamentos en inventario.</div>
+          <div id="vacioMedicamentos" class="vacio hidden">Sin medicamentos en inventario.</div>
         </div>
 
         <div class="card">
-          <h2>Dispensar medicamento</h2>
+          <h3>Dispensar</h3>
+          <p class="hint">La fundación aplica un 20% de descuento sobre el precio de lista. El costo final lo calcula el microservicio de farmacia.</p>
           <form id="formDispensar">
             <label for="dPaciente">Paciente</label>
             <select id="dPaciente" required></select>
@@ -283,23 +371,16 @@
 
             <button type="submit" class="btn" id="btnDispensar">Dispensar</button>
             <div id="msgDispensar"></div>
-
-            <p class="nota">
-              La fundación aplica un <strong>20% de descuento</strong> sobre el precio de
-              lista. El costo final lo calcula el microservicio de farmacia.
-            </p>
           </form>
         </div>
       </div>
 
       <div class="card" style="margin-top:20px">
-        <h2>Historial de dispensaciones del paciente seleccionado
-          <span class="contador" id="totalGastado"></span>
-        </h2>
+        <h3>Historial del paciente seleccionado <span class="contador" id="totalGastado"></span></h3>
         <div class="tabla-wrap">
           <table>
             <thead>
-              <tr><th>#</th><th>Medicamento</th><th>Cantidad</th><th>Costo total</th><th>Fecha</th></tr>
+              <tr><th>Fecha</th><th>Medicamento</th><th>Cantidad</th><th class="right">Costo (Q)</th></tr>
             </thead>
             <tbody id="tbodyHistorial"></tbody>
           </table>
@@ -307,295 +388,278 @@
         <div id="vacioHistorial" class="vacio hidden">Sin dispensaciones para este paciente.</div>
       </div>
     </section>
+
+    <!-- ================ LABORATORIO ================ -->
+    <section id="tabLaboratorio" class="hidden">
+      <header class="stage-head">
+        <div>
+          <div class="eyebrow">Órdenes y resultados</div>
+          <h1>Laboratorio</h1>
+          <p class="lede">Órdenes de examen que llegan desde las visitas médicas, con espacio para registrar el resultado y ver el costo con descuento aplicado.</p>
+        </div>
+      </header>
+
+      <div class="grid-split">
+        <div class="card">
+          <h3>Órdenes pendientes <span class="contador" id="contadorOrdenes"></span></h3>
+          <p class="hint">Exámenes solicitados en visitas médicas que aún no tienen resultado registrado.</p>
+          <div class="tabla-wrap">
+            <table>
+              <thead>
+                <tr><th>#</th><th>Paciente</th><th>Examen</th><th>Solicitado</th><th>Acciones</th></tr>
+              </thead>
+              <tbody id="tbodyOrdenes"></tbody>
+            </table>
+          </div>
+          <div id="vacioOrdenes" class="vacio hidden">No hay órdenes pendientes.</div>
+        </div>
+
+        <div class="card">
+          <h3>Registrar resultado</h3>
+          <p class="hint">Elige la orden desde la tabla o busca por número de examen.</p>
+          <form id="formResultado">
+            <label for="rIdExamen">Número de examen</label>
+            <input type="number" id="rIdExamen" min="1" required>
+
+            <label for="rTipo">Tipo de resultado</label>
+            <select id="rTipo">
+              <option value="texto">Texto (interpretación)</option>
+              <option value="numerico">Numérico</option>
+              <option value="archivo">Archivo adjunto</option>
+              <option value="mixto">Mixto</option>
+            </select>
+
+            <label for="rTexto">Interpretación / texto</label>
+            <textarea id="rTexto" rows="3" placeholder="Descripción del resultado"></textarea>
+
+            <div class="fila-2">
+              <div>
+                <label for="rNumerico">Valor numérico</label>
+                <input type="number" step="0.01" id="rNumerico" placeholder="Ej. 5.6">
+              </div>
+              <div>
+                <label for="rArchivo">Archivo adjunto (URL)</label>
+                <input id="rArchivo" placeholder="https://…">
+              </div>
+            </div>
+
+            <button type="submit" class="btn" id="btnRegistrarResultado">Registrar resultado</button>
+            <div id="msgResultado"></div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================ FINANCIERO ================ -->
+    <section id="tabFinanciero" class="hidden">
+      <header class="stage-head">
+        <div>
+          <div class="eyebrow">Entradas, salidas y caja</div>
+          <h1>Financiero</h1>
+          <p class="lede">Estado de cuenta por paciente, cuotas mensuales, donaciones, gastos operativos y pagos a la fundación.</p>
+        </div>
+      </header>
+
+      <div class="card">
+        <h3>Estado de cuenta</h3>
+        <p class="hint">Elige un paciente para ver cargos pendientes, cuotas y saldo total.</p>
+        <label for="fPaciente">Paciente</label>
+        <select id="fPaciente"></select>
+        <div id="estadoCuentaBox" style="margin-top:18px" class="hidden">
+          <div class="grid-3">
+            <div class="kpi">
+              <div class="kpi-label">Saldo total</div>
+              <div class="kpi-value num" id="kpiSaldoTotal">Q 0.00</div>
+              <div class="kpi-hint" id="kpiAlerta"></div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Cargos por servicios</div>
+              <div class="kpi-value num" id="kpiSaldoCargos">Q 0.00</div>
+              <div class="kpi-hint" id="kpiCantCargos"></div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Cuotas pendientes</div>
+              <div class="kpi-value num" id="kpiSaldoCuotas">Q 0.00</div>
+              <div class="kpi-hint" id="kpiCantCuotas"></div>
+            </div>
+          </div>
+
+          <div class="grid-split" style="margin-top:20px">
+            <div class="subcard">
+              <h4>Cargos</h4>
+              <div class="tabla-wrap">
+                <table>
+                  <thead><tr><th>Fecha</th><th>Concepto</th><th>Estado</th><th class="right">Monto</th></tr></thead>
+                  <tbody id="tbodyCargos"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="subcard">
+              <h4>Cuotas</h4>
+              <div class="tabla-wrap">
+                <table>
+                  <thead><tr><th>Período</th><th>Estado</th><th>Fecha pago</th><th class="right">Monto</th></tr></thead>
+                  <tbody id="tbodyCuotas"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-split" style="margin-top:20px">
+        <div class="card">
+          <h3>Registrar cargo</h3>
+          <p class="hint">Un cargo por servicio prestado al paciente. Genera saldo pendiente.</p>
+          <form id="formCargo">
+            <label for="cPaciente">Paciente</label>
+            <select id="cPaciente" required></select>
+            <label for="cConcepto">Concepto</label>
+            <input id="cConcepto" required placeholder="Consulta especialista, medicamentos, examen...">
+            <label for="cMonto">Monto (Q)</label>
+            <input type="number" id="cMonto" step="0.01" min="0.01" required>
+            <button type="submit" class="btn">Registrar cargo</button>
+            <div id="msgCargo"></div>
+          </form>
+        </div>
+        <div class="card">
+          <h3>Registrar / pagar cuota</h3>
+          <p class="hint">Si la cuota del período no existe, se crea y se marca pagada en un mismo paso.</p>
+          <form id="formCuota">
+            <label for="qPaciente">Paciente</label>
+            <select id="qPaciente" required></select>
+            <div class="fila-2">
+              <div>
+                <label for="qMes">Mes</label>
+                <input type="number" id="qMes" min="1" max="12" required>
+              </div>
+              <div>
+                <label for="qAnio">Año</label>
+                <input type="number" id="qAnio" min="2020" max="2100" value="2026" required>
+              </div>
+            </div>
+            <label for="qMonto">Monto (Q)</label>
+            <input type="number" id="qMonto" step="0.01" min="0.01" required>
+            <button type="submit" class="btn">Registrar pago</button>
+            <div id="msgCuota"></div>
+          </form>
+        </div>
+      </div>
+
+      <div class="grid-split" style="margin-top:20px">
+        <div class="card">
+          <h3>Donaciones <span class="contador" id="contadorDonaciones"></span></h3>
+          <div class="tabla-wrap">
+            <table>
+              <thead><tr><th>Fecha</th><th>Donante</th><th>Tipo</th><th>Concepto</th><th class="right">Monto</th></tr></thead>
+              <tbody id="tbodyDonaciones"></tbody>
+            </table>
+          </div>
+          <div id="vacioDonaciones" class="vacio hidden">Sin donaciones registradas.</div>
+        </div>
+        <div class="card">
+          <h3>Nueva donación</h3>
+          <p class="hint">Registra primero al donante si no existe todavía.</p>
+          <form id="formDonante" style="margin-bottom:14px">
+            <label for="dnNombre">Nombre del donante</label>
+            <input id="dnNombre" required>
+            <div class="fila-2">
+              <div>
+                <label for="dnTelefono">Teléfono</label>
+                <input id="dnTelefono">
+              </div>
+              <div>
+                <label for="dnEmail">Correo</label>
+                <input id="dnEmail" type="email">
+              </div>
+            </div>
+            <button type="submit" class="btn ghost small">Guardar donante</button>
+            <div id="msgDonante"></div>
+          </form>
+          <form id="formDonacion">
+            <label for="ddDonante">Donante</label>
+            <select id="ddDonante" required></select>
+            <label for="ddMonto">Monto (Q)</label>
+            <input type="number" id="ddMonto" step="0.01" min="0.01" required>
+            <div class="fila-2">
+              <div>
+                <label for="ddTipo">Tipo</label>
+                <select id="ddTipo">
+                  <option value="dinero">Dinero</option>
+                  <option value="bienes">Bienes</option>
+                  <option value="otro">Otro</option>
+                </select>
+              </div>
+              <div>
+                <label for="ddConcepto">Concepto</label>
+                <input id="ddConcepto" placeholder="Aporte mensual, ropa, alimentos...">
+              </div>
+            </div>
+            <button type="submit" class="btn">Registrar donación</button>
+            <div id="msgDonacion"></div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================ REPORTES ================ -->
+    <section id="tabReportes" class="hidden">
+      <header class="stage-head">
+        <div>
+          <div class="eyebrow">Análisis y auditoría</div>
+          <h1>Reportes</h1>
+          <p class="lede">Los siete reportes del enunciado. Elige rango de fechas y descarga en PDF o Excel; el JSON se muestra en pantalla para revisar antes de exportar.</p>
+        </div>
+      </header>
+
+      <div class="card">
+        <h3>Generar reporte</h3>
+        <div class="fila-3">
+          <div>
+            <label for="repTipo">Reporte</label>
+            <select id="repTipo">
+              <option value="entradas">Entradas de dinero</option>
+              <option value="cobros-por-rango">Cobros por rango de fecha</option>
+              <option value="pagos-fundacion">Pagos a la fundación</option>
+              <option value="costos-por-paciente">Costos por paciente</option>
+              <option value="analisis-medico">Análisis médico</option>
+              <option value="examenes">Exámenes solicitados</option>
+              <option value="medicamentos-aplicados">Medicamentos aplicados</option>
+            </select>
+          </div>
+          <div>
+            <label for="repDesde">Desde</label>
+            <input type="date" id="repDesde">
+          </div>
+          <div>
+            <label for="repHasta">Hasta</label>
+            <input type="date" id="repHasta">
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+          <button class="btn" id="btnRepVer">Ver en pantalla</button>
+          <button class="btn ghost" id="btnRepPdf">Descargar PDF</button>
+          <button class="btn ghost" id="btnRepExcel">Descargar Excel</button>
+        </div>
+        <div id="msgReporte"></div>
+      </div>
+
+      <div class="card hidden" id="repResultCard" style="margin-top:18px">
+        <h3 id="repResultTitulo">—</h3>
+        <p class="hint" id="repResultMeta"></p>
+        <div class="tabla-wrap">
+          <table>
+            <thead><tr id="repThead"></tr></thead>
+            <tbody id="repTbody"></tbody>
+            <tfoot id="repTfoot"></tfoot>
+          </table>
+        </div>
+      </div>
+    </section>
+
   </main>
 </div>
 
-<script>
-/* ============================================================
-   Configuracion de endpoints.
-   El host se deriva de la URL del navegador, asi la misma pagina
-   funciona servida desde localhost o desde el servidor Debian.
-   ============================================================ */
-const HOST = window.location.hostname || 'localhost';
-const API = {
-  auth:      `http://${HOST}:3000/api/auth`,
-  pacientes: `http://${HOST}:3002/api/pacientes`,
-  farmacia:  `http://${HOST}:3001/api/farmacia`
-};
-
-/* El JWT vive SOLO en memoria: se pierde al recargar la pagina.
-   No se usa localStorage a proposito. */
-let token = null;
-let usuario = null;
-
-/* Cache local para poder mostrar nombres en vez de solo IDs */
-let pacientes = [];
-let medicamentos = [];
-
-/* ---------- Utilidades ---------- */
-function mostrarMensaje(idContenedor, texto, tipo) {
-  const el = document.getElementById(idContenedor);
-  el.innerHTML = `<div class="msg ${tipo}">${texto}</div>`;
-  if (tipo === 'ok') setTimeout(() => { el.innerHTML = ''; }, 4000);
-}
-
-function limpiarMensaje(idContenedor) {
-  document.getElementById(idContenedor).innerHTML = '';
-}
-
-/** fetch con Bearer token + manejo uniforme de errores del backend */
-async function apiFetch(url, opciones = {}) {
-  const cabeceras = Object.assign({}, opciones.headers || {});
-  if (token) cabeceras['Authorization'] = `Bearer ${token}`;
-  if (opciones.body) cabeceras['Content-Type'] = 'application/json';
-
-  let res;
-  try {
-    res = await fetch(url, Object.assign({}, opciones, { headers: cabeceras }));
-  } catch (e) {
-    throw new Error(`No se pudo contactar el servicio (${url}). ¿Está levantado?`);
-  }
-
-  if (res.status === 401) {
-    cerrarSesion();
-    throw new Error('La sesión expiró. Vuelve a iniciar sesión.');
-  }
-
-  const texto = await res.text();
-  const datos = texto ? JSON.parse(texto) : null;
-
-  if (!res.ok) throw new Error((datos && datos.error) || `Error HTTP ${res.status}`);
-  return datos;
-}
-
-function fecha(iso) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('es-GT');
-}
-
-function quetzales(n) {
-  return 'Q ' + Number(n).toFixed(2);
-}
-
-/* ---------- Login ---------- */
-document.getElementById('formLogin').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  limpiarMensaje('msgLogin');
-  const btn = document.getElementById('btnLogin');
-  btn.disabled = true;
-  btn.textContent = 'Entrando...';
-
-  try {
-    const datos = await apiFetch(`${API.auth}/login`, {
-      method: 'POST',
-      body: JSON.stringify({
-        email: document.getElementById('email').value,
-        password: document.getElementById('password').value
-      })
-    });
-
-    token = datos.token;
-    usuario = datos.usuario;
-
-    document.getElementById('usuarioNombre').textContent = usuario.nombre;
-    document.getElementById('usuarioRol').textContent = usuario.rol;
-    document.getElementById('vistaLogin').classList.add('hidden');
-    document.getElementById('vistaApp').classList.remove('hidden');
-    document.getElementById('password').value = '';
-
-    await Promise.all([cargarPacientes(), cargarMedicamentos()]);
-  } catch (err) {
-    mostrarMensaje('msgLogin', err.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Entrar';
-  }
-});
-
-function cerrarSesion() {
-  token = null;
-  usuario = null;
-  pacientes = [];
-  medicamentos = [];
-  document.getElementById('vistaApp').classList.add('hidden');
-  document.getElementById('vistaLogin').classList.remove('hidden');
-}
-document.getElementById('btnSalir').addEventListener('click', cerrarSesion);
-
-/* ---------- Tabs ---------- */
-document.querySelectorAll('nav.tabs button').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('nav.tabs button').forEach(b => b.classList.remove('activo'));
-    btn.classList.add('activo');
-    const tab = btn.dataset.tab;
-    document.getElementById('tabPacientes').classList.toggle('hidden', tab !== 'pacientes');
-    document.getElementById('tabFarmacia').classList.toggle('hidden', tab !== 'farmacia');
-  });
-});
-
-/* ---------- Pacientes ---------- */
-async function cargarPacientes() {
-  try {
-    pacientes = await apiFetch(API.pacientes);
-  } catch (err) {
-    mostrarMensaje('msgPaciente', err.message, 'error');
-    return;
-  }
-
-  const tbody = document.getElementById('tbodyPacientes');
-  tbody.innerHTML = pacientes.map(p => `
-    <tr>
-      <td>${p.id}</td>
-      <td><strong>${p.nombres} ${p.apellidos}</strong><br>
-          <span style="color:var(--muted)">n. ${fecha(p.fechaNacimiento)}</span></td>
-      <td>${p.dpi}</td>
-      <td>${p.genero}</td>
-      <td>${p.padecimientos || '—'}</td>
-    </tr>
-  `).join('');
-
-  document.getElementById('vacioPacientes').classList.toggle('hidden', pacientes.length > 0);
-  document.getElementById('contadorPacientes').textContent =
-    pacientes.length ? `${pacientes.length} en total` : '';
-
-  const select = document.getElementById('dPaciente');
-  const previo = select.value;
-  select.innerHTML = pacientes.map(p =>
-    `<option value="${p.id}">${p.nombres} ${p.apellidos}</option>`).join('');
-  if (previo) select.value = previo;
-
-  await cargarHistorial();
-}
-
-document.getElementById('formPaciente').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  limpiarMensaje('msgPaciente');
-  const btn = document.getElementById('btnCrearPaciente');
-  btn.disabled = true;
-
-  try {
-    await apiFetch(API.pacientes, {
-      method: 'POST',
-      body: JSON.stringify({
-        nombres: document.getElementById('pNombres').value,
-        apellidos: document.getElementById('pApellidos').value,
-        fechaNacimiento: document.getElementById('pFechaNac').value,
-        genero: document.getElementById('pGenero').value,
-        dpi: document.getElementById('pDpi').value,
-        telefono: document.getElementById('pTelefono').value || null,
-        contactoEmergencia: document.getElementById('pContacto').value || null,
-        direccion: document.getElementById('pDireccion').value || null,
-        padecimientos: document.getElementById('pPadecimientos').value || null
-      })
-    });
-
-    document.getElementById('formPaciente').reset();
-    mostrarMensaje('msgPaciente', 'Paciente registrado correctamente.', 'ok');
-    await cargarPacientes();
-  } catch (err) {
-    mostrarMensaje('msgPaciente', err.message, 'error');
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-/* ---------- Farmacia ---------- */
-async function cargarMedicamentos() {
-  try {
-    medicamentos = await apiFetch(`${API.farmacia}/medicamentos`);
-  } catch (err) {
-    mostrarMensaje('msgDispensar', err.message, 'error');
-    return;
-  }
-
-  const tbody = document.getElementById('tbodyMedicamentos');
-  tbody.innerHTML = medicamentos.map(m => `
-    <tr>
-      <td>${m.id}</td>
-      <td><strong>${m.nombre}</strong></td>
-      <td>${m.presentacion || '—'}</td>
-      <td class="pill-stock ${m.stock <= 50 ? 'bajo' : ''}">${m.stock}</td>
-      <td>${quetzales(m.precioUnitario)}</td>
-    </tr>
-  `).join('');
-
-  document.getElementById('vacioMedicamentos').classList.toggle('hidden', medicamentos.length > 0);
-  document.getElementById('contadorMedicamentos').textContent =
-    medicamentos.length ? `${medicamentos.length} en inventario` : '';
-
-  const select = document.getElementById('dMedicamento');
-  const previo = select.value;
-  select.innerHTML = medicamentos.map(m =>
-    `<option value="${m.id}">${m.nombre} — ${quetzales(m.precioUnitario)} (stock ${m.stock})</option>`
-  ).join('');
-  if (previo) select.value = previo;
-}
-
-document.getElementById('formDispensar').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  limpiarMensaje('msgDispensar');
-  const btn = document.getElementById('btnDispensar');
-  btn.disabled = true;
-
-  try {
-    const resultado = await apiFetch(`${API.farmacia}/dispensaciones`, {
-      method: 'POST',
-      body: JSON.stringify({
-        idPaciente: Number(document.getElementById('dPaciente').value),
-        idMedicamento: Number(document.getElementById('dMedicamento').value),
-        cantidad: Number(document.getElementById('dCantidad').value)
-      })
-    });
-
-    mostrarMensaje('msgDispensar',
-      `Dispensado. Costo con descuento: <strong>${quetzales(resultado.costoTotal)}</strong>`, 'ok');
-
-    await cargarMedicamentos();
-    await cargarHistorial();
-  } catch (err) {
-    mostrarMensaje('msgDispensar', err.message, 'error');
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-document.getElementById('dPaciente').addEventListener('change', cargarHistorial);
-
-async function cargarHistorial() {
-  const idPaciente = document.getElementById('dPaciente').value;
-  const tbody = document.getElementById('tbodyHistorial');
-
-  if (!idPaciente) {
-    tbody.innerHTML = '';
-    document.getElementById('vacioHistorial').classList.remove('hidden');
-    document.getElementById('totalGastado').textContent = '';
-    return;
-  }
-
-  try {
-    const datos = await apiFetch(`${API.farmacia}/dispensaciones/paciente/${idPaciente}`);
-    const lista = datos.dispensaciones || [];
-
-    tbody.innerHTML = lista.map(d => {
-      const med = medicamentos.find(m => m.id === d.idMedicamento);
-      return `
-        <tr>
-          <td>${d.id}</td>
-          <td>${med ? med.nombre : '#' + d.idMedicamento}</td>
-          <td>${d.cantidad}</td>
-          <td>${quetzales(d.costoTotal)}</td>
-          <td>${fecha(d.fecha)}</td>
-        </tr>`;
-    }).join('');
-
-    document.getElementById('vacioHistorial').classList.toggle('hidden', lista.length > 0);
-    document.getElementById('totalGastado').textContent =
-      lista.length ? `Total: ${quetzales(datos.totalGastado)}` : '';
-  } catch (err) {
-    tbody.innerHTML = '';
-    document.getElementById('totalGastado').textContent = '';
-  }
-}
-</script>
+<script src="app.js"></script>
 </body>
 </html>

@@ -68,14 +68,15 @@ todo el sistema sea consistente.
 | Módulo | Descripción | Estado |
 |---|---|---|
 | **Autenticación** | JWT centralizado, registro (solo admin), login, RBAC | ✅ `auth-service/` |
-| **Pacientes / Fichas médicas** | Registro de internos, historial médico, padecimientos | ✅ Dentro de `pacientes-service/` (dominio Paciente) |
-| **Solicitudes a especialista** | Médico general refiere a especialidad; fundación asigna horario y médico | ✅ Dentro de `pacientes-service/` (dominio SolicitudReferencia) |
-| **Visita médica** | Registro de fecha, motivo, médico, exámenes, diagnóstico, medicamento, observaciones | ✅ Dentro de `pacientes-service/` (dominio VisitaMedica) |
-| **Laboratorio** | Recepción de órdenes, registro de resultados | ⏳ Pendiente (exámenes hoy se registran localmente en la visita, sin conexión al servicio) |
-| **Farmacia** | Inventario y dispensación de medicamentos con descuento fundación | ✅ `farmacia-service/` (prescripciones hoy se registran localmente en la visita, sin conexión al servicio) |
-| **Entradas, Salidas y Caja** | Donaciones, cobros a familiares, gastos, pagos a fundación | ⏳ Pendiente |
-| **Reportes** | Costos por cita, análisis médicos, cobros por rango de fecha, pagos a fundación, entradas, exámenes, medicamentos aplicados | ⏳ Pendiente |
-| **Notificaciones** | Correo automático al familiar cuando se crea una solicitud médica | ⏳ Pendiente |
+| **Pacientes / Fichas médicas** | Registro de internos, historial médico, padecimientos | ✅ Dentro de `pacientes-service/` |
+| **Solicitudes a especialista** | Médico general refiere a especialidad; fundación asigna horario y médico | ✅ Dentro de `pacientes-service/` |
+| **Visita médica** | Diagnóstico, observaciones, exámenes, prescripciones | ✅ Dentro de `pacientes-service/` |
+| **Laboratorio** | Órdenes pendientes desde visita, registro de resultados, costo con descuento fundación (RN-09) | ✅ `laboratorio-service/` |
+| **Farmacia** | Inventario y dispensación de medicamentos con descuento fundación | ✅ `farmacia-service/` |
+| **Entradas, Salidas y Caja** | Donaciones, cobros a familiares, gastos, pagos a fundación, estado de cuenta con alerta de saldo | ✅ `financiero-service/` |
+| **Reportes** | Los 7 reportes del enunciado, exportables a JSON, PDF (pdfkit) o Excel (exceljs) | ✅ `reportes-service/` |
+| **Notificaciones** | Correo automático al familiar (Brevo) al crear una solicitud médica; modo simulación para dev | ✅ `notificaciones-service/` |
+| **Frontend** | Login + Dashboard + 7 pantallas (Pacientes, Solicitudes, Visitas, Farmacia, Laboratorio, Financiero, Reportes) | ✅ `frontend/` (nginx, HTML/CSS/JS plano) |
 
 ### 3.1 Nota sobre agrupación en `pacientes-service`
 
@@ -223,22 +224,45 @@ proyecto/
       acepta URL de repositorio.
 
 ### Desarrollo (módulos por construir)
-- [x] Módulo de Pacientes / Ficha médica (dentro de `pacientes-service/`).
-- [x] Módulo de Solicitudes a especialista + asignación de horario
-      (fundación) (dentro de `pacientes-service/`).
-- [x] Módulo de Visita médica (dentro de `pacientes-service/`).
-- [x] Autenticación/autorización unificada por roles en todo el sistema
-      (`auth-service/` con JWT + `autorizarRoles`).
-- [x] Migrar Farmacia de SQLite a la base de datos definitiva
-      (SQL Server en `AsiloCabezaAlgodon`).
-- [ ] Módulo de Laboratorio (hoy: exámenes se registran locales en visita).
-- [ ] Conectar prescripciones de visita a `farmacia-service`
-      (hoy: registro local dentro de la visita).
-- [ ] Módulo de Entradas, Salidas y Caja (donaciones, cobros, gastos).
-- [ ] Módulo de Reportes (los 7 reportes listados en el enunciado).
-- [ ] Servicio de notificaciones por correo a familiares.
-- [ ] Definir cómo se comunican los microservicios entre sí (API Gateway,
-      llamadas directas, cola de mensajes, etc.) — aún no decidido.
+- [x] Módulo de Pacientes / Ficha médica.
+- [x] Módulo de Solicitudes a especialista + asignación de horario (fundación).
+- [x] Módulo de Visita médica.
+- [x] Autenticación/autorización unificada por roles (`auth-service/` con JWT + `autorizarRoles`).
+- [x] Migrar Farmacia de SQLite a SQL Server (`AsiloCabezaAlgodon`).
+- [x] Módulo de Laboratorio (`laboratorio-service/`, puerto 3003).
+- [x] Módulo de Entradas, Salidas y Caja (`financiero-service/`, puerto 3004).
+- [x] Módulo de Reportes con PDF/Excel (`reportes-service/`, puerto 3005).
+- [x] Servicio de notificaciones por correo (`notificaciones-service/` con Brevo, puerto 3006).
+- [x] Frontend con todas las pantallas del sistema.
+- [x] Comunicación entre microservicios: HTTP directo llamando por nombre
+      de contenedor (`http://notificaciones-service:3006`, etc.). No hay
+      API Gateway ni cola de mensajes; el patrón acordado es el más simple
+      dado el estado actual del proyecto.
+- [ ] Conectar prescripciones de visita a `farmacia-service` (hoy sólo
+      registro local en `visita_prescripciones` sin descontar inventario).
+- [ ] Reintentos automáticos para notificaciones fallidas (hoy: fire-and-forget).
+
+### Endpoints internos (para referencia rápida)
+
+| Servicio | Puerto | Prefijo |
+|---|---|---|
+| auth-service | 3000 | `/api/auth/*` |
+| farmacia-service | 3001 | `/api/farmacia/*` |
+| pacientes-service | 3002 | `/api/pacientes`, `/api/solicitudes`, `/api/visitas` |
+| laboratorio-service | 3003 | `/api/laboratorio/*` |
+| financiero-service | 3004 | `/api/financiero/*` |
+| reportes-service | 3005 | `/api/reportes/*` |
+| notificaciones-service | 3006 | `/api/notificaciones/*` |
+| frontend (nginx) | 8090 | HTML estático |
+
+### Tablas nuevas agregadas en esta ronda
+
+- `resultados_examenes`, `examenes_precios` (laboratorio).
+- `cargos_servicio`, `cuotas_mensuales`, `donantes`, `donaciones`,
+  `gastos_operativos`, `pagos_fundacion` (financiero).
+- `notificaciones` (notificaciones).
+- Columna `familiarEmail` en `pacientes` (bootstrap con `ALTER TABLE`
+  idempotente para no romper datos existentes).
 
 ### Infraestructura
 - [ ] Resolver instalación de Docker Desktop en la máquina de desarrollo

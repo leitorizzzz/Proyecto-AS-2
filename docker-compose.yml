@@ -1,6 +1,7 @@
 # Infraestructura completa — Sistema Asilo "Cabeza de Algodon"
 #
-# Levanta SQL Server + los tres microservicios.
+# Levanta SQL Server + los 7 microservicios (auth, pacientes, farmacia,
+# laboratorio, financiero, reportes, notificaciones) + frontend nginx.
 #
 # Uso:
 #   docker compose up -d --build
@@ -118,8 +119,107 @@ services:
       DB_ENCRYPT: "false"
       DB_TRUST_SERVER_CERTIFICATE: "true"
       JWT_SECRET: ${JWT_SECRET}
+      # Fire-and-forget al crear una solicitud. Si el servicio no responde,
+      # la solicitud se crea igual y el error queda en el log.
+      NOTIFICACIONES_URL: http://notificaciones-service:3006
     ports:
       - "3002:3002"
+    restart: unless-stopped
+
+  laboratorio-service:
+    build: ./laboratorio-service
+    container_name: asilo-laboratorio-service
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      PORT: 3003
+      DB_SERVER: sqlserver
+      DB_PORT: 1433
+      DB_NAME: AsiloCabezaAlgodon
+      DB_USER: sa
+      DB_PASSWORD: ${MSSQL_SA_PASSWORD}
+      DB_ENCRYPT: "false"
+      DB_TRUST_SERVER_CERTIFICATE: "true"
+      JWT_SECRET: ${JWT_SECRET}
+      DESCUENTO_FUNDACION: "0.20"
+    ports:
+      - "3003:3003"
+    restart: unless-stopped
+
+  financiero-service:
+    build: ./financiero-service
+    container_name: asilo-financiero-service
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      PORT: 3004
+      DB_SERVER: sqlserver
+      DB_PORT: 1433
+      DB_NAME: AsiloCabezaAlgodon
+      DB_USER: sa
+      DB_PASSWORD: ${MSSQL_SA_PASSWORD}
+      DB_ENCRYPT: "false"
+      DB_TRUST_SERVER_CERTIFICATE: "true"
+      JWT_SECRET: ${JWT_SECRET}
+      UMBRAL_ALERTA_SALDO: "1000"
+    ports:
+      - "3004:3004"
+    restart: unless-stopped
+
+  reportes-service:
+    build: ./reportes-service
+    container_name: asilo-reportes-service
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      PORT: 3005
+      DB_SERVER: sqlserver
+      DB_PORT: 1433
+      DB_NAME: AsiloCabezaAlgodon
+      DB_USER: sa
+      DB_PASSWORD: ${MSSQL_SA_PASSWORD}
+      DB_ENCRYPT: "false"
+      DB_TRUST_SERVER_CERTIFICATE: "true"
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "3005:3005"
+    restart: unless-stopped
+
+  notificaciones-service:
+    build: ./notificaciones-service
+    container_name: asilo-notificaciones-service
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      PORT: 3006
+      DB_SERVER: sqlserver
+      DB_PORT: 1433
+      DB_NAME: AsiloCabezaAlgodon
+      DB_USER: sa
+      DB_PASSWORD: ${MSSQL_SA_PASSWORD}
+      DB_ENCRYPT: "false"
+      DB_TRUST_SERVER_CERTIFICATE: "true"
+      JWT_SECRET: ${JWT_SECRET}
+      BREVO_API_KEY: ${BREVO_API_KEY:-}
+      BREVO_API_URL: https://api.brevo.com/v3/smtp/email
+      REMITENTE_EMAIL: ${REMITENTE_EMAIL:-notificaciones@asilo.gt}
+      REMITENTE_NOMBRE: "Asilo Cabeza de Algodon"
+      # true = no llama a Brevo, guarda como enviada. Util en dev.
+      MODO_SIMULACION: ${MODO_SIMULACION:-true}
+    ports:
+      - "3006:3006"
     restart: unless-stopped
 
   # Frontend estatico (HTML/CSS/JS plano) servido por nginx.

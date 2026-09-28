@@ -1,0 +1,442 @@
+/*
+ * Estilos del sistema Asilo Cabeza de Algodon
+ *
+ * Sistema de tokens deliberado para el dominio: casa de retiro geriatrica.
+ * Se aparta de la paleta "tech-genericos" (azul saturado, grises frios,
+ * sans-serif institucional) buscando un caracter calido, digno y legible
+ * por personal de distintas edades.
+ *
+ * Un solo lugar de audacia: la tipografia display "Fraunces" en titulos
+ * y numeros. Todo lo demas se mantiene disciplinado y con jerarquia
+ * codificada por reglas (borders), no por sombras.
+ */
+
+/* ============ TOKENS ============ */
+:root {
+  /* Paleta calida — evita blanco puro y gris azulado.
+     La marca "Cabeza de Algodon" sugiere lino, papel, algodon crudo. */
+  --paper:      #F7F3EB;  /* fondo, evoca papel */
+  --paper-2:    #FFFDF7;  /* cards, "algodon" apenas mas claro */
+  --ink:        #26201B;  /* texto principal, negro con matiz sepia */
+  --ink-soft:   #6B5D51;  /* texto secundario, tierra */
+  --rule:       #E4DBCC;  /* lineas y bordes */
+  --rule-strong:#C9BCA5;  /* borde bajo cabecera de tabla */
+
+  /* Acentos: terracota (calidez, sin tecnologia)
+     + salvia (salud, sin verde neon). Un solo tono principal. */
+  --clay:       #8B4F32;
+  --clay-deep:  #6E3E27;
+  --clay-tint:  #F1E4DA;
+  --sage:       #4C6B57;
+  --sage-tint:  #E1EAE1;
+
+  --warn:       #A8541A;
+  --warn-tint:  #F7E4D0;
+  --danger:     #922B21;
+  --danger-tint:#F6E1DE;
+  --ok:         var(--sage);
+  --ok-tint:    var(--sage-tint);
+
+  /* Tipografia */
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-body:    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* Escala tipografica — Elementos del estilo tipografico:
+     4 tamaños base, uso deliberado, sin saltos aleatorios */
+  --fs-hero:  clamp(32px, 4vw, 44px);
+  --fs-title: 24px;
+  --fs-sub:   17px;
+  --fs-body:  16px;
+  --fs-meta:  14px;
+  --fs-tiny:  12px;
+
+  --radius:   4px;    /* sutil, no "app juguetona" */
+  --radius-lg: 10px;
+}
+
+/* ============ RESET ============ */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  line-height: 1.55;
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.hidden { display: none !important; }
+
+/* ============ TIPO ============ */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 500;      /* Fraunces se ve mejor en 500, no 700 */
+  color: var(--ink);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+h1 { font-size: var(--fs-hero); line-height: 1.05; }
+h2 { font-size: var(--fs-title); line-height: 1.2; }
+h3 { font-size: var(--fs-sub); line-height: 1.3; font-weight: 600; }
+p  { margin: 0; }
+.meta { font-size: var(--fs-meta); color: var(--ink-soft); }
+.tiny { font-size: var(--fs-tiny); color: var(--ink-soft); }
+
+/* Numeros y datos: usamos serif tabular para que las columnas se alineen
+   sin sentirse frias. Un pequeno acento distintivo. */
+.num, td.num, th.num {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+a { color: var(--clay); text-decoration: underline; text-underline-offset: 3px; }
+a:hover { color: var(--clay-deep); }
+
+/* ============ LAYOUT DE APP ============ */
+.app-shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+}
+@media (max-width: 900px) {
+  .app-shell { grid-template-columns: 1fr; }
+}
+
+aside.sidebar {
+  background: var(--paper-2);
+  border-right: 1px solid var(--rule);
+  padding: 32px 22px 24px;
+  display: flex; flex-direction: column; gap: 32px;
+  position: sticky; top: 0;
+  height: 100vh; overflow-y: auto;
+}
+@media (max-width: 900px) {
+  aside.sidebar { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--rule); }
+}
+
+.brand {
+  font-family: var(--font-display);
+  font-size: 22px; line-height: 1.15; font-weight: 500;
+  color: var(--ink);
+}
+.brand small {
+  display: block; font-size: 12px;
+  color: var(--ink-soft); margin-top: 4px;
+  font-family: var(--font-body);
+  letter-spacing: 0;
+}
+
+nav.side ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+nav.side a, nav.side button.tab {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+  padding: 9px 12px;
+  background: none; border: none;
+  font-family: inherit; font-size: 15px; color: var(--ink-soft);
+  cursor: pointer; text-align: left; width: 100%;
+  border-left: 2px solid transparent;
+  border-radius: 0;
+  text-decoration: none;
+}
+nav.side button.tab:hover { color: var(--ink); }
+nav.side button.tab.activo {
+  color: var(--clay-deep);
+  border-left-color: var(--clay);
+  background: var(--clay-tint);
+  font-weight: 600;
+}
+nav.side .section-label {
+  font-family: var(--font-body);
+  font-size: 12px; color: var(--ink-soft);
+  margin: 8px 12px 4px; font-weight: 500;
+}
+
+.user-block {
+  border-top: 1px solid var(--rule);
+  padding-top: 20px;
+  font-size: 14px;
+}
+.user-block .who { font-weight: 600; color: var(--ink); }
+.user-block .rol {
+  display: inline-block; margin-top: 4px;
+  font-size: 12px; color: var(--clay-deep);
+  padding: 2px 8px; border: 1px solid var(--clay);
+  border-radius: 999px; font-weight: 500;
+}
+
+main.stage {
+  padding: 40px clamp(20px, 4vw, 56px) 80px;
+  max-width: 1240px;
+  width: 100%;
+}
+.stage > header.stage-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 20px; margin-bottom: 28px; flex-wrap: wrap;
+}
+.stage-head .eyebrow {
+  font-size: 12px; color: var(--clay-deep);
+  font-weight: 600; margin-bottom: 6px;
+  font-family: var(--font-body);
+}
+.stage-head p.lede {
+  max-width: 620px; font-size: var(--fs-sub);
+  color: var(--ink-soft); margin-top: 12px;
+  line-height: 1.5;
+}
+
+/* ============ CARDS ============ */
+.card {
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 24px 26px;
+}
+.card + .card { margin-top: 20px; }
+.card h3 {
+  margin-bottom: 6px;
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+}
+.card h3 .contador {
+  font-family: var(--font-body); font-size: 13px;
+  color: var(--ink-soft); font-weight: 500;
+}
+.card > p.hint {
+  font-size: 13px; color: var(--ink-soft);
+  margin-bottom: 16px;
+}
+
+/* Split grid con proporciones deliberadas (no 50/50 default) */
+.grid-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 1000px) { .grid-split { grid-template-columns: 1fr; } }
+.grid-3 {
+  display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px;
+}
+@media (max-width: 900px) { .grid-3 { grid-template-columns: 1fr; } }
+
+/* ============ FORMULARIOS ============ */
+label {
+  display: block; font-size: 13px; color: var(--ink-soft);
+  margin: 16px 0 6px; font-weight: 500;
+}
+label:first-child { margin-top: 4px; }
+input, select, textarea {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: var(--fs-body);
+  font-family: inherit;
+  color: var(--ink);
+  background: #FFF;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  transition: border-color .15s, box-shadow .15s;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--clay);
+  box-shadow: 0 0 0 3px var(--clay-tint);
+}
+.fila-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.fila-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+@media (max-width: 640px) {
+  .fila-2, .fila-3 { grid-template-columns: 1fr; }
+}
+textarea { resize: vertical; min-height: 88px; }
+
+/* ============ BOTONES ============ */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 10px 18px;
+  background: var(--clay);
+  color: #FFF;
+  border: 1px solid var(--clay);
+  border-radius: var(--radius);
+  font-family: inherit; font-size: var(--fs-body);
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 20px;
+  text-decoration: none;
+  transition: background .15s, border-color .15s;
+}
+.btn:hover { background: var(--clay-deep); border-color: var(--clay-deep); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.wide { width: 100%; }
+.btn.ghost {
+  background: transparent; color: var(--clay-deep);
+}
+.btn.ghost:hover { background: var(--clay-tint); }
+.btn.sage { background: var(--sage); border-color: var(--sage); }
+.btn.sage:hover { background: #3E5A48; border-color: #3E5A48; }
+.btn.small { padding: 6px 12px; font-size: 13px; margin-top: 0; }
+
+.btn-link {
+  background: none; border: 0; padding: 0;
+  color: var(--clay-deep); text-decoration: underline;
+  font-family: inherit; font-size: 14px;
+  cursor: pointer;
+}
+.btn-link:hover { color: var(--clay); }
+.btn-link.danger { color: var(--danger); }
+
+/* ============ TABLAS ============ */
+.tabla-wrap { overflow-x: auto; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+thead th {
+  text-align: left;
+  font-family: var(--font-body);
+  font-size: 12px; color: var(--ink-soft);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--rule-strong);
+  font-weight: 600;
+}
+tbody td {
+  padding: 12px;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: rgba(139, 79, 50, 0.03); }
+td.right, th.right { text-align: right; }
+
+.vacio {
+  padding: 24px 12px;
+  color: var(--ink-soft);
+  font-style: italic;
+  border: 1px dashed var(--rule);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+/* ============ CHIPS / ESTADOS ============ */
+.chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--rule);
+  background: #FFF;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.chip.pendiente_asignacion,
+.chip.pendiente { background: var(--warn-tint); border-color: #E5C79A; color: #7A3E12; }
+.chip.cita_asignada { background: var(--clay-tint); border-color: var(--clay); color: var(--clay-deep); }
+.chip.en_atencion { background: var(--sage-tint); border-color: var(--sage); color: #2F4A38; }
+.chip.completada,
+.chip.pagada,
+.chip.disponible,
+.chip.enviada { background: var(--sage-tint); border-color: var(--sage); color: #2F4A38; }
+.chip.cancelada,
+.chip.fallida { background: var(--danger-tint); border-color: #C87B72; color: var(--danger); }
+
+/* ============ MENSAJES ============ */
+.msg {
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  margin-top: 14px;
+  border: 1px solid var(--rule);
+}
+.msg.ok    { background: var(--ok-tint);     border-color: var(--sage); color: #2F4A38; }
+.msg.error { background: var(--danger-tint); border-color: #C87B72;     color: var(--danger); }
+.msg.warn  { background: var(--warn-tint);   border-color: #E5C79A;     color: #7A3E12; }
+
+/* ============ LOGIN ============ */
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: center;
+  justify-items: center;
+  padding: 40px 20px;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(139,79,50,0.06), transparent 50%),
+    radial-gradient(circle at 85% 80%, rgba(76,107,87,0.06), transparent 50%),
+    var(--paper);
+}
+.login-card {
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  padding: 44px 42px 38px;
+  width: 100%; max-width: 420px;
+  border-radius: var(--radius-lg);
+}
+.login-card .brand-mark {
+  font-family: var(--font-display);
+  font-size: 12px; letter-spacing: 0.08em;
+  color: var(--clay-deep); margin-bottom: 24px;
+  text-transform: none;
+  font-weight: 600;
+}
+.login-card h1 {
+  font-size: 34px; line-height: 1.15;
+  font-family: var(--font-display); font-weight: 500;
+  margin-bottom: 6px;
+}
+.login-card p.sub {
+  color: var(--ink-soft); font-size: 15px;
+  margin-bottom: 28px;
+}
+
+/* ============ DASHBOARD ============ */
+.kpi {
+  padding: 22px 24px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--paper-2);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.kpi .kpi-label {
+  font-size: 12px; color: var(--ink-soft);
+  font-family: var(--font-body); font-weight: 500;
+}
+.kpi .kpi-value {
+  font-family: var(--font-display); font-weight: 500;
+  font-size: 34px; line-height: 1.1;
+  color: var(--ink);
+}
+.kpi .kpi-hint {
+  font-size: 12px; color: var(--ink-soft);
+  margin-top: 6px;
+}
+
+/* ============ VISITA DETAIL ============ */
+.visita-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 22px;
+}
+@media (max-width: 1000px) { .visita-panel { grid-template-columns: 1fr; } }
+.subcard {
+  border: 1px solid var(--rule);
+  padding: 18px 20px;
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+.subcard h4 {
+  font-family: var(--font-display);
+  font-size: 16px; font-weight: 600;
+  margin-bottom: 12px;
+}
+.subcard ul { list-style: none; margin: 0; padding: 0; }
+.subcard li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.subcard li:last-child { border-bottom: none; }
+
+/* Reglas de tipografia: no ALL CAPS en labels, no un solo word italic,
+   no numeracion 01/02/03 salvo si el contenido fuera realmente una
+   secuencia. Aqui todos los estados son etiquetas de estado (chips),
+   no un paso ordinal, asi que se muestran en texto normal. */
