@@ -104,6 +104,57 @@ function puede(...rolesPermitidos) {
   return rolesPermitidos.includes(state.usuario.rol);
 }
 
+/* ============ RBAC centralizado ============
+   La UI oculta/deshabilita acciones que el backend ya rechaza, para
+   que el personal no se tope con 403 en el flujo normal. El backend
+   sigue siendo la autoridad; esto solo es cortesia visual.
+
+   La tabla matchea CONTEXT_SISTEMA.md §3.3. 'admin' siempre pasa. */
+const RBAC = {
+  // Secciones visibles por rol (ademas de admin que ve todo)
+  tabs: {
+    dashboard:   ['*'],
+    pacientes:   ['*'],
+    solicitudes: ['medico_general', 'medico', 'medico_especialista', 'especialista',
+                  'coordinador_fundacion', 'fundacion', 'enfermero'],
+    visitas:     ['medico_especialista', 'especialista', 'medico_general', 'medico',
+                  'coordinador_fundacion', 'fundacion', 'enfermero'],
+    farmacia:    ['farmacia', 'enfermero', 'medico_especialista', 'especialista'],
+    laboratorio: ['laboratorio', 'medico_especialista', 'especialista', 'enfermero'],
+    financiero:  ['fundacion', 'coordinador_fundacion'],
+    reportes:    ['*']
+  },
+  // Acciones de escritura por rol
+  acciones: {
+    crearPaciente:       ['enfermero'],
+    crearSolicitud:      ['medico_general'],
+    asignarCita:         ['coordinador_fundacion'],
+    convertirAVisita:    ['medico_especialista'],
+    cancelarSolicitud:   ['medico_general'],
+    editarVisita:        ['medico_especialista'],
+    dispensar:           ['farmacia'],
+    registrarResultadoLab:['laboratorio'],
+    editarInventarioFar: ['farmacia'],
+    registrarCargoFin:   [],      // solo admin
+    registrarCuotaFin:   [],      // solo admin
+    crearDonanteFin:     [],      // solo admin
+    registrarDonacionFin:[],      // solo admin
+  }
+};
+function rolActual() { return state.usuario?.rol || null; }
+function esAdmin() { return rolActual() === 'admin'; }
+function tabVisible(tab) {
+  if (esAdmin()) return true;
+  const roles = RBAC.tabs[tab] || [];
+  if (roles.includes('*')) return true;
+  return roles.includes(rolActual());
+}
+function puedeAccion(nombre) {
+  if (esAdmin()) return true;
+  const roles = RBAC.acciones[nombre] || [];
+  return roles.includes(rolActual());
+}
+
 /* ============================================================
  *   AUTENTICACION Y ARRANQUE
  * ============================================================ */
@@ -159,12 +210,35 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#btnRepPdf').addEventListener('click', () => generarReporte('pdf'));
   $('#btnRepExcel').addEventListener('click', () => generarReporte('excel'));
 
-  // Rango de fechas por defecto: ultimo trimestre
-  const hoy = new Date();
-  const inicio = new Date(hoy.getFullYear(), hoy.getMonth() - 3, 1);
-  $('#repDesde').value = inicio.toISOString().slice(0, 10);
-  $('#repHasta').value = hoy.toISOString().slice(0, 10);
+  // Rango por defecto contextual segun el tipo de reporte elegido.
+  // Se recalcula al cambiar el dropdown.
+  $('#repTipo').addEventListener('change', aplicarRangoDefectoReporte);
+  aplicarRangoDefectoReporte();
 });
+
+/**
+ * Rangos razonables por tipo de reporte:
+ *  - financieros (entradas, cobros, pagos a fundacion): mes en curso
+ *  - operativos (examenes, medicamentos): ultimos 30 dias
+ *  - analisis medico, costos por paciente: ultimos 90 dias
+ */
+function aplicarRangoDefectoReporte() {
+  const tipo = $('#repTipo').value;
+  const hoy = new Date();
+  let desde;
+  const FINANCIEROS = ['entradas', 'cobros-por-rango', 'pagos-fundacion'];
+  const OPERATIVOS  = ['examenes', 'medicamentos-aplicados'];
+
+  if (FINANCIEROS.includes(tipo)) {
+    desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  } else if (OPERATIVOS.includes(tipo)) {
+    desde = new Date(hoy); desde.setDate(hoy.getDate() - 30);
+  } else {
+    desde = new Date(hoy); desde.setDate(hoy.getDate() - 90);
+  }
+  $('#repDesde').value = desde.toISOString().slice(0, 10);
+  $('#repHasta').value = hoy.toISOString().slice(0, 10);
+}
 
 async function onLogin(e) {
   e.preventDefault();
@@ -201,7 +275,21 @@ function abrirApp() {
   $('#usuarioNombre').textContent = state.usuario?.email || '—';
   $('#usuarioRol').textContent = state.usuario?.rol || '—';
   $('#saludoNombre').textContent = nombre.replace(/[._-]+/g, ' ');
+  filtrarMenuPorRol();
   cambiarTab('dashboard');
+}
+
+/** Oculta en el menu lateral las secciones que el rol no puede usar. */
+function filtrarMenuPorRol() {
+  $$('.tab').forEach(b => {
+    const tab = b.dataset.tab;
+    const li = b.parentElement;
+    const visible = tabVisible(tab);
+    if (li) li.style.display = visible ? '' : 'none';
+  });
+  // Si queda sin pestana activa, mandar a dashboard
+  const activo = $$('.tab.activo').find(b => b.parentElement.style.display !== 'none');
+  if (!activo) $$('.tab').find(b => b.dataset.tab === 'dashboard')?.classList.add('activo');
 }
 
 /* ============================================================
@@ -220,6 +308,7 @@ const CARGADORES = {
 };
 
 function cambiarTab(tab) {
+  if (!tabVisible(tab)) tab = 'dashboard';
   $$('.tab').forEach(b => b.classList.toggle('activo', b.dataset.tab === tab));
   $$('main.stage > section').forEach(s => s.classList.add('hidden'));
   const seccion = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
@@ -305,6 +394,15 @@ async function cargarKpiAlertasSaldo(pacientes) {
  * ============================================================ */
 
 async function cargarPacientes() {
+  // Habilitar/deshabilitar form segun rol
+  const puedeCrear = puedeAccion('crearPaciente');
+  const form = $('#formPaciente');
+  if (form) {
+    const btn = form.querySelector('#btnCrearPaciente');
+    btn.disabled = !puedeCrear;
+    btn.textContent = puedeCrear ? 'Registrar paciente' : 'Registro no permitido para su rol';
+    form.querySelectorAll('input, select, textarea').forEach(el => el.disabled = !puedeCrear);
+  }
   try {
     const pacientes = await api(API.pacientes, '/api/pacientes');
     $('#contadorPacientes').textContent = `${pacientes.length} personas`;
@@ -370,6 +468,20 @@ async function onCrearPaciente(e) {
  * ============================================================ */
 
 async function cargarSolicitudes() {
+  // Form de crear visible solo para medico_general / admin
+  const puedeCrear = puedeAccion('crearSolicitud');
+  const form = $('#formSolicitud');
+  if (form) {
+    form.querySelectorAll('input, select, textarea').forEach(el => el.disabled = !puedeCrear);
+    const btn = form.querySelector('#btnCrearSolicitud');
+    btn.disabled = !puedeCrear;
+    const msgEl = $('#msgSolicitud');
+    if (msgEl) {
+      if (!puedeCrear) warn(msgEl, 'Solo un médico general puede crear una nueva solicitud.');
+      else limpiar(msgEl);
+    }
+  }
+
   try {
     const [solicitudes, pacientes] = await Promise.all([
       api(API.pacientes, '/api/solicitudes'),
@@ -378,9 +490,9 @@ async function cargarSolicitudes() {
     const mapa = Object.fromEntries(pacientes.map(p => [p.id, `${p.nombres} ${p.apellidos}`]));
     $('#contadorSolicitudes').textContent = `${solicitudes.length} en total`;
 
-    const puedeAsignar   = puede('coordinador_fundacion', 'admin');
-    const puedeConvertir = puede('medico_especialista');
-    const puedeCancelar  = puede('medico_general', 'admin');
+    const puedeAsignar   = puedeAccion('asignarCita');
+    const puedeConvertir = puedeAccion('convertirAVisita');
+    const puedeCancelar  = puedeAccion('cancelarSolicitud');
 
     const rows = solicitudes.map(s => {
       const acciones = [];
@@ -408,14 +520,6 @@ async function cargarSolicitudes() {
 
     $$('#tbodySolicitudes [data-action]').forEach(b =>
       b.addEventListener('click', () => onAccionSolicitud(b.dataset.action, Number(b.dataset.id))));
-
-    // Deshabilitar el form si no es medico_general
-    $('#btnCrearSolicitud').disabled = !puede('medico_general');
-    if (!puede('medico_general')) {
-      warn($('#msgSolicitud'), 'Solo un médico general puede crear una nueva solicitud.');
-    } else {
-      limpiar($('#msgSolicitud'));
-    }
   } catch (err) {
     console.error('Solicitudes:', err);
   }
@@ -544,7 +648,7 @@ async function cargarDetalleVisita() {
     $('#vDiagnostico').value = v.diagnostico || '';
     $('#vObservaciones').value = v.observaciones || '';
 
-    const puedeEditar = puede('medico_especialista') && v.estado === 'en_atencion';
+    const puedeEditar = puedeAccion('editarVisita') && v.estado === 'en_atencion';
     $('#vDiagnostico').disabled = !puedeEditar;
     $('#vObservaciones').disabled = !puedeEditar;
     $('#btnGuardarClinico').disabled = !puedeEditar;
@@ -642,6 +746,16 @@ async function onAgregarPrescripcion() {
  * ============================================================ */
 
 async function cargarFarmacia() {
+  // Habilitar el form de dispensar solo si rol farmacia o admin
+  const puedeDisp = puedeAccion('dispensar');
+  const form = $('#formDispensar');
+  if (form) {
+    form.querySelectorAll('input, select, button').forEach(el => el.disabled = !puedeDisp);
+  }
+  const msgD = $('#msgDispensar');
+  if (msgD && !puedeDisp) warn(msgD, 'Solo personal de farmacia puede dispensar.');
+  else if (msgD) limpiar(msgD);
+
   try {
     const [meds, pacientes] = await Promise.all([
       api(API.farmacia, '/api/farmacia/medicamentos'),
@@ -744,6 +858,15 @@ async function onDispensar(e) {
  * ============================================================ */
 
 async function cargarLaboratorio() {
+  const puedeReg = puedeAccion('registrarResultadoLab');
+  const form = $('#formResultado');
+  if (form) {
+    form.querySelectorAll('input, select, textarea, button').forEach(el => el.disabled = !puedeReg);
+  }
+  const msgR = $('#msgResultado');
+  if (msgR && !puedeReg) warn(msgR, 'Solo personal de laboratorio puede registrar resultados.');
+  else if (msgR) limpiar(msgR);
+
   try {
     const ordenes = await api(API.laboratorio, '/api/laboratorio/ordenes-pendientes');
     $('#contadorOrdenes').textContent = `${ordenes.length} pendientes`;
@@ -806,6 +929,18 @@ async function onRegistrarResultado(e) {
  * ============================================================ */
 
 async function cargarFinancieroTab() {
+  // Habilitar formularios de escritura solo si admin
+  const puedeEscribir = esAdmin();
+  [['#formCargo', '#msgCargo'], ['#formCuota', '#msgCuota'],
+   ['#formDonante', '#msgDonante'], ['#formDonacion', '#msgDonacion']].forEach(([sel, msgSel]) => {
+    const f = $(sel);
+    if (!f) return;
+    f.querySelectorAll('input, select, textarea, button').forEach(el => el.disabled = !puedeEscribir);
+    const m = $(msgSel);
+    if (m && !puedeEscribir) warn(m, 'Solo administración puede modificar la caja.');
+    else if (m) limpiar(m);
+  });
+
   try {
     const pacientes = await api(API.pacientes, '/api/pacientes');
     llenarSelectPacientes($('#fPaciente'), pacientes);
