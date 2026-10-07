@@ -100,25 +100,55 @@ solicitud se crea igual y el error queda en el log.
 
 ### `frontend/` — ✅ funcional, puerto 8090
 HTML/CSS/JS plano servido por nginx. Un solo `index.html` + `styles.css`
-+ `app.js`. Sistema de tokens propios (paleta cálida terracota + salvia,
-tipografía Fraunces/Inter cargadas desde Google Fonts) aplicando la skill
-`frontend-design` — decisiones deliberadas sobre "AI-generic defaults".
-Sidebar con las 8 secciones (Panel, Pacientes, Solicitudes, Visitas,
-Farmacia, Laboratorio, Financiero, Reportes). Bootstrap 5 fue evaluado
-pero se optó por CSS custom para poder aplicar el sistema de tokens sin
-pelear con estilos por defecto.
++ `app.js`.
+
+**Identidad visual clínica (segunda iteración, oct 2026)**: paleta
+reducida a azul zafiro (`#1A4D7A`) + verde bosque apagado (`#2F6B4A`)
+sobre papel blanco. Tipografía IBM Plex Sans + IBM Plex Mono para
+números tabulares. Estados de error/éxito/advertencia nunca dependen
+solo del color — llevan prefijo tipográfico (Error / Ok / Aviso) y los
+chips de estado alternan patrones de borde (sólido, dashed, double)
+para ser legibles en escala de grises. Controles ≥ 44px, foco visible
+grueso. Sidebar con las 8 secciones filtradas por rol. Bootstrap 5 fue
+evaluado y descartado: el CSS propio es más corto y permite aplicar la
+skill sin pelear con defaults.
+
+**RBAC en la UI**: cada sección se oculta del menú si el rol no la usa
+y cada formulario de escritura se deshabilita si el rol no tiene
+permiso (tabla centralizada en `RBAC.tabs` + `RBAC.acciones` de
+`app.js`, alineada con §3.3 de `CONTEXT_SISTEMA.md`). El backend sigue
+siendo la autoridad; la UI solo evita que el usuario se tope con 403.
+
+**Rangos de reportes contextuales**: financieros → mes en curso;
+operativos (exámenes, medicamentos) → últimos 30 días; análisis
+(costos por paciente, análisis médico) → últimos 90 días.
+
+### Pruebas automatizadas — ✅
+Suite jest+supertest a nivel raíz. Comando: `npm run test:todo` o
+`scripts/run-all-tests.sh|.ps1`. Última ejecución 45/45 pasando.
+Mapa de casos SQA ↔ pruebas en [`docs/PLAN_PRUEBAS.md`](docs/PLAN_PRUEBAS.md).
+
+### Datos de demo — ✅
+`scripts/seed-demo.js` (`npm run seed:demo`). Idempotente, pobla
+usuarios por rol, pacientes, solicitudes en cada estado, visita
+completada con prescripción y examen, donaciones y gastos. Documentado
+en [`scripts/README.md`](scripts/README.md).
+
+### Documentación adicional
+- [`docs/ERD.mmd`](docs/ERD.mmd) — ERD completo de `AsiloCabezaAlgodon` (Mermaid).
+- [`docs/COMPONENTES.mmd`](docs/COMPONENTES.mmd) — diagrama de componentes.
+- [`docs/MANUAL_USUARIO.md`](docs/MANUAL_USUARIO.md) — borrador con marcadores `[CAPTURA: ...]`.
+- [`docs/PLAN_PRUEBAS.md`](docs/PLAN_PRUEBAS.md) — plan de pruebas con tabla ID → test.
 
 ## Pendiente de implementar
 
-1. **Conectar prescripciones de visita a `farmacia-service`**: hoy
-   `visita_prescripciones` sólo se guarda localmente en pacientes-service.
-   Al aplicar RN-06 hay que validar contra prescripción existente antes
-   de permitir un `POST /api/farmacia/dispensaciones`. Llamada HTTP
-   directa (patrón adoptado en el resto del sistema).
-2. **Reintentos automáticos** para notificaciones fallidas (hoy: fire-and-forget).
-3. **Refinamiento de RBAC** en las nuevas UI (algunas acciones se muestran
-   siempre y el 403 se ve al ejecutarlas — funcional pero áspero).
-4. **Rangos de reportes por defecto contextuales** (hoy: últimos 3 meses).
+1. Insertar las capturas reales en `docs/MANUAL_USUARIO.md`.
+2. Renderizar los `.mmd` a PNG con mermaid-cli para la entrega impresa
+   (hoy sólo quedan como fuente .mmd).
+3. Pantalla de administración para `examenes_precios` (hoy sólo seed).
+4. Flujo de "asociar medicamento del inventario a una prescripción ya
+   emitida sin idMedicamento" (hoy hay que crear otra prescripción).
+5. Reportes extra o auto-paginación cuando una tabla supere N filas.
 
 ## Reglas de negocio críticas (no romper al tocar código existente)
 
