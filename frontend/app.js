@@ -232,20 +232,29 @@ function cambiarTab(tab) {
  * ============================================================ */
 
 async function cargarDashboard() {
+  // Estados iniciales de carga
+  $('#kpiPacientes').textContent = '···';
+  $('#kpiSolicitudesActivas').textContent = '···';
+  $('#kpiVisitasActivas').textContent = '···';
+  $('#kpiAlertasSaldo').textContent = '···';
+  $('#tbodyDashSolic').innerHTML = `<tr><td colspan="4"><span class="cargando">Cargando…</span></td></tr>`;
+
   try {
     const [pacientes, solicitudes] = await Promise.all([
       api(API.pacientes, '/api/pacientes'),
       api(API.pacientes, '/api/solicitudes')
     ]);
     $('#kpiPacientes').textContent = pacientes.length;
+
     const activas = solicitudes.filter(s =>
-      ['pendiente_asignacion','cita_asignada','en_atencion'].includes(s.estado)
-    );
+      ['pendiente_asignacion','cita_asignada','en_atencion'].includes(s.estado));
     $('#kpiSolicitudesActivas').textContent = activas.length;
+
     const enAtencion = solicitudes.filter(s => s.estado === 'en_atencion');
     $('#kpiVisitasActivas').textContent = enAtencion.length;
 
     const mapa = Object.fromEntries(pacientes.map(p => [p.id, `${p.nombres} ${p.apellidos}`]));
+    $('#contadorDashSolic').textContent = `${solicitudes.length} en el sistema`;
     const rows = solicitudes.slice(0, 8).map(s => `
       <tr>
         <td>${esc(mapa[s.idPaciente] || `Paciente #${s.idPaciente}`)}</td>
@@ -253,9 +262,41 @@ async function cargarDashboard() {
         <td>${chip(s.estado)}</td>
         <td class="tiny">${fechaHora(s.fechaCreacion)}</td>
       </tr>`).join('');
-    $('#tbodyDashSolic').innerHTML = rows || `<tr><td colspan="4" class="tiny">Sin solicitudes todavía.</td></tr>`;
+    $('#tbodyDashSolic').innerHTML = rows ||
+      `<tr><td colspan="4" class="tiny">Sin solicitudes todavía — aparecerán aquí cuando el médico general registre una.</td></tr>`;
+
+    // KPI alertas de saldo: consulta financiero para los primeros 10
+    // pacientes (compromiso simple entre latencia y cobertura).
+    cargarKpiAlertasSaldo(pacientes.slice(0, 20));
   } catch (err) {
-    console.error('Dashboard:', err);
+    $('#kpiPacientes').textContent = '—';
+    $('#kpiSolicitudesActivas').textContent = '—';
+    $('#kpiVisitasActivas').textContent = '—';
+    $('#kpiAlertasSaldo').textContent = '—';
+    $('#tbodyDashSolic').innerHTML =
+      `<tr><td colspan="4"><div class="msg error">No se pudo cargar el panel: ${esc(err.message)}</div></td></tr>`;
+  }
+}
+
+async function cargarKpiAlertasSaldo(pacientes) {
+  if (!pacientes.length) {
+    $('#kpiAlertasSaldo').textContent = '0';
+    return;
+  }
+  try {
+    const resultados = await Promise.all(pacientes.map(p =>
+      api(API.financiero, `/api/financiero/estado-cuenta/${p.id}`)
+        .catch(() => null)
+    ));
+    const altas = resultados.filter(r => r && r.alerta && r.alerta.nivel === 'alto');
+    $('#kpiAlertasSaldo').textContent = altas.length;
+    const box = $('#kpiAlertasBox');
+    box.classList.remove('ok', 'warn', 'error');
+    if (altas.length > 0) box.classList.add('error');
+    else if (resultados.some(r => r && r.alerta)) box.classList.add('warn');
+    else box.classList.add('ok');
+  } catch {
+    $('#kpiAlertasSaldo').textContent = '—';
   }
 }
 
