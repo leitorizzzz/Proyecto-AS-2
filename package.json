@@ -1,0 +1,26 @@
+{
+  "name": "asilo-cabeza-de-algodon",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Monorepo-lite: solo contiene scripts de prueba y de siembra para el sistema completo. Cada microservicio tiene su propio package.json con sus dependencias de produccion.",
+  "scripts": {
+    "test:todo": "jest --runInBand",
+    "test": "jest --runInBand",
+    "test:ci": "jest --runInBand --silent --json --outputFile=docs/jest-report.json",
+    "seed:demo": "node scripts/seed-demo.js"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "<rootDir>/**/__tests__/**/*.test.js"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/"
+    ],
+    "verbose": true
+  }
+}
