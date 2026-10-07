@@ -7,6 +7,7 @@ const path = require('path');
 const { inicializarEsquema } = require('./repositories/database');
 const MedicamentoRepository = require('./repositories/MedicamentoRepository');
 const DispensacionRepository = require('./repositories/DispensacionRepository');
+const PrescripcionReadRepository = require('./repositories/PrescripcionReadRepository');
 const FarmaciaService = require('./services/FarmaciaService');
 const FarmaciaController = require('./controllers/FarmaciaController');
 const crearRutasFarmacia = require('./routes/farmaciaRoutes');
@@ -15,7 +16,12 @@ const crearRutasFarmacia = require('./routes/farmaciaRoutes');
 // Presentacion -> Logica de Negocio -> Acceso a Datos -> Entidades
 const medicamentoRepository = new MedicamentoRepository();
 const dispensacionRepository = new DispensacionRepository();
-const farmaciaService = new FarmaciaService(medicamentoRepository, dispensacionRepository);
+const prescripcionRepository = new PrescripcionReadRepository();
+const farmaciaService = new FarmaciaService(
+  medicamentoRepository,
+  dispensacionRepository,
+  prescripcionRepository
+);
 const farmaciaController = new FarmaciaController(farmaciaService);
 
 const app = express();

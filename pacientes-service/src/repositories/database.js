@@ -136,10 +136,47 @@ async function inicializarEsquema() {
       medicamento NVARCHAR(200) NOT NULL,
       dosis NVARCHAR(200) NULL,
       indicaciones NVARCHAR(500) NULL,
+      idMedicamento INT NULL,
+      estado NVARCHAR(20) NOT NULL DEFAULT 'pendiente',
+      idDispensacion INT NULL,
+      fechaDispensacion DATETIME2 NULL,
       fechaPrescripcion DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
       CONSTRAINT FK_prescripciones_visita
         FOREIGN KEY (idVisita) REFERENCES visitas_medicas(id)
     );
+  `);
+
+  // RN-06: la prescripcion debe tener identidad y estado para que
+  // farmacia-service pueda validar antes de dispensar. ALTERs idempotentes
+  // para no romper BDs ya desplegadas.
+  await pool.request().query(`
+    IF NOT EXISTS (
+      SELECT 1 FROM sys.columns
+      WHERE object_id = OBJECT_ID('visita_prescripciones') AND name = 'idMedicamento'
+    )
+    ALTER TABLE visita_prescripciones ADD idMedicamento INT NULL;
+  `);
+  await pool.request().query(`
+    IF NOT EXISTS (
+      SELECT 1 FROM sys.columns
+      WHERE object_id = OBJECT_ID('visita_prescripciones') AND name = 'estado'
+    )
+    ALTER TABLE visita_prescripciones ADD estado NVARCHAR(20) NOT NULL
+      CONSTRAINT DF_visita_prescripciones_estado DEFAULT 'pendiente';
+  `);
+  await pool.request().query(`
+    IF NOT EXISTS (
+      SELECT 1 FROM sys.columns
+      WHERE object_id = OBJECT_ID('visita_prescripciones') AND name = 'idDispensacion'
+    )
+    ALTER TABLE visita_prescripciones ADD idDispensacion INT NULL;
+  `);
+  await pool.request().query(`
+    IF NOT EXISTS (
+      SELECT 1 FROM sys.columns
+      WHERE object_id = OBJECT_ID('visita_prescripciones') AND name = 'fechaDispensacion'
+    )
+    ALTER TABLE visita_prescripciones ADD fechaDispensacion DATETIME2 NULL;
   `);
 }
 

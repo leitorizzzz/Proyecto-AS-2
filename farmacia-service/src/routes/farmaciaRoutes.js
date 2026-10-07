@@ -14,7 +14,13 @@ function crearRutasFarmacia(farmaciaController) {
   router.put('/medicamentos/:id', farmaciaController.actualizarMedicamento);
   router.delete('/medicamentos/:id', farmaciaController.eliminarMedicamento);
 
-  // Dispensacion de medicamentos a pacientes
+  // Prescripciones pendientes (lectura desde visita_prescripciones)
+  router.get(
+    '/prescripciones/pendientes/paciente/:idPaciente',
+    farmaciaController.prescripcionesPendientesPaciente
+  );
+
+  // Dispensacion de medicamentos a pacientes (requiere prescripcion valida, RN-06)
   router.post('/dispensaciones', farmaciaController.dispensar);
   router.get('/dispensaciones/paciente/:idPaciente', farmaciaController.historialPaciente);
 

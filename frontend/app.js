@@ -136,7 +136,19 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#formDonante').addEventListener('submit', onRegistrarDonante);
   $('#formDonacion').addEventListener('submit', onRegistrarDonacion);
 
-  $('#dPaciente').addEventListener('change', cargarHistorialFarmacia);
+  $('#dPaciente').addEventListener('change', async () => {
+    await cargarPrescripcionesPendientes();
+    await cargarHistorialFarmacia();
+  });
+  $('#rxIdMedicamento').addEventListener('change', () => {
+    const sel = $('#rxIdMedicamento');
+    const opt = sel.options[sel.selectedIndex];
+    if (opt && opt.value) {
+      // Pre-rellenar el texto con el nombre del medicamento elegido
+      const label = opt.textContent.split(' — ')[0];
+      $('#rxMedicamento').value = label;
+    }
+  });
   $('#fPaciente').addEventListener('change', cargarEstadoCuenta);
   $('#selectorVisita').addEventListener('change', cargarDetalleVisita);
   $('#btnGuardarClinico').addEventListener('click', onGuardarClinico);
@@ -504,9 +516,19 @@ async function cargarDetalleVisita() {
     ).join('') || `<li class="tiny">Sin exámenes solicitados.</li>`;
 
     $('#listaPrescripciones').innerHTML = (v.prescripciones || []).map(rx =>
-      `<li><strong>${esc(rx.medicamento)}</strong>${rx.dosis ? ' — ' + esc(rx.dosis) : ''}
-        <div class="tiny">${esc(rx.indicaciones || '')}</div></li>`
+      `<li><strong>${esc(rx.medicamento)}</strong>${rx.dosis ? ' — ' + esc(rx.dosis) : ''} ${chip(rx.estado || 'pendiente')}
+        <div class="tiny">${esc(rx.indicaciones || '')}${rx.idMedicamento ? ' · inventario #' + rx.idMedicamento : ' · sin inventario'}</div></li>`
     ).join('') || `<li class="tiny">Sin prescripciones.</li>`;
+
+    // Cargar inventario de farmacia para la lista de medicamentos
+    if (puedeEditar) {
+      try {
+        const meds = await api(API.farmacia, '/api/farmacia/medicamentos');
+        $('#rxIdMedicamento').innerHTML =
+          `<option value="">— elegir del inventario (requerido para que farmacia pueda dispensar) —</option>` +
+          meds.map(m => `<option value="${m.id}">${esc(m.nombre)} — ${esc(m.presentacion || '')}</option>`).join('');
+      } catch { /* el servicio de farmacia puede estar caido */ }
+    }
   } catch (err) {
     error($('#msgClinico'), err.message);
   }
@@ -553,18 +575,23 @@ async function onAgregarExamen() {
 
 async function onAgregarPrescripcion() {
   const msg = $('#msgRx'); limpiar(msg);
+  const idMedSel = Number($('#rxIdMedicamento').value) || null;
   const body = {
     medicamento: $('#rxMedicamento').value.trim(),
     dosis: $('#rxDosis').value.trim() || null,
-    indicaciones: $('#rxIndicaciones').value.trim() || null
+    indicaciones: $('#rxIndicaciones').value.trim() || null,
+    idMedicamento: idMedSel
   };
   if (!body.medicamento) return error(msg, 'Escribe el medicamento.');
   try {
     await api(API.pacientes, `/api/visitas/${state.visitaSeleccionada}/prescripciones`, {
       method: 'POST', body
     });
-    $('#rxMedicamento').value = ''; $('#rxDosis').value = ''; $('#rxIndicaciones').value = '';
-    ok(msg, 'Prescripción registrada.');
+    $('#rxMedicamento').value = ''; $('#rxDosis').value = '';
+    $('#rxIndicaciones').value = ''; $('#rxIdMedicamento').value = '';
+    ok(msg, idMedSel
+      ? 'Prescripción registrada y lista para dispensar.'
+      : 'Prescripción registrada (sin medicamento de inventario — farmacia no podrá dispensarla hasta que se asocie).');
     cargarDetalleVisita();
   } catch (err) { error(msg, err.message); }
 }
@@ -588,11 +615,50 @@ async function cargarFarmacia() {
         <td class="right num">${money(m.precioUnitario)}</td>
       </tr>`).join('');
     $('#vacioMedicamentos').classList.toggle('hidden', meds.length > 0);
-    $('#dMedicamento').innerHTML = `<option value="">Elegir…</option>` +
-      meds.map(m => `<option value="${m.id}">${esc(m.nombre)} — ${money(m.precioUnitario)}</option>`).join('');
     llenarSelectPacientes($('#dPaciente'), pacientes);
-    if ($('#dPaciente').value) cargarHistorialFarmacia();
+    if ($('#dPaciente').value) {
+      await cargarPrescripcionesPendientes();
+      await cargarHistorialFarmacia();
+    } else {
+      $('#dPrescripcion').innerHTML = `<option value="">— selecciona paciente primero —</option>`;
+      $('#hintPrescripcion').textContent = '';
+    }
   } catch (err) { console.error('Farmacia:', err); }
+}
+
+async function cargarPrescripcionesPendientes() {
+  const id = Number($('#dPaciente').value);
+  const sel = $('#dPrescripcion');
+  const hint = $('#hintPrescripcion');
+  if (!id) {
+    sel.innerHTML = `<option value="">— selecciona paciente primero —</option>`;
+    hint.textContent = '';
+    return;
+  }
+  try {
+    const prescripciones = await api(
+      API.farmacia,
+      `/api/farmacia/prescripciones/pendientes/paciente/${id}`
+    );
+    if (prescripciones.length === 0) {
+      sel.innerHTML = `<option value="">— sin prescripciones pendientes —</option>`;
+      sel.disabled = true;
+      $('#btnDispensar').disabled = true;
+      hint.textContent = 'Este paciente no tiene prescripciones pendientes. El médico especialista debe emitir una en una visita antes de que farmacia pueda dispensarla.';
+    } else {
+      sel.disabled = false;
+      $('#btnDispensar').disabled = false;
+      sel.innerHTML = `<option value="">Elegir…</option>` + prescripciones.map(p => {
+        const sinMed = p.idMedicamento == null;
+        const etiqueta = `${esc(p.medicamento)}${p.dosis ? ' · ' + esc(p.dosis) : ''}${sinMed ? ' (sin medicamento de inventario)' : ''}`;
+        return `<option value="${p.id}" data-sinmed="${sinMed}">${etiqueta}</option>`;
+      }).join('');
+      hint.textContent = `${prescripciones.length} prescripción(es) pendiente(s) para este paciente.`;
+    }
+  } catch (err) {
+    sel.innerHTML = `<option value="">— error al cargar —</option>`;
+    hint.textContent = err.message;
+  }
 }
 
 async function cargarHistorialFarmacia() {
@@ -618,15 +684,17 @@ async function cargarHistorialFarmacia() {
 async function onDispensar(e) {
   e.preventDefault();
   const msg = $('#msgDispensar'); limpiar(msg);
+  const idPrescripcion = Number($('#dPrescripcion').value);
+  if (!idPrescripcion) return error(msg, 'Elegí una prescripción pendiente.');
   const body = {
-    idPaciente: Number($('#dPaciente').value),
-    idMedicamento: Number($('#dMedicamento').value),
+    idPaciente: Number($('#dPaciente').value) || null,
+    idPrescripcion,
     cantidad: Number($('#dCantidad').value)
   };
   try {
     const d = await api(API.farmacia, '/api/farmacia/dispensaciones', { method: 'POST', body });
-    ok(msg, `Dispensado. Costo con descuento fundación: ${money(d.costoTotal)}`);
-    cargarFarmacia();
+    ok(msg, `Dispensado "${d.medicamento}". Costo con descuento fundación: ${money(d.costoTotal)}`);
+    await cargarFarmacia();
   } catch (err) { error(msg, err.message); }
 }
 

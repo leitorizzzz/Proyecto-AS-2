@@ -312,8 +312,12 @@
             <div class="subcard" style="margin-top:16px">
               <h4>Prescripciones</h4>
               <ul id="listaPrescripciones"></ul>
-              <label for="rxMedicamento">Medicamento</label>
-              <input id="rxMedicamento" placeholder="Losartán 50mg">
+              <label for="rxIdMedicamento">Medicamento del inventario</label>
+              <select id="rxIdMedicamento">
+                <option value="">— elegir del inventario (requerido para que farmacia pueda dispensar) —</option>
+              </select>
+              <label for="rxMedicamento">Nombre y presentación</label>
+              <input id="rxMedicamento" placeholder="Se completa al elegir del inventario">
               <div class="fila-2">
                 <div>
                   <label for="rxDosis">Dosis</label>
@@ -357,20 +361,23 @@
         </div>
 
         <div class="card">
-          <h3>Dispensar</h3>
-          <p class="hint">La fundación aplica un 20% de descuento sobre el precio de lista. El costo final lo calcula el microservicio de farmacia.</p>
+          <h3>Dispensar contra prescripción</h3>
+          <p class="hint">RN-06: solo se dispensa lo prescrito por un médico en una visita. Elige al paciente y verás sus prescripciones pendientes.</p>
           <form id="formDispensar">
             <label for="dPaciente">Paciente</label>
             <select id="dPaciente" required></select>
 
-            <label for="dMedicamento">Medicamento</label>
-            <select id="dMedicamento" required></select>
+            <label for="dPrescripcion">Prescripción pendiente</label>
+            <select id="dPrescripcion" required>
+              <option value="">— selecciona paciente primero —</option>
+            </select>
 
-            <label for="dCantidad">Cantidad</label>
+            <label for="dCantidad">Cantidad a entregar</label>
             <input type="number" id="dCantidad" min="1" value="1" required>
 
             <button type="submit" class="btn" id="btnDispensar">Dispensar</button>
             <div id="msgDispensar"></div>
+            <p class="tiny" id="hintPrescripcion"></p>
           </form>
         </div>
       </div>

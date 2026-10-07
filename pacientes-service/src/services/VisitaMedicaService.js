@@ -94,7 +94,12 @@ class VisitaMedicaService {
     return this.repo.agregarPrescripcion(id, {
       medicamento: String(datos.medicamento).trim(),
       dosis: datos.dosis ? String(datos.dosis) : null,
-      indicaciones: datos.indicaciones ? String(datos.indicaciones) : null
+      indicaciones: datos.indicaciones ? String(datos.indicaciones) : null,
+      // idMedicamento es opcional al prescribir, pero obligatorio para que
+      // farmacia-service pueda dispensarla despues (RN-06). Si viene vacio,
+      // la prescripcion queda como registro informativo y no se podra
+      // dispensar hasta que el especialista la asocie a un medicamento.
+      idMedicamento: datos.idMedicamento != null ? Number(datos.idMedicamento) : null
     });
   }
 
