@@ -218,6 +218,11 @@ services:
       REMITENTE_NOMBRE: "Asilo Cabeza de Algodon"
       # true = no llama a Brevo, guarda como enviada. Util en dev.
       MODO_SIMULACION: ${MODO_SIMULACION:-true}
+      # Reintentos automaticos de notificaciones fallidas
+      NOTIF_MAX_INTENTOS: ${NOTIF_MAX_INTENTOS:-3}
+      NOTIF_ESPERA_BASE_SEG: ${NOTIF_ESPERA_BASE_SEG:-30}
+      NOTIF_ESPERA_MAX_SEG: ${NOTIF_ESPERA_MAX_SEG:-300}
+      NOTIF_INTERVALO_JOB_SEG: ${NOTIF_INTERVALO_JOB_SEG:-30}
     ports:
       - "3006:3006"
     restart: unless-stopped
