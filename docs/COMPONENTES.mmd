@@ -1,0 +1,51 @@
+%% Diagrama de componentes del Sistema Asilo Cabeza de Algodon.
+%% Refleja la topologia real de docker-compose.yml (7 microservicios +
+%% SQL Server + nginx) y las llamadas HTTP entre ellos.
+graph LR
+
+    subgraph Cliente
+        BR[Navegador del personal<br/>del asilo]
+    end
+
+    subgraph Infra["Infraestructura (docker-compose)"]
+        NG[nginx :8090<br/>frontend/]
+        AU[auth-service :3000]
+        PA[pacientes-service :3002]
+        FA[farmacia-service :3001]
+        LA[laboratorio-service :3003]
+        FI[financiero-service :3004]
+        RE[reportes-service :3005]
+        NO[notificaciones-service :3006]
+        DB[(SQL Server :1433<br/>AsiloCabezaAlgodon)]
+        BV[Brevo API]
+    end
+
+    BR -->|HTTP + JWT| NG
+    BR -->|HTTP + JWT| AU
+    BR -->|HTTP + JWT| PA
+    BR -->|HTTP + JWT| FA
+    BR -->|HTTP + JWT| LA
+    BR -->|HTTP + JWT| FI
+    BR -->|HTTP + JWT| RE
+    BR -->|HTTP + JWT| NO
+
+    AU -->|mssql| DB
+    PA -->|mssql| DB
+    FA -->|mssql| DB
+    LA -->|mssql| DB
+    FI -->|mssql| DB
+    RE -->|mssql| DB
+    NO -->|mssql| DB
+
+    PA -.->|POST /api/notificaciones/solicitud<br/>fire-and-forget con JWT| NO
+    FA -.->|lee + marca visita_prescripciones<br/>misma BD compartida| DB
+    LA -.->|lee + marca visita_examenes<br/>misma BD compartida| DB
+
+    NO -->|POST v3/smtp/email<br/>si BREVO_API_KEY| BV
+
+    classDef servicio fill:#eef3fb,stroke:#2a4f7a,stroke-width:1px,color:#15202b
+    classDef bd fill:#efe8d9,stroke:#8a6b3e,stroke-width:1px,color:#2b1f0b
+    classDef externo fill:#f0eef7,stroke:#5a4e7d,stroke-width:1px,color:#2e2748
+    class AU,PA,FA,LA,FI,RE,NO,NG servicio
+    class DB bd
+    class BV,BR externo

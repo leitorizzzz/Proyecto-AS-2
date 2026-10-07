@@ -158,70 +158,88 @@ RBAC por endpoint (aplicado con `autorizarRoles(...)`):
 
 ## 4. Lenguajes y tecnologías (a nivel de sistema)
 
-| Categoría | Definido / usado |
-|---|---|
-| Base de datos objetivo (producción) | MySQL, SQL Server u Oracle (requerido por el enunciado) |
-| Microservicio de Farmacia (actual) | Node.js + Express + SQLite (demo) |
-| Contenedores | Docker (Dockerfile ya creado para Farmacia) |
-| Orquestación (pendiente de explorar) | Kubernetes / Azure Container Instances |
-| Entorno de desarrollo | Antigravity (fork de VS Code), Claude Code como asistente |
-| Modelado UML/ERD | Pendiente de herramienta a definir |
-| Planificación | Microsoft Project (requerido por el enunciado, trabajar junto a SQA) |
+Stack realmente usado hoy en el repositorio:
 
-No hay un stack único obligatorio para todos los módulos — cada
-microservicio individual puede usar la tecnología que el estudiante
-prefiera (Node.js, Java Spring, Python, .NET), siempre que se comunique con
-los demás y respete las 4 capas.
+| Categoría | Tecnología |
+|---|---|
+| Lenguaje de los 7 microservicios | **Node.js 20+ (Alpine en Docker)** |
+| Framework HTTP | **Express 4** |
+| Base de datos | **SQL Server 2022** (BD compartida `AsiloCabezaAlgodon`) |
+| Cliente SQL | `mssql` (sin ORM; mapeo manual en la capa Repository) |
+| Autenticación | JWT HS256 (`jsonwebtoken`) + bcrypt (`bcryptjs`) |
+| Correo transaccional | **Brevo** (`fetch` nativo contra `/v3/smtp/email`) |
+| Reportes | **pdfkit** (PDF) + **exceljs** (Excel) |
+| Frontend | HTML/CSS/JS plano servido por **nginx** 1.27 (sin build, sin frameworks) |
+| Tipografías del frontend | Fuentes del sistema + Google Fonts cuando lo pide la skill de diseño |
+| Pruebas automatizadas | **Jest 29 + Supertest 7** (ver [docs/PLAN_PRUEBAS.md](docs/PLAN_PRUEBAS.md)) |
+| Contenedores / orquestación local | **Docker Compose** |
+| Despliegue | Servidor Debian (Lenovo) accesible por Tailscale (`100.96.172.77`) y LAN (`192.168.1.100`) |
+| Entorno de desarrollo | VS Code / Antigravity, Claude Code como asistente |
+| Gestión del proyecto (SQA + planificación) | **ClickUp** |
+| Modelado UML/ERD | Diagramas Mermaid en `docs/` (ERD, componentes) |
+
+Decisiones arquitectónicas tomadas:
+- **Un solo motor de BD** (SQL Server). Se evaluó database-per-service y
+  se rechazó porque multiplicaba la complejidad operativa sin aportar
+  aislamiento real al proyecto académico.
+- **Comunicación entre microservicios por HTTP directo** usando el
+  nombre del contenedor de docker-compose (`http://auth-service:3000`,
+  etc.). Sin API Gateway, sin cola de mensajes.
+- **Mismo stack Node.js en todos los servicios** por mantenibilidad.
 
 ---
 
 ## 5. Estructura de carpetas actual del repositorio
 
-Por ahora solo existe el microservicio de Farmacia como código real; el
-resto del sistema aún es documentación.
-
 ```
-proyecto/
-├── farmacia-service/          # Microservicio funcional (Node.js/Express/SQLite)
-│   ├── src/
-│   │   ├── app.js
-│   │   ├── controllers/
-│   │   ├── routes/
-│   │   ├── services/
-│   │   ├── repositories/
-│   │   └── models/
-│   ├── public/                # Frontend de prueba
-│   ├── Dockerfile
-│   ├── CONTEXT.md             # Contexto específico de este microservicio
-│   └── README.md
-├── documentacion/
-│   ├── Arquitectura_Asilo_Cabeza_Algodonn.docx / .pdf
-│   ├── Estructura_Capas_Proyecto.docx / .pdf
-│   └── (UX/UI login: v1, v2, wireframe, PPTX)
-└── (módulos pendientes: pacientes, laboratorio, financiero, reportes, notificaciones)
+Proyecto-AS-2/
+├── auth-service/              # Puerto 3000 — JWT + RBAC
+├── pacientes-service/         # Puerto 3002 — Paciente, Solicitud, Visita
+├── farmacia-service/          # Puerto 3001 — Inventario + Dispensación (RN-06, RN-09)
+├── laboratorio-service/       # Puerto 3003 — Órdenes y resultados (RN-09)
+├── financiero-service/        # Puerto 3004 — Cuentas, cuotas, donaciones, gastos
+├── reportes-service/          # Puerto 3005 — 7 reportes (PDF/Excel/JSON)
+├── notificaciones-service/    # Puerto 3006 — Brevo + reintentos
+├── frontend/                  # Puerto 8090 — HTML/CSS/JS por nginx
+├── infra/                     # SQL de bootstrap (crear BD compartida)
+├── scripts/                   # run-all-tests.sh, run-all-tests.ps1, seed-demo.js
+├── docs/                      # PLAN_PRUEBAS.md, ERD.mmd, COMPONENTES.mmd, MANUAL_USUARIO.md
+├── docker-compose.yml         # 7 servicios + SQL Server + db-init + nginx
+├── .env.example               # Credenciales y configuración (NO versionada)
+├── package.json               # Monorepo-lite: solo scripts (test:todo, seed:demo) + jest
+├── CLAUDE.md                  # Resumen operativo para Claude Code
+└── CONTEXT_SISTEMA.md         # Este archivo
 ```
 
-> Sugerencia: a medida que se construyan más microservicios, cada uno debería
-> vivir en su propia carpeta al mismo nivel que `farmacia-service/`, cada uno
-> con su propio `README.md` y `Dockerfile`, para poder desplegarse de forma
-> independiente.
+Cada servicio tiene la **misma estructura interna de 4 capas**:
+
+```
+<servicio>/
+├── src/
+│   ├── app.js                  # Ensamblado (DI manual)
+│   ├── controllers/            # Presentación
+│   ├── routes/                 # Presentación (endpoints)
+│   ├── services/               # Lógica de Negocio (RN-xx)
+│   ├── repositories/           # Acceso a Datos
+│   ├── models/                 # Entidades / Modelos
+│   └── middleware/             # authMiddleware + autorizarRoles (copias idénticas)
+├── __tests__/                  # Pruebas Jest (en los servicios con RN críticas)
+├── package.json
+├── Dockerfile
+├── .env  / .env.example
+└── README.md
+```
 
 ---
 
 ## 6. Requisitos / features pendientes a nivel de sistema
 
-### Documentación (fases del proyecto, según fechas de entrega)
-- [ ] Fase de Análisis: estudio de factibilidad, análisis de requerimientos,
-      diagramas UML completos, ERD.
-- [ ] Planificación real del proyecto en Microsoft Project (junto a SQA).
-- [ ] Prototipo de interfaz completo (ya se avanzó con el login; faltan las
-      demás pantallas).
-- [ ] Documentación de componentes de software basada en clases.
-- [ ] Plan de pruebas (junto a SQA).
-- [ ] Manual de usuario (con modelo E-R y diagrama de componentes).
-- [ ] Definir protocolo de versionado (GitHub u otro) — **recordar que el
-      enunciado prohíbe entregar ZIP/RAR en la entrega final**, solo se
-      acepta URL de repositorio.
+### Documentación
+- [x] Diagramas Mermaid: ERD (`docs/ERD.mmd`) y componentes (`docs/COMPONENTES.mmd`).
+- [x] Plan de pruebas (`docs/PLAN_PRUEBAS.md`) con mapeo 1-a-1 a los tests.
+- [x] Manual de usuario (`docs/MANUAL_USUARIO.md`) con huecos marcados para capturas.
+- [ ] Planificación del proyecto en ClickUp (fuera del repo).
+- [ ] Protocolo de versionado documentado en el repo (branches, PRs, revisión SQA).
 
 ### Desarrollo (módulos por construir)
 - [x] Módulo de Pacientes / Ficha médica.

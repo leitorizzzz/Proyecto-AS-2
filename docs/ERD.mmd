@@ -1,0 +1,197 @@
+%% ERD de la base de datos compartida AsiloCabezaAlgodon.
+%% Generado leyendo los bootstraps SQL de cada servicio (inicializarEsquema).
+%% Las columnas marcadas FK son referencias logicas; no todas tienen FK
+%% declarado en SQL para permitir que los servicios arranquen en cualquier
+%% orden (ej. resultados_examenes.idExamen apunta a visita_examenes).
+erDiagram
+
+    usuarios {
+        INT id PK
+        NVARCHAR nombre
+        NVARCHAR email UK
+        NVARCHAR passwordHash
+        NVARCHAR rol
+        DATETIME2 fechaRegistro
+    }
+
+    pacientes {
+        INT id PK
+        NVARCHAR nombres
+        NVARCHAR apellidos
+        DATE fechaNacimiento
+        NVARCHAR genero
+        NVARCHAR dpi UK
+        NVARCHAR direccion
+        NVARCHAR telefono
+        NVARCHAR contactoEmergencia
+        NVARCHAR familiarEmail
+        NVARCHAR padecimientos
+        DATETIME2 fechaIngreso
+    }
+
+    solicitudes_referencia {
+        INT id PK
+        INT idPaciente FK
+        INT idMedicoGeneral
+        NVARCHAR especialidad
+        NVARCHAR motivo
+        NVARCHAR estado
+        DATE fechaCita
+        TIME horaCita
+        INT idMedicoEspecialista
+        DATETIME2 fechaCreacion
+        DATETIME2 fechaActualizacion
+    }
+
+    visitas_medicas {
+        INT id PK
+        INT idSolicitudReferencia FK
+        INT idPaciente FK
+        INT idMedicoEspecialista
+        DATETIME2 fecha
+        NVARCHAR diagnostico
+        NVARCHAR observaciones
+        NVARCHAR estado
+        DATETIME2 fechaCompletada
+    }
+
+    visita_examenes {
+        INT id PK
+        INT idVisita FK
+        NVARCHAR tipo
+        NVARCHAR estado
+        DATETIME2 fechaSolicitud
+    }
+
+    visita_prescripciones {
+        INT id PK
+        INT idVisita FK
+        NVARCHAR medicamento
+        NVARCHAR dosis
+        NVARCHAR indicaciones
+        INT idMedicamento FK
+        NVARCHAR estado
+        INT idDispensacion FK
+        DATETIME2 fechaDispensacion
+        DATETIME2 fechaPrescripcion
+    }
+
+    medicamentos {
+        INT id PK
+        NVARCHAR nombre
+        NVARCHAR presentacion
+        INT stock
+        DECIMAL precioUnitario
+    }
+
+    dispensaciones {
+        INT id PK
+        INT idPaciente
+        INT idVisita
+        INT idMedicamento FK
+        INT cantidad
+        DECIMAL costoTotal
+        DATETIME2 fecha
+    }
+
+    examenes_precios {
+        INT id PK
+        NVARCHAR tipo UK
+        DECIMAL precioBase
+    }
+
+    resultados_examenes {
+        INT id PK
+        INT idExamen FK
+        NVARCHAR tipoResultado
+        NVARCHAR valorTexto
+        DECIMAL valorNumerico
+        NVARCHAR archivoAdjunto
+        NVARCHAR estado
+        DATETIME2 fechaCreacion
+        DATETIME2 fechaDisponible
+    }
+
+    cargos_servicio {
+        INT id PK
+        INT idPaciente FK
+        NVARCHAR concepto
+        DECIMAL monto
+        DATETIME2 fecha
+        NVARCHAR estado
+    }
+
+    cuotas_mensuales {
+        INT id PK
+        INT idPaciente FK
+        TINYINT mes
+        SMALLINT anio
+        DECIMAL monto
+        NVARCHAR estado
+        DATETIME2 fechaPago
+    }
+
+    donantes {
+        INT id PK
+        NVARCHAR nombre
+        NVARCHAR telefono
+        NVARCHAR email
+        NVARCHAR direccion
+        DATETIME2 fechaRegistro
+    }
+
+    donaciones {
+        INT id PK
+        INT idDonante FK
+        DECIMAL monto
+        NVARCHAR tipo
+        NVARCHAR concepto
+        DATETIME2 fecha
+    }
+
+    gastos_operativos {
+        INT id PK
+        NVARCHAR concepto
+        DECIMAL monto
+        NVARCHAR categoria
+        DATETIME2 fecha
+    }
+
+    pagos_fundacion {
+        INT id PK
+        DECIMAL monto
+        NVARCHAR concepto
+        DATETIME2 fecha
+    }
+
+    notificaciones {
+        INT id PK
+        INT idPaciente
+        NVARCHAR tipoEvento
+        NVARCHAR destinatarioEmail
+        NVARCHAR asunto
+        NVARCHAR cuerpo
+        NVARCHAR estado
+        INT intentos
+        INT maxIntentos
+        DATETIME2 proximoIntento
+        DATETIME2 fechaCreacion
+        DATETIME2 fechaEnvio
+        DATETIME2 fechaUltimoIntento
+        NVARCHAR mensajeError
+    }
+
+    pacientes ||--o{ solicitudes_referencia : "tiene"
+    pacientes ||--o{ visitas_medicas       : "recibe"
+    pacientes ||--o{ cargos_servicio       : "le aplican"
+    pacientes ||--o{ cuotas_mensuales      : "paga"
+    solicitudes_referencia ||--o| visitas_medicas : "deriva en"
+    visitas_medicas ||--o{ visita_examenes       : "solicita"
+    visitas_medicas ||--o{ visita_prescripciones : "prescribe"
+    medicamentos    ||--o{ visita_prescripciones : "referenciado por"
+    medicamentos    ||--o{ dispensaciones        : "entregado como"
+    visita_prescripciones ||--o| dispensaciones  : "se dispensa como (RN-06)"
+    visita_examenes ||--o| resultados_examenes   : "se completa con"
+    donantes        ||--o{ donaciones            : "aporta"
+    usuarios        ||--o{ solicitudes_referencia : "crea / asigna"
+    usuarios        ||--o{ visitas_medicas        : "atiende"
