@@ -7,7 +7,9 @@
     "test:todo": "jest --runInBand",
     "test": "jest --runInBand",
     "test:ci": "jest --runInBand --silent --json --outputFile=docs/jest-report.json",
-    "seed:demo": "node scripts/seed-demo.js"
+    "test:e2e": "node scripts/e2e-smoke.js",
+    "seed:demo": "node scripts/seed-demo.js",
+    "bootstrap": "node scripts/bootstrap-node.js"
   },
   "devDependencies": {
     "jest": "^29.7.0",

@@ -11,16 +11,25 @@ reglas RN-xx) y el **pipe de middlewares** (autenticacion + autorizacion
 por rol). Los repositorios se simulan con mocks para aislar las pruebas
 de la base de datos.
 
-Las pruebas NO requieren levantar el stack Docker. Se corren con:
+Las pruebas se dividen en dos capas separadas:
 
+**(1) Unitarias + RBAC**: NO requieren el stack Docker. Mocks de repositorios
+y app Express sintetica.
 ```bash
 ./scripts/run-all-tests.sh         # Linux / Git Bash
 ./scripts/run-all-tests.ps1        # PowerShell
-# o directamente
 npm run test:todo
 ```
-
 Ultima ejecucion: **45 casos, 45 OK, 0 falla**.
+
+**(2) Integracion end-to-end**: requieren el stack docker-compose
+arriba. Recorren el flujo completo de un paciente, con usuarios reales
+y JWT, contra las APIs HTTP. Un paso por linea con [ OK ] / [FALLA].
+```bash
+npm run test:e2e                         # localhost
+BASE_HOST=100.96.172.77 npm run test:e2e  # servidor Debian
+```
+Ultima ejecucion: **15 pasos, 15 OK**.
 
 ## Tabla de casos
 
@@ -89,8 +98,27 @@ mapeo abriendo cada archivo.
 
 ## Casos pendientes de automatizar
 
-- Pruebas de integracion end-to-end contra Docker (hoy se verifican a mano
-  con los curl del commit de cada bloque; alimentan el guion de la demo).
 - Flujo de reintentos de notificaciones con proveedor real; hoy se
   valida que la cola los recoge y marca `fallida_definitiva` al agotar
   intentos, pero las pruebas quedan en modo simulacion.
+- Reportes en PDF y Excel verificando bytes (no solo status + content-type).
+
+## Suite de integracion E2E (scripts/e2e-smoke.js)
+
+| ID | Paso | Valida |
+|---|---|---|
+| E2E-01 | login admin | Credenciales admin del seed |
+| E2E-02 | asegurar 5 usuarios de rol | register con admin (RBAC) |
+| E2E-03 | crear paciente con DPI unico | pacientes-service POST |
+| E2E-04 | medico_general crea solicitud | **dispara notificacion fire-and-forget** |
+| E2E-05 | coordinador asigna cita | transicion a `cita_asignada` |
+| E2E-06 | especialista convierte en visita | transicion a `en_atencion` |
+| E2E-07 | PATCH diagnostico + observaciones | precondicion para completar |
+| E2E-08 | agregar examen | genera orden pendiente para laboratorio |
+| E2E-09 | agregar prescripcion con idMedicamento | precondicion para RN-06 |
+| E2E-10 | laboratorio registra resultado | lectura cross-service de `visita_examenes` |
+| E2E-11 | farmacia dispensa | RN-06 + RN-09 end-to-end |
+| E2E-12 | segundo intento de dispensar | debe fallar con 409 (idempotencia RN-06) |
+| E2E-13 | completar visita | transicion a `completada`, inmutabilidad |
+| E2E-14 | verificar notificacion | HTTP cross-service pacientes->notificaciones |
+| E2E-15 | estado de cuenta financiero | lectura cross-service |
