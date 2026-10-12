@@ -261,6 +261,94 @@ async function asegurarUsuario(adminToken, u) {
     ok(`saldoTotal=${r.data.saldoTotal} alerta=${r.data.alerta?.nivel || 'ninguna'}`);
   } catch (e) { falla(e.message); }
 
+  // 14 - GET /api/auth/me (no estaba probado antes)
+  paso('auth: GET /api/auth/me devuelve el usuario del token');
+  try {
+    const r = await req('GET', `${API.auth}/api/auth/me`, { token: adminToken, esperarStatus: 200 });
+    if (!r.data?.email) throw new Error('respuesta sin email');
+    ok(`email=${r.data.email} rol=${r.data.rol}`);
+  } catch (e) { falla(e.message); }
+
+  // 15 - PUT /api/pacientes/:id (actualizar paciente)
+  paso('pacientes: PUT /:id actualiza telefono');
+  try {
+    const original = (await req('GET', `${API.pacientes}/api/pacientes/${pacienteId}`, { token: adminToken, esperarStatus: 200 })).data;
+    const r = await req('PUT', `${API.pacientes}/api/pacientes/${pacienteId}`, {
+      body: { ...original, telefono: '55559999' },
+      token: adminToken, esperarStatus: 200
+    });
+    if (r.data.telefono !== '55559999') throw new Error(`telefono no se actualizo: ${r.data.telefono}`);
+    ok(`telefono actualizado a 55559999`);
+  } catch (e) { falla(e.message); }
+
+  // 16 - DELETE /api/pacientes/:id (crea uno descartable y lo borra)
+  paso('pacientes: DELETE /:id borra un paciente descartable');
+  try {
+    const dpi = String(Date.now() + 1).padStart(13, '0').slice(-13);
+    const creado = await req('POST', `${API.pacientes}/api/pacientes`, {
+      body: {
+        nombres: 'E2E', apellidos: 'Descartable',
+        fechaNacimiento: '1950-01-01', genero: 'M', dpi
+      },
+      token: adminToken, esperarStatus: 201
+    });
+    await req('DELETE', `${API.pacientes}/api/pacientes/${creado.data.id}`, { token: adminToken, esperarStatus: 204 });
+    const check = await req('GET', `${API.pacientes}/api/pacientes/${creado.data.id}`, { token: adminToken });
+    if (check.status !== 404) throw new Error(`post-DELETE deberia ser 404, fue ${check.status}`);
+    ok(`id=${creado.data.id} borrado y 404 confirmado`);
+  } catch (e) { falla(e.message); }
+
+  // 17..19 - los 7 reportes en JSON, PDF y Excel
+  const tiposReporte = [
+    'entradas', 'cobros-por-rango', 'pagos-fundacion',
+    'costos-por-paciente', 'analisis-medico', 'examenes', 'medicamentos-aplicados'
+  ];
+  const hoy = new Date().toISOString().slice(0, 10);
+  const haceUnAnio = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const qs = `desde=${haceUnAnio}&hasta=${hoy}`;
+
+  paso('reportes: los 7 tipos en JSON (status 200, columnas presentes)');
+  try {
+    for (const tipo of tiposReporte) {
+      const r = await req('GET', `${API.reportes}/api/reportes/${tipo}?${qs}&formato=json`, { token: adminToken, esperarStatus: 200 });
+      if (!Array.isArray(r.data?.columnas) || r.data.columnas.length === 0) {
+        throw new Error(`${tipo}: respuesta sin columnas`);
+      }
+    }
+    ok(`${tiposReporte.length} reportes JSON validos`);
+  } catch (e) { falla(e.message); }
+
+  paso('reportes: los 7 tipos en PDF (content-type application/pdf, no vacio)');
+  try {
+    for (const tipo of tiposReporte) {
+      const url = `${API.reportes}/api/reportes/${tipo}?${qs}&formato=pdf`;
+      const resp = await fetch(url, { headers: { Authorization: `Bearer ${adminToken}` } });
+      if (resp.status !== 200) throw new Error(`${tipo} PDF status ${resp.status}`);
+      const ct = resp.headers.get('content-type') || '';
+      if (!/application\/pdf/i.test(ct)) throw new Error(`${tipo} PDF content-type=${ct}`);
+      const buf = Buffer.from(await resp.arrayBuffer());
+      if (buf.length < 500) throw new Error(`${tipo} PDF demasiado pequeno (${buf.length}B)`);
+      if (buf.slice(0, 4).toString() !== '%PDF') throw new Error(`${tipo} PDF sin firma %PDF`);
+    }
+    ok(`${tiposReporte.length} reportes PDF validos`);
+  } catch (e) { falla(e.message); }
+
+  paso('reportes: los 7 tipos en Excel (content-type xlsx, no vacio)');
+  try {
+    for (const tipo of tiposReporte) {
+      const url = `${API.reportes}/api/reportes/${tipo}?${qs}&formato=excel`;
+      const resp = await fetch(url, { headers: { Authorization: `Bearer ${adminToken}` } });
+      if (resp.status !== 200) throw new Error(`${tipo} Excel status ${resp.status}`);
+      const ct = resp.headers.get('content-type') || '';
+      if (!/spreadsheetml/i.test(ct)) throw new Error(`${tipo} Excel content-type=${ct}`);
+      const buf = Buffer.from(await resp.arrayBuffer());
+      if (buf.length < 500) throw new Error(`${tipo} Excel demasiado pequeno (${buf.length}B)`);
+      // Los .xlsx son zip; empiezan con "PK"
+      if (buf.slice(0, 2).toString() !== 'PK') throw new Error(`${tipo} Excel sin firma PK`);
+    }
+    ok(`${tiposReporte.length} reportes Excel validos`);
+  } catch (e) { falla(e.message); }
+
   finalizar();
 })().catch(err => {
   console.error('\nERROR INESPERADO:', err.message);

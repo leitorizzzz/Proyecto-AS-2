@@ -122,3 +122,9 @@ mapeo abriendo cada archivo.
 | E2E-13 | completar visita | transicion a `completada`, inmutabilidad |
 | E2E-14 | verificar notificacion | HTTP cross-service pacientes->notificaciones |
 | E2E-15 | estado de cuenta financiero | lectura cross-service |
+| E2E-16 | GET /api/auth/me | token devuelve el usuario correcto |
+| E2E-17 | PUT /api/pacientes/:id | actualizacion de paciente persiste |
+| E2E-18 | DELETE /api/pacientes/:id + GET 404 | borrado efectivo |
+| E2E-19 | 7 reportes en JSON (columnas presentes) | reportes-service formato json |
+| E2E-20 | 7 reportes en PDF (firma %PDF, >500 B, content-type) | pdfkit genera PDF valido |
+| E2E-21 | 7 reportes en Excel (firma PK, >500 B, content-type) | exceljs genera XLSX valido |
