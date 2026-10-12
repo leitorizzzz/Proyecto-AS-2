@@ -4,28 +4,43 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Asilo Cabeza de Algodón — Sistema</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+
+<!-- Iconos SVG inline reutilizables (sin emojis) -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="i-dashboard" viewBox="0 0 24 24"><path class="ico" d="M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 9h8V3h-8z"/></symbol>
+  <symbol id="i-pacientes" viewBox="0 0 24 24"><circle class="ico" cx="12" cy="8" r="4"/><path class="ico" d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></symbol>
+  <symbol id="i-solicitudes" viewBox="0 0 24 24"><path class="ico" d="M7 4h10l3 4v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 3-2zM9 10h6M9 14h6M9 18h4"/></symbol>
+  <symbol id="i-visitas" viewBox="0 0 24 24"><path class="ico" d="M4 7h16M4 7v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7M4 7l2-4h12l2 4M9 12h6M9 16h4"/></symbol>
+  <symbol id="i-farmacia" viewBox="0 0 24 24"><path class="ico" d="M9 3h6l1 4H8zM8 7l2 14h4l2-14M10 11h4M9 15h6"/></symbol>
+  <symbol id="i-laboratorio" viewBox="0 0 24 24"><path class="ico" d="M9 3v6l-5 9a2 2 0 0 0 2 3h12a2 2 0 0 0 2-3l-5-9V3M9 3h6M8 14h8"/></symbol>
+  <symbol id="i-financiero" viewBox="0 0 24 24"><path class="ico" d="M3 7h18v10H3zM3 10h18M7 14h2M12 14h5"/></symbol>
+  <symbol id="i-reportes" viewBox="0 0 24 24"><path class="ico" d="M5 3h11l4 4v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM8 11v6M12 8v9M16 14v3"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path class="ico" d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H10"/></symbol>
+</svg>
+
 </head>
 <body>
 
 <!-- ==================== LOGIN ==================== -->
 <div id="vistaLogin" class="login-page">
-  <aside class="login-side">
-    <div class="brand-tag">Cabeza de Algodón · Asilo</div>
-    <div>
-      <h1>Sistema de administración clínica interna</h1>
-      <p class="lede">Expedientes, atención a especialistas, laboratorio, farmacia y caja del asilo, en una sola herramienta auditada.</p>
+  <aside class="login-side" aria-hidden="true">
+    <div class="brand-tag">Asilo Cabeza de Algodón · Sistema Interno</div>
+    <div class="hero-title">
+      <div class="mark">Expediente, cuidado y <em>caja del asilo</em>, en una sola herramienta.</div>
+      <p class="lede">Para enfermería, médicos, laboratorio, farmacia y administración. Diseñado para turnos largos y datos densos.</p>
     </div>
-    <p class="foot">Centro Regional de Mazatenango — Universidad Mariano Gálvez de Guatemala.</p>
+    <div class="foot">
+      <span>Mazatenango, Guatemala</span>
+      <span class="roman">MMXXVI · III</span>
+    </div>
   </aside>
 
   <div class="login-form-wrap">
     <form class="login-card" id="formLogin" autocomplete="on">
+      <div class="eyebrow">Acceso del personal</div>
       <h2>Iniciar sesión</h2>
-      <p class="sub">Este acceso es solo para personal autorizado.</p>
+      <p class="sub">Credenciales emitidas por administración.</p>
 
       <label for="email">Correo</label>
       <input type="email" id="email" value="admin@asilo.gt" required autocomplete="username" placeholder="usuario@asilo.gt">
@@ -34,7 +49,7 @@
       <input type="password" id="password" required autocomplete="current-password" placeholder="Escriba su contraseña">
 
       <button type="submit" class="btn wide" id="btnLogin">Entrar</button>
-      <div id="msgLogin"></div>
+      <div id="msgLogin" role="status" aria-live="polite"></div>
     </form>
   </div>
 </div>
@@ -42,39 +57,42 @@
 <!-- ==================== APP ==================== -->
 <div id="vistaApp" class="app-shell hidden">
 
-  <aside class="sidebar">
+  <aside class="sidebar" aria-label="Navegación principal">
     <div class="brand">
       Cabeza de Algodón
-      <small>Sistema de administración del asilo</small>
+      <small>Asilo · Sistema</small>
     </div>
 
     <nav class="side">
-      <div class="section-label">Cuidado</div>
+      <div class="section-label"><span class="numeral">I.</span>Cuidado</div>
       <ul>
-        <li><button class="tab activo" data-tab="dashboard">Panel</button></li>
-        <li><button class="tab" data-tab="pacientes">Pacientes</button></li>
-        <li><button class="tab" data-tab="solicitudes">Solicitudes</button></li>
-        <li><button class="tab" data-tab="visitas">Visitas</button></li>
+        <li><button class="tab activo" data-tab="dashboard"><svg class="ico" width="18" height="18"><use href="#i-dashboard"/></svg>Panel</button></li>
+        <li><button class="tab" data-tab="pacientes"><svg class="ico" width="18" height="18"><use href="#i-pacientes"/></svg>Pacientes</button></li>
+        <li><button class="tab" data-tab="solicitudes"><svg class="ico" width="18" height="18"><use href="#i-solicitudes"/></svg>Solicitudes</button></li>
+        <li><button class="tab" data-tab="visitas"><svg class="ico" width="18" height="18"><use href="#i-visitas"/></svg>Visitas</button></li>
       </ul>
 
-      <div class="section-label">Servicios</div>
+      <div class="section-label"><span class="numeral">II.</span>Servicios</div>
       <ul>
-        <li><button class="tab" data-tab="farmacia">Farmacia</button></li>
-        <li><button class="tab" data-tab="laboratorio">Laboratorio</button></li>
+        <li><button class="tab" data-tab="farmacia"><svg class="ico" width="18" height="18"><use href="#i-farmacia"/></svg>Farmacia</button></li>
+        <li><button class="tab" data-tab="laboratorio"><svg class="ico" width="18" height="18"><use href="#i-laboratorio"/></svg>Laboratorio</button></li>
       </ul>
 
-      <div class="section-label">Administración</div>
+      <div class="section-label"><span class="numeral">III.</span>Administración</div>
       <ul>
-        <li><button class="tab" data-tab="financiero">Financiero</button></li>
-        <li><button class="tab" data-tab="reportes">Reportes</button></li>
+        <li><button class="tab" data-tab="financiero"><svg class="ico" width="18" height="18"><use href="#i-financiero"/></svg>Financiero</button></li>
+        <li><button class="tab" data-tab="reportes"><svg class="ico" width="18" height="18"><use href="#i-reportes"/></svg>Reportes</button></li>
       </ul>
     </nav>
 
     <div class="user-block">
-      <div class="who" id="usuarioNombre">—</div>
-      <div class="rol" id="usuarioRol">—</div>
+      <span class="who" id="usuarioNombre">—</span>
+      <span class="rol" id="usuarioRol">—</span>
       <div style="margin-top:14px">
-        <button class="btn-link" id="btnSalir">Cerrar sesión</button>
+        <button class="btn-link" id="btnSalir" aria-label="Cerrar sesión">
+          <svg class="ico" width="14" height="14" style="vertical-align:middle"><use href="#i-logout"/></svg>
+          Cerrar sesión
+        </button>
       </div>
     </div>
   </aside>
@@ -85,45 +103,46 @@
     <section id="tabDashboard">
       <header class="stage-head">
         <div>
-          <div class="eyebrow">Panel general</div>
-          <h1>Buenas, <span id="saludoNombre">personal</span>.</h1>
-          <p class="lede">Resumen del día: residentes bajo cuidado, solicitudes médicas en curso, visitas abiertas y pacientes con saldo alto.</p>
+          <div class="eyebrow">Panel general · <span id="fechaHoy"></span></div>
+          <h1>Buen día, <span id="saludoNombre">personal</span>.</h1>
+          <p class="lede">Un vistazo al asilo esta jornada: residentes, atención en curso, caja y alertas.</p>
         </div>
       </header>
 
-      <div class="grid-4">
-        <div class="kpi">
+      <div class="panel-grid">
+        <div class="kpi hero">
+          <div class="kpi-badge">Residentes</div>
           <div class="kpi-label">Pacientes registrados</div>
           <div class="kpi-value num" id="kpiPacientes">—</div>
-          <div class="kpi-hint">personas bajo cuidado del asilo</div>
+          <div class="kpi-hint">bajo cuidado del asilo</div>
         </div>
         <div class="kpi">
           <div class="kpi-label">Solicitudes activas</div>
           <div class="kpi-value num" id="kpiSolicitudesActivas">—</div>
-          <div class="kpi-hint">pendientes de asignación o en atención</div>
+          <div class="kpi-hint">pendientes o en atención</div>
         </div>
         <div class="kpi">
-          <div class="kpi-label">Visitas en atención</div>
+          <div class="kpi-label">Visitas abiertas</div>
           <div class="kpi-value num" id="kpiVisitasActivas">—</div>
-          <div class="kpi-hint">consultas de especialista en curso</div>
+          <div class="kpi-hint">en atención</div>
         </div>
         <div class="kpi" id="kpiAlertasBox">
-          <div class="kpi-label">Pacientes con alerta de saldo</div>
+          <div class="kpi-label">Alertas de saldo</div>
           <div class="kpi-value num" id="kpiAlertasSaldo">—</div>
-          <div class="kpi-hint">saldo total supera el umbral</div>
+          <div class="kpi-hint">pacientes sobre el umbral</div>
         </div>
       </div>
 
       <div class="card" style="margin-top:22px">
         <h3>Solicitudes recientes <span class="contador" id="contadorDashSolic"></span></h3>
-        <p class="hint">Últimas ocho solicitudes de referencia a especialista, sin importar su estado.</p>
+        <p class="hint">Últimas ocho referencias a especialista.</p>
         <div class="tabla-wrap">
           <table>
             <thead>
               <tr><th>Paciente</th><th>Especialidad</th><th>Estado</th><th>Creada</th></tr>
             </thead>
             <tbody id="tbodyDashSolic">
-              <tr><td colspan="4"><span class="cargando">Cargando…</span></td></tr>
+              <tr><td colspan="4"><span class="cargando">Cargando</span></td></tr>
             </tbody>
           </table>
         </div>
@@ -134,21 +153,21 @@
     <section id="tabPacientes" class="hidden">
       <header class="stage-head">
         <div>
-          <div class="eyebrow">Fichas médicas</div>
+          <div class="eyebrow">Expediente</div>
           <h1>Pacientes</h1>
-          <p class="lede">Residentes bajo cuidado del asilo. El DPI se usa como identificador único y el correo del familiar recibe los avisos automáticos.</p>
+          <p class="lede">Residentes bajo cuidado del asilo. El DPI es la identidad y el correo del familiar recibe los avisos.</p>
         </div>
       </header>
 
       <div class="grid-split">
         <div class="card">
-          <h3>Personas registradas <span class="contador" id="contadorPacientes"></span></h3>
+          <h3>Residentes <span class="contador" id="contadorPacientes"></span></h3>
           <div class="tabla-wrap">
             <table>
               <thead>
                 <tr><th>Paciente</th><th>DPI</th><th>Nacimiento</th><th>Ingreso</th></tr>
               </thead>
-              <tbody id="tbodyPacientes"></tbody>
+              <tbody id="tbodyPacientes"><tr><td colspan="4"><span class="cargando">Cargando</span></td></tr></tbody>
             </table>
           </div>
           <div id="vacioPacientes" class="vacio hidden">Aún no hay pacientes registrados.</div>
@@ -156,57 +175,35 @@
 
         <div class="card">
           <h3>Registrar paciente</h3>
-          <p class="hint">Los datos personales del paciente y el correo del familiar responsable.</p>
+          <p class="hint">Datos personales + correo del familiar responsable.</p>
           <form id="formPaciente">
             <div class="fila-2">
-              <div>
-                <label for="pNombres">Nombres</label>
-                <input id="pNombres" required>
-              </div>
-              <div>
-                <label for="pApellidos">Apellidos</label>
-                <input id="pApellidos" required>
-              </div>
+              <div><label for="pNombres">Nombres</label><input id="pNombres" required></div>
+              <div><label for="pApellidos">Apellidos</label><input id="pApellidos" required></div>
             </div>
             <div class="fila-2">
-              <div>
-                <label for="pFechaNac">Fecha de nacimiento</label>
-                <input type="date" id="pFechaNac" required>
-              </div>
+              <div><label for="pFechaNac">Fecha de nacimiento</label><input type="date" id="pFechaNac" required></div>
               <div>
                 <label for="pGenero">Género</label>
                 <select id="pGenero" required>
-                  <option value="F">Femenino</option>
-                  <option value="M">Masculino</option>
-                  <option value="Otro">Otro</option>
+                  <option value="F">Femenino</option><option value="M">Masculino</option><option value="Otro">Otro</option>
                 </select>
               </div>
             </div>
             <label for="pDpi">DPI (13 dígitos)</label>
             <input id="pDpi" inputmode="numeric" maxlength="13" placeholder="1234567890123" required>
-
             <div class="fila-2">
-              <div>
-                <label for="pTelefono">Teléfono</label>
-                <input id="pTelefono">
-              </div>
-              <div>
-                <label for="pContacto">Contacto de emergencia</label>
-                <input id="pContacto" placeholder="Nombre y teléfono del familiar">
-              </div>
+              <div><label for="pTelefono">Teléfono</label><input id="pTelefono"></div>
+              <div><label for="pContacto">Contacto de emergencia</label><input id="pContacto" placeholder="Nombre y teléfono"></div>
             </div>
-
             <label for="pFamiliarEmail">Correo del familiar</label>
             <input id="pFamiliarEmail" type="email" placeholder="familiar@correo.com">
-
             <label for="pDireccion">Dirección</label>
             <input id="pDireccion">
-
             <label for="pPadecimientos">Padecimientos conocidos</label>
             <textarea id="pPadecimientos" rows="2" placeholder="Hipertensión, diabetes, artritis..."></textarea>
-
             <button type="submit" class="btn" id="btnCrearPaciente">Registrar paciente</button>
-            <div id="msgPaciente"></div>
+            <div id="msgPaciente" role="status" aria-live="polite"></div>
           </form>
         </div>
       </div>
@@ -218,26 +215,22 @@
         <div>
           <div class="eyebrow">Referencia a especialista</div>
           <h1>Solicitudes médicas</h1>
-          <p class="lede">Trazabilidad completa de cada solicitud: creación por el médico general, asignación de cita por la fundación, conversión a visita, cierre.</p>
+          <p class="lede">Trazabilidad del flujo: creación, asignación de cita, conversión a visita y cierre.</p>
         </div>
       </header>
 
       <div class="grid-split">
         <div class="card">
           <h3>Bandeja <span class="contador" id="contadorSolicitudes"></span></h3>
-          <p class="hint">Todas las solicitudes ordenadas por creación más reciente. Los estados coloreados indican en qué etapa se encuentran.</p>
+          <p class="hint">Todas las solicitudes ordenadas por fecha. Los estados coloreados y el patrón del borde indican la etapa.</p>
           <div class="tabla-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>Paciente</th>
-                  <th>Especialidad</th>
-                  <th>Estado</th>
-                  <th>Cita</th>
-                  <th>Acciones</th>
+                  <th>Paciente</th><th>Especialidad</th><th>Estado</th><th>Cita</th><th>Acciones</th>
                 </tr>
               </thead>
-              <tbody id="tbodySolicitudes"></tbody>
+              <tbody id="tbodySolicitudes"><tr><td colspan="5"><span class="cargando">Cargando</span></td></tr></tbody>
             </table>
           </div>
           <div id="vacioSolicitudes" class="vacio hidden">Aún no hay solicitudes registradas.</div>
@@ -245,28 +238,21 @@
 
         <div class="card">
           <h3>Nueva solicitud</h3>
-          <p class="hint">Solo el médico general puede crear una nueva referencia. La fundación asignará luego médico y horario.</p>
+          <p class="hint">Solo el médico general puede crear la referencia.</p>
           <form id="formSolicitud">
             <label for="sPaciente">Paciente</label>
             <select id="sPaciente" required></select>
-
             <label for="sEspecialidad">Especialidad</label>
             <input id="sEspecialidad" list="listaEspecialidades" placeholder="cardiologia, neurologia, geriatria..." required>
             <datalist id="listaEspecialidades">
-              <option value="cardiologia">
-              <option value="neurologia">
-              <option value="geriatria">
-              <option value="oftalmologia">
-              <option value="traumatologia">
-              <option value="dermatologia">
+              <option value="cardiologia"><option value="neurologia"><option value="geriatria">
+              <option value="oftalmologia"><option value="traumatologia"><option value="dermatologia">
               <option value="endocrinologia">
             </datalist>
-
             <label for="sMotivo">Motivo</label>
             <textarea id="sMotivo" rows="3" required placeholder="Descripción del motivo de la referencia"></textarea>
-
             <button type="submit" class="btn" id="btnCrearSolicitud">Crear solicitud</button>
-            <div id="msgSolicitud"></div>
+            <div id="msgSolicitud" role="status" aria-live="polite"></div>
           </form>
         </div>
       </div>
@@ -278,13 +264,13 @@
         <div>
           <div class="eyebrow">Consulta con especialista</div>
           <h1>Visitas médicas</h1>
-          <p class="lede">Registro clínico de cada visita. Solo el médico especialista puede escribir el diagnóstico, agregar exámenes, prescribir medicamentos y cerrar la visita.</p>
+          <p class="lede">Registro clínico de cada visita. Solo el médico especialista escribe diagnóstico, agrega exámenes/prescripciones y cierra.</p>
         </div>
       </header>
 
       <div class="card">
         <h3>Elegir visita</h3>
-        <p class="hint">Selecciona una visita activa para trabajar sobre ella. Las visitas se crean al convertir una solicitud con cita asignada desde la bandeja de solicitudes.</p>
+        <p class="hint">Las visitas se crean al convertir una solicitud con cita asignada desde la bandeja de solicitudes.</p>
         <label for="selectorVisita">Visita</label>
         <select id="selectorVisita"></select>
       </div>
@@ -305,14 +291,14 @@
               <label for="vObservaciones">Observaciones</label>
               <textarea id="vObservaciones" rows="3"></textarea>
               <button class="btn" id="btnGuardarClinico">Guardar cambios</button>
-              <div id="msgClinico"></div>
+              <div id="msgClinico" role="status" aria-live="polite"></div>
             </div>
 
             <div class="subcard" style="margin-top:16px">
               <h4>Cerrar visita</h4>
-              <p class="tiny">Para marcar la visita como completa hay que tener diagnóstico y observaciones registrados. Al completarla, la solicitud enlazada también pasa a completada.</p>
+              <p class="tiny">Para completar: diagnóstico y observaciones no pueden estar vacíos. Al cerrar, la solicitud enlazada también se marca <em>completada</em>.</p>
               <button class="btn sage" id="btnCompletarVisita">Marcar visita como completa</button>
-              <div id="msgCompletar"></div>
+              <div id="msgCompletar" role="status" aria-live="polite"></div>
             </div>
           </div>
 
@@ -323,7 +309,7 @@
               <label for="exTipo">Nuevo examen</label>
               <input id="exTipo" placeholder="Hematología completa, EKG, uroanálisis...">
               <button class="btn ghost small" id="btnAgregarExamen" style="margin-top:10px">Agregar examen</button>
-              <div id="msgExamen"></div>
+              <div id="msgExamen" role="status" aria-live="polite"></div>
             </div>
 
             <div class="subcard" style="margin-top:16px">
@@ -331,22 +317,16 @@
               <ul id="listaPrescripciones"></ul>
               <label for="rxIdMedicamento">Medicamento del inventario</label>
               <select id="rxIdMedicamento">
-                <option value="">— elegir del inventario (requerido para que farmacia pueda dispensar) —</option>
+                <option value="">— elegir del inventario —</option>
               </select>
               <label for="rxMedicamento">Nombre y presentación</label>
               <input id="rxMedicamento" placeholder="Se completa al elegir del inventario">
               <div class="fila-2">
-                <div>
-                  <label for="rxDosis">Dosis</label>
-                  <input id="rxDosis" placeholder="1 tab / 24h">
-                </div>
-                <div>
-                  <label for="rxIndicaciones">Indicaciones</label>
-                  <input id="rxIndicaciones" placeholder="Con agua, en ayunas">
-                </div>
+                <div><label for="rxDosis">Dosis</label><input id="rxDosis" placeholder="1 tab / 24h"></div>
+                <div><label for="rxIndicaciones">Indicaciones</label><input id="rxIndicaciones" placeholder="Con agua, en ayunas"></div>
               </div>
               <button class="btn ghost small" id="btnAgregarPrescripcion" style="margin-top:10px">Agregar prescripción</button>
-              <div id="msgRx"></div>
+              <div id="msgRx" role="status" aria-live="polite"></div>
             </div>
           </div>
         </div>
@@ -359,7 +339,7 @@
         <div>
           <div class="eyebrow">Inventario y dispensación</div>
           <h1>Farmacia</h1>
-          <p class="lede">Control de medicamentos y dispensación con el descuento del 20% que la fundación otorga a los residentes.</p>
+          <p class="lede">Dispensación contra prescripción emitida en visita, aplicando el 20 % de descuento de la fundación.</p>
         </div>
       </header>
 
@@ -371,7 +351,7 @@
               <thead>
                 <tr><th>Medicamento</th><th>Presentación</th><th>Stock</th><th class="right">Precio (Q)</th></tr>
               </thead>
-              <tbody id="tbodyMedicamentos"></tbody>
+              <tbody id="tbodyMedicamentos"><tr><td colspan="4"><span class="cargando">Cargando</span></td></tr></tbody>
             </table>
           </div>
           <div id="vacioMedicamentos" class="vacio hidden">Sin medicamentos en inventario.</div>
@@ -383,17 +363,14 @@
           <form id="formDispensar">
             <label for="dPaciente">Paciente</label>
             <select id="dPaciente" required></select>
-
             <label for="dPrescripcion">Prescripción pendiente</label>
             <select id="dPrescripcion" required>
               <option value="">— selecciona paciente primero —</option>
             </select>
-
             <label for="dCantidad">Cantidad a entregar</label>
             <input type="number" id="dCantidad" min="1" value="1" required>
-
             <button type="submit" class="btn" id="btnDispensar">Dispensar</button>
-            <div id="msgDispensar"></div>
+            <div id="msgDispensar" role="status" aria-live="polite"></div>
             <p class="tiny" id="hintPrescripcion"></p>
           </form>
         </div>
@@ -404,7 +381,7 @@
         <div class="tabla-wrap">
           <table>
             <thead>
-              <tr><th>Fecha</th><th>Medicamento</th><th>Cantidad</th><th class="right">Costo (Q)</th></tr>
+              <tr><th>Fecha</th><th>Medicamento</th><th class="num right">Cantidad</th><th class="right">Costo (Q)</th></tr>
             </thead>
             <tbody id="tbodyHistorial"></tbody>
           </table>
@@ -419,20 +396,20 @@
         <div>
           <div class="eyebrow">Órdenes y resultados</div>
           <h1>Laboratorio</h1>
-          <p class="lede">Órdenes de examen que llegan desde las visitas médicas, con espacio para registrar el resultado y ver el costo con descuento aplicado.</p>
+          <p class="lede">Órdenes solicitadas desde visitas médicas, resultado y costo con descuento aplicado.</p>
         </div>
       </header>
 
       <div class="grid-split">
         <div class="card">
           <h3>Órdenes pendientes <span class="contador" id="contadorOrdenes"></span></h3>
-          <p class="hint">Exámenes solicitados en visitas médicas que aún no tienen resultado registrado.</p>
+          <p class="hint">Exámenes sin resultado registrado.</p>
           <div class="tabla-wrap">
             <table>
               <thead>
-                <tr><th>#</th><th>Paciente</th><th>Examen</th><th>Solicitado</th><th>Acciones</th></tr>
+                <tr><th class="num">#</th><th>Paciente</th><th>Examen</th><th>Solicitado</th><th>Acciones</th></tr>
               </thead>
-              <tbody id="tbodyOrdenes"></tbody>
+              <tbody id="tbodyOrdenes"><tr><td colspan="5"><span class="cargando">Cargando</span></td></tr></tbody>
             </table>
           </div>
           <div id="vacioOrdenes" class="vacio hidden">No hay órdenes pendientes.</div>
@@ -440,11 +417,10 @@
 
         <div class="card">
           <h3>Registrar resultado</h3>
-          <p class="hint">Elige la orden desde la tabla o busca por número de examen.</p>
+          <p class="hint">Elige la orden desde la tabla o escribe el número.</p>
           <form id="formResultado">
             <label for="rIdExamen">Número de examen</label>
             <input type="number" id="rIdExamen" min="1" required>
-
             <label for="rTipo">Tipo de resultado</label>
             <select id="rTipo">
               <option value="texto">Texto (interpretación)</option>
@@ -452,23 +428,14 @@
               <option value="archivo">Archivo adjunto</option>
               <option value="mixto">Mixto</option>
             </select>
-
             <label for="rTexto">Interpretación / texto</label>
             <textarea id="rTexto" rows="3" placeholder="Descripción del resultado"></textarea>
-
             <div class="fila-2">
-              <div>
-                <label for="rNumerico">Valor numérico</label>
-                <input type="number" step="0.01" id="rNumerico" placeholder="Ej. 5.6">
-              </div>
-              <div>
-                <label for="rArchivo">Archivo adjunto (URL)</label>
-                <input id="rArchivo" placeholder="https://…">
-              </div>
+              <div><label for="rNumerico">Valor numérico</label><input type="number" step="0.01" id="rNumerico" placeholder="Ej. 5.6"></div>
+              <div><label for="rArchivo">Archivo adjunto (URL)</label><input id="rArchivo" placeholder="https://…"></div>
             </div>
-
             <button type="submit" class="btn" id="btnRegistrarResultado">Registrar resultado</button>
-            <div id="msgResultado"></div>
+            <div id="msgResultado" role="status" aria-live="polite"></div>
           </form>
         </div>
       </div>
@@ -480,7 +447,7 @@
         <div>
           <div class="eyebrow">Entradas, salidas y caja</div>
           <h1>Financiero</h1>
-          <p class="lede">Estado de cuenta por paciente, cuotas mensuales, donaciones, gastos operativos y pagos a la fundación.</p>
+          <p class="lede">Estado de cuenta por paciente, cuotas, donaciones, gastos y pagos a la fundación.</p>
         </div>
       </header>
 
@@ -490,8 +457,9 @@
         <label for="fPaciente">Paciente</label>
         <select id="fPaciente"></select>
         <div id="estadoCuentaBox" style="margin-top:18px" class="hidden">
-          <div class="grid-3">
-            <div class="kpi">
+          <div class="panel-grid">
+            <div class="kpi hero">
+              <div class="kpi-badge">Saldo</div>
               <div class="kpi-label">Saldo total</div>
               <div class="kpi-value num" id="kpiSaldoTotal">Q 0.00</div>
               <div class="kpi-hint" id="kpiAlerta"></div>
@@ -505,6 +473,11 @@
               <div class="kpi-label">Cuotas pendientes</div>
               <div class="kpi-value num" id="kpiSaldoCuotas">Q 0.00</div>
               <div class="kpi-hint" id="kpiCantCuotas"></div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Último movimiento</div>
+              <div class="kpi-value num" id="kpiUltMov" style="font-size:20px">—</div>
+              <div class="kpi-hint">cargo o cuota más reciente</div>
             </div>
           </div>
 
@@ -536,36 +509,25 @@
           <h3>Registrar cargo</h3>
           <p class="hint">Un cargo por servicio prestado al paciente. Genera saldo pendiente.</p>
           <form id="formCargo">
-            <label for="cPaciente">Paciente</label>
-            <select id="cPaciente" required></select>
-            <label for="cConcepto">Concepto</label>
-            <input id="cConcepto" required placeholder="Consulta especialista, medicamentos, examen...">
-            <label for="cMonto">Monto (Q)</label>
-            <input type="number" id="cMonto" step="0.01" min="0.01" required>
+            <label for="cPaciente">Paciente</label><select id="cPaciente" required></select>
+            <label for="cConcepto">Concepto</label><input id="cConcepto" required placeholder="Consulta especialista, medicamentos, examen...">
+            <label for="cMonto">Monto (Q)</label><input type="number" id="cMonto" step="0.01" min="0.01" required>
             <button type="submit" class="btn">Registrar cargo</button>
-            <div id="msgCargo"></div>
+            <div id="msgCargo" role="status" aria-live="polite"></div>
           </form>
         </div>
         <div class="card">
           <h3>Registrar / pagar cuota</h3>
           <p class="hint">Si la cuota del período no existe, se crea y se marca pagada en un mismo paso.</p>
           <form id="formCuota">
-            <label for="qPaciente">Paciente</label>
-            <select id="qPaciente" required></select>
+            <label for="qPaciente">Paciente</label><select id="qPaciente" required></select>
             <div class="fila-2">
-              <div>
-                <label for="qMes">Mes</label>
-                <input type="number" id="qMes" min="1" max="12" required>
-              </div>
-              <div>
-                <label for="qAnio">Año</label>
-                <input type="number" id="qAnio" min="2020" max="2100" value="2026" required>
-              </div>
+              <div><label for="qMes">Mes</label><input type="number" id="qMes" min="1" max="12" required></div>
+              <div><label for="qAnio">Año</label><input type="number" id="qAnio" min="2020" max="2100" value="2026" required></div>
             </div>
-            <label for="qMonto">Monto (Q)</label>
-            <input type="number" id="qMonto" step="0.01" min="0.01" required>
+            <label for="qMonto">Monto (Q)</label><input type="number" id="qMonto" step="0.01" min="0.01" required>
             <button type="submit" class="btn">Registrar pago</button>
-            <div id="msgCuota"></div>
+            <div id="msgCuota" role="status" aria-live="polite"></div>
           </form>
         </div>
       </div>
@@ -585,42 +547,26 @@
           <h3>Nueva donación</h3>
           <p class="hint">Registra primero al donante si no existe todavía.</p>
           <form id="formDonante" style="margin-bottom:14px">
-            <label for="dnNombre">Nombre del donante</label>
-            <input id="dnNombre" required>
+            <label for="dnNombre">Nombre del donante</label><input id="dnNombre" required>
             <div class="fila-2">
-              <div>
-                <label for="dnTelefono">Teléfono</label>
-                <input id="dnTelefono">
-              </div>
-              <div>
-                <label for="dnEmail">Correo</label>
-                <input id="dnEmail" type="email">
-              </div>
+              <div><label for="dnTelefono">Teléfono</label><input id="dnTelefono"></div>
+              <div><label for="dnEmail">Correo</label><input id="dnEmail" type="email"></div>
             </div>
             <button type="submit" class="btn ghost small">Guardar donante</button>
-            <div id="msgDonante"></div>
+            <div id="msgDonante" role="status" aria-live="polite"></div>
           </form>
           <form id="formDonacion">
-            <label for="ddDonante">Donante</label>
-            <select id="ddDonante" required></select>
-            <label for="ddMonto">Monto (Q)</label>
-            <input type="number" id="ddMonto" step="0.01" min="0.01" required>
+            <label for="ddDonante">Donante</label><select id="ddDonante" required></select>
+            <label for="ddMonto">Monto (Q)</label><input type="number" id="ddMonto" step="0.01" min="0.01" required>
             <div class="fila-2">
               <div>
                 <label for="ddTipo">Tipo</label>
-                <select id="ddTipo">
-                  <option value="dinero">Dinero</option>
-                  <option value="bienes">Bienes</option>
-                  <option value="otro">Otro</option>
-                </select>
+                <select id="ddTipo"><option value="dinero">Dinero</option><option value="bienes">Bienes</option><option value="otro">Otro</option></select>
               </div>
-              <div>
-                <label for="ddConcepto">Concepto</label>
-                <input id="ddConcepto" placeholder="Aporte mensual, ropa, alimentos...">
-              </div>
+              <div><label for="ddConcepto">Concepto</label><input id="ddConcepto" placeholder="Aporte mensual, ropa, alimentos..."></div>
             </div>
             <button type="submit" class="btn">Registrar donación</button>
-            <div id="msgDonacion"></div>
+            <div id="msgDonacion" role="status" aria-live="polite"></div>
           </form>
         </div>
       </div>
@@ -632,13 +578,13 @@
         <div>
           <div class="eyebrow">Análisis y auditoría</div>
           <h1>Reportes</h1>
-          <p class="lede">Los siete reportes del enunciado. Elige rango de fechas y descarga en PDF o Excel; el JSON se muestra en pantalla para revisar antes de exportar.</p>
+          <p class="lede">Los siete reportes del enunciado. El rango por defecto se ajusta al tipo elegido.</p>
         </div>
       </header>
 
       <div class="card">
         <h3>Generar reporte</h3>
-        <p class="hint" id="hintRangoReporte">El rango por defecto se ajusta al tipo de reporte (financieros al mes en curso, operativos a los últimos 30 días, análisis a los últimos 90).</p>
+        <p class="hint" id="hintRangoReporte">Financieros → mes en curso. Operativos → últimos 30 días. Análisis → últimos 90 días.</p>
         <div class="fila-3">
           <div>
             <label for="repTipo">Reporte</label>
@@ -652,21 +598,15 @@
               <option value="medicamentos-aplicados">Medicamentos aplicados</option>
             </select>
           </div>
-          <div>
-            <label for="repDesde">Desde</label>
-            <input type="date" id="repDesde">
-          </div>
-          <div>
-            <label for="repHasta">Hasta</label>
-            <input type="date" id="repHasta">
-          </div>
+          <div><label for="repDesde">Desde</label><input type="date" id="repDesde"></div>
+          <div><label for="repHasta">Hasta</label><input type="date" id="repHasta"></div>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
           <button class="btn" id="btnRepVer">Ver en pantalla</button>
           <button class="btn ghost" id="btnRepPdf">Descargar PDF</button>
           <button class="btn ghost" id="btnRepExcel">Descargar Excel</button>
         </div>
-        <div id="msgReporte"></div>
+        <div id="msgReporte" role="status" aria-live="polite"></div>
       </div>
 
       <div class="card hidden" id="repResultCard" style="margin-top:18px">

@@ -275,6 +275,10 @@ function abrirApp() {
   $('#usuarioNombre').textContent = state.usuario?.email || '—';
   $('#usuarioRol').textContent = state.usuario?.rol || '—';
   $('#saludoNombre').textContent = nombre.replace(/[._-]+/g, ' ');
+  const fh = $('#fechaHoy');
+  if (fh) fh.textContent = new Date().toLocaleDateString('es-GT', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  });
   filtrarMenuPorRol();
   cambiarTab('dashboard');
 }
@@ -963,6 +967,14 @@ async function cargarEstadoCuenta() {
     $('#kpiCantCargos').textContent = `${c.cargos.length} cargos`;
     $('#kpiCantCuotas').textContent = `${c.cuotas.length} cuotas`;
     $('#kpiAlerta').textContent = c.alerta ? c.alerta.mensaje : 'Sin alertas';
+    const ultMovEl = $('#kpiUltMov');
+    if (ultMovEl) {
+      const movs = [
+        ...c.cargos.map(x => ({ f: x.fecha, t: x.concepto })),
+        ...c.cuotas.map(x => ({ f: x.fechaPago || null, t: `Cuota ${x.mes}/${x.anio}` }))
+      ].filter(m => m.f).sort((a, b) => new Date(b.f) - new Date(a.f));
+      ultMovEl.textContent = movs[0] ? fechaCorta(movs[0].f) : '—';
+    }
     $('#tbodyCargos').innerHTML = c.cargos.map(x => `
       <tr>
         <td class="tiny">${fechaHora(x.fecha)}</td>
