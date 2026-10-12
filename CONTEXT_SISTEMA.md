@@ -182,10 +182,35 @@ Decisiones arquitectónicas tomadas:
 - **Un solo motor de BD** (SQL Server). Se evaluó database-per-service y
   se rechazó porque multiplicaba la complejidad operativa sin aportar
   aislamiento real al proyecto académico.
-- **Comunicación entre microservicios por HTTP directo** usando el
-  nombre del contenedor de docker-compose (`http://auth-service:3000`,
-  etc.). Sin API Gateway, sin cola de mensajes.
+- **Comunicación entre microservicios: MIXTA.** No es "HTTP directo"
+  uniforme. Hay dos canales deliberados, ver §4.1.
 - **Mismo stack Node.js en todos los servicios** por mantenibilidad.
+
+### 4.1 Comunicación entre microservicios (dos canales)
+
+Al compartir una sola BD, la elección entre HTTP y lectura directa de
+la BD depende de la naturaleza del evento, no de la ortodoxia de
+microservicios:
+
+| Canal | Cuándo se usa | Ejemplos reales |
+|---|---|---|
+| **HTTP + JWT** | Para efectos secundarios sin estado compartido: avisos, integraciones externas, operaciones idempotentes que puede ser retry-friendly. | `pacientes-service` → `POST /api/notificaciones/solicitud` (fire-and-forget al crear solicitud). `notificaciones-service` → Brevo. |
+| **Lectura / escritura directa de la BD compartida** | Cuando el servicio B necesita leer y marcar un recurso que es parte del **agregado transaccional** de A, y una llamada HTTP solo introduciría coupling, latencia y modos de falla sin aportar nada. | `farmacia-service` lee y marca `visita_prescripciones` (RN-06). `laboratorio-service` lee y marca `visita_examenes`. `reportes-service` lee todas las tablas de dominio. |
+
+Justificación de usar la BD como canal de integración en lugar de más
+HTTP: (a) el agregado transaccional (prescripción, examen) **pertenece
+a la visita médica**, no al servicio que lo despacha; su "ser válido"
+y su "estar dispensado/entregado" son estados sobre la misma fila. (b)
+Hay un solo modelo de datos, versionado por los `inicializarEsquema()`
+de cada servicio con ALTER idempotente. (c) Los servicios pueden
+arrancar **en cualquier orden**: ni laboratorio ni farmacia necesitan
+que pacientes esté levantado para funcionar — basta la BD. (d) Si en
+el futuro se separa la BD por microservicio, el paso natural es
+reemplazar estas lecturas por HTTP; hasta entonces, es la decisión más
+simple y la que menos acoplamiento operativo introduce.
+
+Lo que **no** hacemos: API Gateway, service mesh, broker de eventos ni
+schema registry. Están fuera del alcance del proyecto académico.
 
 ---
 
@@ -252,10 +277,12 @@ Cada servicio tiene la **misma estructura interna de 4 capas**:
 - [x] Módulo de Reportes con PDF/Excel (`reportes-service/`, puerto 3005).
 - [x] Servicio de notificaciones por correo (`notificaciones-service/` con Brevo, puerto 3006).
 - [x] Frontend con todas las pantallas del sistema.
-- [x] Comunicación entre microservicios: HTTP directo llamando por nombre
-      de contenedor (`http://notificaciones-service:3006`, etc.). No hay
-      API Gateway ni cola de mensajes; el patrón acordado es el más simple
-      dado el estado actual del proyecto.
+- [x] Comunicación entre microservicios **mixta y documentada** (ver §4.1):
+      HTTP + JWT para efectos secundarios (pacientes → notificaciones;
+      notificaciones → Brevo), lectura/escritura directa de la BD
+      compartida para los agregados transaccionales que viven en otra
+      tabla (farmacia ↔ visita_prescripciones, laboratorio ↔
+      visita_examenes, reportes lee todo).
 - [ ] Conectar prescripciones de visita a `farmacia-service` (hoy sólo
       registro local en `visita_prescripciones` sin descontar inventario).
 - [ ] Reintentos automáticos para notificaciones fallidas (hoy: fire-and-forget).

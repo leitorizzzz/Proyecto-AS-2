@@ -41,6 +41,8 @@ JWT (HS256) + bcrypt. Roles válidos: `enfermero, medico, medico_general,
 especialista, medico_especialista, farmacia, laboratorio, admin,
 fundacion, coordinador_fundacion`. Registro protegido (solo admin).
 Estructura: `AuthController`, `AuthService`, `UsuarioRepository`, `Usuario`.
+**`JWT_EXPIRES_IN` solo aplica aquí** (es quien firma); los demás servicios
+solo verifican con `JWT_SECRET` y respetan el `exp` embebido en el token.
 
 ### `pacientes-service/` — ✅ funcional, agrupa 3 dominios
 **Importante:** Solicitudes y Visita Médica NO son microservicios aparte —
@@ -58,15 +60,21 @@ mantiene sus propias 4 capas dentro del mismo servicio:
 - **VisitaMedica**: `VisitaMedicaController/Service/Repository`, modelo
   `VisitaMedica`. Completar visita exige `diagnostico` y `observaciones`
   no vacíos → 400 si faltan. Estado inmutable tras `completada`/`cancelada`.
-  Hoy los exámenes y prescripciones de la visita se registran **localmente
-  dentro de la visita** (tablas `visita_examenes`, `visita_prescripciones`),
-  sin conexión real a laboratorio-service ni farmacia-service todavía.
+- **Exámenes y prescripciones de la visita**: viven en
+  `visita_examenes` y `visita_prescripciones`, propiedad de este
+  servicio. `laboratorio-service` y `farmacia-service` **sí** las leen
+  y las marcan como `disponible`/`dispensada` (lectura directa de la BD
+  compartida; ver `CONTEXT_SISTEMA.md` §4.1). RN-06 queda cubierta por
+  `farmacia-service`: no se dispensa sin prescripción pendiente con
+  `idMedicamento` asociado.
 
-### `farmacia-service/` — ✅ funcional, standalone
-`FarmaciaController/Service`, repos separados `MedicamentoRepository` y
-`DispensacionRepository`, modelos `Medicamento` y `Dispensacion`.
-Dispensación aplica 20% de descuento fundación (RN-09). Ya migrado de
-SQLite a SQL Server (`AsiloCabezaAlgodon`).
+### `farmacia-service/` — ✅ funcional
+`FarmaciaController/Service`, repos: `MedicamentoRepository`,
+`DispensacionRepository` y **`PrescripcionReadRepository`** (lee y marca
+`visita_prescripciones` para RN-06, misma BD compartida). Modelos:
+`Medicamento`, `Dispensacion`, **`Prescripcion`**. Dispensación aplica
+20 % de descuento fundación (RN-09). Ya migrado de SQLite a SQL Server
+(`AsiloCabezaAlgodon`).
 
 ### `laboratorio-service/` — ✅ funcional, puerto 3003
 `LaboratorioController` → `ordenesPendientes`, `identificarPaciente(dpi)`,
@@ -90,13 +98,18 @@ compartida vía `ReportesRepository`. `GET /api/reportes/tipos` lista los
 identificadores; `GET /api/reportes/:tipo?desde=&hasta=&formato=` genera.
 
 ### `notificaciones-service/` — ✅ funcional, puerto 3006
-Correo transaccional vía Brevo (`api-key` + JSON a
-`/v3/smtp/email`). Tabla `notificaciones` guarda cada intento con estado
-`pendiente | enviada | fallida`. Con `MODO_SIMULACION=true` no llama a
-Brevo (útil en dev/CI). `pacientes-service` invoca
-`POST /api/notificaciones/solicitud` en modo fire-and-forget al crear una
-solicitud (`NotificacionesClient`); si Brevo o el servicio caen, la
-solicitud se crea igual y el error queda en el log.
+Correo transaccional vía Brevo (`api-key` + JSON a `/v3/smtp/email`).
+Tabla `notificaciones` guarda cada intento con estado
+**`pendiente | enviada | fallida | fallida_definitiva`** (4 estados;
+`fallida_definitiva` cuando se agota `NOTIF_MAX_INTENTOS`). Job interno
+reintenta las fallidas con backoff exponencial
+(`NOTIF_ESPERA_BASE_SEG` → `NOTIF_ESPERA_MAX_SEG`). Con
+`MODO_SIMULACION=true` no llama a Brevo (útil en dev/CI).
+`pacientes-service` invoca `POST /api/notificaciones/solicitud` en modo
+fire-and-forget al crear una solicitud (`NotificacionesClient`); si Brevo
+o el servicio caen, la solicitud se crea igual y el reintento lo hace el
+job interno. `POST /api/notificaciones/:id/reintentar` fuerza un reintento
+manual (solo admin).
 
 ### `frontend/` — ✅ funcional, puerto 8090
 HTML/CSS/JS plano servido por nginx. Un solo `index.html` + `styles.css`

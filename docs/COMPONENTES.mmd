@@ -1,6 +1,14 @@
 %% Diagrama de componentes del Sistema Asilo Cabeza de Algodon.
 %% Refleja la topologia real de docker-compose.yml (7 microservicios +
-%% SQL Server + nginx) y las llamadas HTTP entre ellos.
+%% SQL Server + nginx + Brevo externo).
+%%
+%% IMPORTANTE: la comunicacion entre servicios NO es uniforme. Hay dos
+%% canales deliberados (ver CONTEXT_SISTEMA.md §4.1):
+%%   - HTTP (flecha solida gruesa): sincrono fire-and-forget con JWT.
+%%   - Lectura/escritura directa a la BD compartida (flecha dashed):
+%%     cuando el agregado transaccional vive en otra tabla pero no
+%%     justifica un contrato HTTP (ver "agregado transaccional"
+%%     en CONTEXT_SISTEMA.md §4.1).
 graph LR
 
     subgraph Cliente
@@ -17,31 +25,41 @@ graph LR
         RE[reportes-service :3005]
         NO[notificaciones-service :3006]
         DB[(SQL Server :1433<br/>AsiloCabezaAlgodon)]
+    end
+
+    subgraph Externo
         BV[Brevo API]
     end
 
-    BR -->|HTTP + JWT| NG
-    BR -->|HTTP + JWT| AU
-    BR -->|HTTP + JWT| PA
-    BR -->|HTTP + JWT| FA
-    BR -->|HTTP + JWT| LA
-    BR -->|HTTP + JWT| FI
-    BR -->|HTTP + JWT| RE
-    BR -->|HTTP + JWT| NO
+    BR ==>|HTTP + JWT| NG
+    BR ==>|HTTP + JWT| AU
+    BR ==>|HTTP + JWT| PA
+    BR ==>|HTTP + JWT| FA
+    BR ==>|HTTP + JWT| LA
+    BR ==>|HTTP + JWT| FI
+    BR ==>|HTTP + JWT| RE
+    BR ==>|HTTP + JWT| NO
 
-    AU -->|mssql| DB
-    PA -->|mssql| DB
-    FA -->|mssql| DB
-    LA -->|mssql| DB
-    FI -->|mssql| DB
-    RE -->|mssql| DB
-    NO -->|mssql| DB
+    %% Acceso de cada servicio a su subconjunto de la BD compartida.
+    AU -->|mssql: usuarios| DB
+    PA -->|mssql: pacientes, solicitudes_referencia,<br/>visitas_medicas, visita_examenes,<br/>visita_prescripciones| DB
+    FA -->|mssql: medicamentos, dispensaciones| DB
+    LA -->|mssql: resultados_examenes,<br/>examenes_precios| DB
+    FI -->|mssql: cargos_servicio, cuotas_mensuales,<br/>donantes, donaciones, gastos_operativos,<br/>pagos_fundacion| DB
+    RE -->|mssql: lee todas| DB
+    NO -->|mssql: notificaciones| DB
 
-    PA -.->|POST /api/notificaciones/solicitud<br/>fire-and-forget con JWT| NO
-    FA -.->|lee + marca visita_prescripciones<br/>misma BD compartida| DB
-    LA -.->|lee + marca visita_examenes<br/>misma BD compartida| DB
+    %% COMUNICACION ENTRE SERVICIOS - canal HTTP
+    PA ==>|HTTP POST /api/notificaciones/solicitud<br/>fire-and-forget con JWT del usuario| NO
 
-    NO -->|POST v3/smtp/email<br/>si BREVO_API_KEY| BV
+    %% COMUNICACION ENTRE SERVICIOS - canal "lectura/escritura directa de la BD compartida"
+    %% (dashed = cross-service via BD, no HTTP)
+    FA -.->|lee + marca visita_prescripciones<br/>lectura BD compartida| DB
+    LA -.->|lee + marca visita_examenes<br/>lectura BD compartida| DB
+    RE -.->|lee pacientes, solicitudes, visitas, dispensaciones,<br/>donaciones, cuotas, ...<br/>lectura BD compartida| DB
+
+    %% Externo
+    NO ==>|HTTP POST v3/smtp/email<br/>cuando BREVO_API_KEY esta configurado| BV
 
     classDef servicio fill:#eef3fb,stroke:#2a4f7a,stroke-width:1px,color:#15202b
     classDef bd fill:#efe8d9,stroke:#8a6b3e,stroke-width:1px,color:#2b1f0b
@@ -49,3 +67,8 @@ graph LR
     class AU,PA,FA,LA,FI,RE,NO,NG servicio
     class DB bd
     class BV,BR externo
+
+    %% Leyenda:
+    %% ==> flecha solida: HTTP (contrato REST con JWT)
+    %% -.-> flecha dashed: lectura/escritura directa de la BD compartida
+    %%                    (cross-service via tabla, no HTTP)

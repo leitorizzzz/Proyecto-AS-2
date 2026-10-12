@@ -261,8 +261,12 @@ Node.js + Express + SQLite implementado con las 4 capas. Incluye:
       enlace real cuando exista ese módulo.
 - [ ] **Módulo Financiero** — exponer un endpoint o evento para que caja/cobros tome el
       `costoTotal` de cada dispensación.
-- [ ] **Estrategia de comunicación entre servicios** — HTTP directo, gateway o cola. Debe
-      quedar reflejada en el documento de arquitectura general.
+- [x] **Estrategia de comunicación entre servicios** — definida en
+      `CONTEXT_SISTEMA.md` §4.1 como **mixta**: HTTP + JWT para efectos
+      secundarios (pacientes → notificaciones), lectura directa de la BD
+      compartida para agregados transaccionales (farmacia lee y marca
+      `visita_prescripciones` para RN-06; laboratorio hace lo mismo con
+      `visita_examenes`). Sin API Gateway ni cola.
 
 ### Infraestructura
 
