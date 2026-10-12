@@ -29,13 +29,27 @@ app.use('/api/financiero', crearRutasFinanciero(financieroController));
 
 const PORT = process.env.PORT || 3004;
 
-inicializarEsquema()
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`Microservicio Financiero corriendo en http://localhost:${PORT}`);
-    });
-  })
-  .catch(err => {
-    console.error('Error inicializando esquema en SQL Server:', err.message);
-    process.exit(1);
-  });
+// Resiliencia de arranque
+const MAX_INTENTOS = Number(process.env.DB_BOOTSTRAP_MAX_INTENTOS || 10);
+const ESPERA_MS    = Number(process.env.DB_BOOTSTRAP_ESPERA_MS || 3000);
+
+async function arrancar() {
+  for (let i = 1; i <= MAX_INTENTOS; i++) {
+    try {
+      await inicializarEsquema();
+      app.listen(PORT, () => {
+        console.log(`Microservicio Financiero corriendo en http://localhost:${PORT}`);
+      });
+      return;
+    } catch (err) {
+      const motivo = String(err.message || err).split('\n')[0];
+      console.log(`[bootstrap] financiero-service: intento ${i}/${MAX_INTENTOS} - BD no lista (${motivo})`);
+      if (i === MAX_INTENTOS) {
+        console.error('[bootstrap] financiero-service: se agotaron los reintentos. Saliendo.');
+        process.exit(1);
+      }
+      await new Promise(r => setTimeout(r, ESPERA_MS));
+    }
+  }
+}
+arrancar();
