@@ -137,6 +137,9 @@ a:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 2
   min-height: 100vh;
 }
 @media (max-width: 960px) { .app-shell { grid-template-columns: 1fr; } }
+/* Sin min-width:0 una tabla ancha estira la columna 1fr y en telefono
+   aparece scroll horizontal de toda la pagina. */
+.app-shell > * { min-width: 0; }
 
 /* ---- SIDEBAR con regleta magenta ---- */
 aside.sidebar {
@@ -279,6 +282,9 @@ main.stage {
   padding: 22px 24px;
 }
 .card + .card { margin-top: 20px; }
+/* Dentro de una grilla el espaciado lo da el gap; sin esto la segunda
+   tarjeta queda 20px mas abajo que la primera. */
+.grid-split > .card + .card { margin-top: 0; }
 .card h3 {
   margin-bottom: 6px;
   display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
@@ -299,7 +305,15 @@ main.stage {
   gap: 20px;
   align-items: start;
 }
-@media (max-width: 1000px) { .grid-split { grid-template-columns: 1fr; } }
+/* La bandeja de solicitudes tiene 5 columnas: necesita mas ancho que el
+   formulario para que el nombre del paciente no se parta en 3 lineas. */
+#tabSolicitudes .grid-split { grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr); }
+#tbodySolicitudes td:first-child { min-width: 120px; }
+#tbodySolicitudes td { padding-left: 10px; padding-right: 10px; }
+#tbodySolicitudes .btn-link { white-space: nowrap; }
+@media (max-width: 1000px) {
+  .grid-split, #tabSolicitudes .grid-split { grid-template-columns: minmax(0, 1fr); }
+}
 
 /* PANEL con composición no estándar: 1 hero KPI + 3 compactos */
 .panel-grid {
@@ -419,7 +433,7 @@ tbody tr { transition: background var(--t-fast); }
 tbody tr:hover td { background: var(--surface-raised); }
 tfoot td { border-top: 1px solid var(--line); font-weight: 600; padding: 12px 14px; }
 td.right, th.right { text-align: right; }
-td.num, th.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+td.num, th.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 .vacio {
   padding: 32px 20px;
@@ -465,7 +479,7 @@ td.num, th.num { font-family: var(--font-mono); font-variant-numeric: tabular-nu
 .chip.pagada,
 .chip.disponible,
 .chip.enviada,
-.chip.dispensada { background: var(--ok-tint); border: 1px double var(--ok); color: var(--ok-ink); }
+.chip.dispensada { background: var(--ok-tint); border: 3px double var(--ok); color: var(--ok-ink); }
 .chip.completada::before, .chip.pagada::before,
 .chip.disponible::before, .chip.enviada::before,
 .chip.dispensada::before { content: "✓"; }
@@ -545,6 +559,10 @@ td.num, th.num { font-family: var(--font-mono); font-variant-numeric: tabular-nu
   font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
   text-transform: uppercase;
 }
+
+/* Montos (Q 1,234.00): no deben partirse entre el simbolo y la cifra. */
+#estadoCuentaBox .kpi .kpi-value { white-space: nowrap; font-size: 26px; }
+#estadoCuentaBox .kpi.hero .kpi-value { font-size: 40px; }
 
 .kpi.ok    { border-left: 3px solid var(--ok); }
 .kpi.warn  { border-left: 3px solid var(--warn); }
@@ -651,7 +669,7 @@ td.num, th.num { font-family: var(--font-mono); font-variant-numeric: tabular-nu
   grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
   gap: 20px;
 }
-@media (max-width: 1000px) { .visita-panel { grid-template-columns: 1fr; } }
+@media (max-width: 1000px) { .visita-panel { grid-template-columns: minmax(0, 1fr); } }
 .subcard {
   border: 1px solid var(--line-weak);
   padding: 18px 20px;

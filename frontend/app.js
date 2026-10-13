@@ -236,8 +236,12 @@ function aplicarRangoDefectoReporte() {
   } else {
     desde = new Date(hoy); desde.setDate(hoy.getDate() - 90);
   }
-  $('#repDesde').value = desde.toISOString().slice(0, 10);
-  $('#repHasta').value = hoy.toISOString().slice(0, 10);
+  // Fecha local, no toISOString(): en UTC-6 despues de las 18:00 el
+  // "hasta" saltaba al dia siguiente.
+  const isoLocal = d =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  $('#repDesde').value = isoLocal(desde);
+  $('#repHasta').value = isoLocal(hoy);
 }
 
 async function onLogin(e) {
@@ -290,6 +294,13 @@ function filtrarMenuPorRol() {
     const li = b.parentElement;
     const visible = tabVisible(tab);
     if (li) li.style.display = visible ? '' : 'none';
+  });
+  // Un grupo sin secciones visibles no debe dejar su rotulo huerfano
+  // (p. ej. "II. Servicios" para medico_general).
+  $$('nav.side .section-label').forEach(label => {
+    const ul = label.nextElementSibling;
+    const hayVisibles = ul && [...ul.children].some(li => li.style.display !== 'none');
+    label.style.display = hayVisibles ? '' : 'none';
   });
   // Si queda sin pestana activa, mandar a dashboard
   const activo = $$('.tab.activo').find(b => b.parentElement.style.display !== 'none');
@@ -659,6 +670,8 @@ async function cargarDetalleVisita() {
     $('#btnCompletarVisita').disabled = !puedeEditar;
     $('#btnAgregarExamen').disabled = !puedeEditar;
     $('#btnAgregarPrescripcion').disabled = !puedeEditar;
+    ['#exTipo', '#rxIdMedicamento', '#rxMedicamento', '#rxDosis', '#rxIndicaciones']
+      .forEach(sel => { $(sel).disabled = !puedeEditar; });
 
     $('#listaExamenes').innerHTML = (v.examenes || []).map(ex =>
       `<li>${esc(ex.tipo)} ${chip(ex.estado)}<div class="tiny">${fechaHora(ex.fechaSolicitud)}</div></li>`
@@ -805,8 +818,10 @@ async function cargarPrescripcionesPendientes() {
       $('#btnDispensar').disabled = true;
       hint.textContent = 'Este paciente no tiene prescripciones pendientes. El médico especialista debe emitir una en una visita antes de que farmacia pueda dispensarla.';
     } else {
-      sel.disabled = false;
-      $('#btnDispensar').disabled = false;
+      // Solo farmacia/admin: otros roles ven la lista pero no dispensan.
+      const puedeDisp = puedeAccion('dispensar');
+      sel.disabled = !puedeDisp;
+      $('#btnDispensar').disabled = !puedeDisp;
       sel.innerHTML = `<option value="">Elegir…</option>` + prescripciones.map(p => {
         const sinMed = p.idMedicamento == null;
         const etiqueta = `${esc(p.medicamento)}${p.dosis ? ' · ' + esc(p.dosis) : ''}${sinMed ? ' (sin medicamento de inventario)' : ''}`;
