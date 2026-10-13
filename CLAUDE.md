@@ -115,16 +115,39 @@ manual (solo admin).
 HTML/CSS/JS plano servido por nginx. Un solo `index.html` + `styles.css`
 + `app.js`.
 
-**Identidad visual clínica (segunda iteración, oct 2026)**: paleta
-reducida a azul zafiro (`#1A4D7A`) + verde bosque apagado (`#2F6B4A`)
-sobre papel blanco. Tipografía IBM Plex Sans + IBM Plex Mono para
-números tabulares. Estados de error/éxito/advertencia nunca dependen
-solo del color — llevan prefijo tipográfico (Error / Ok / Aviso) y los
-chips de estado alternan patrones de borde (sólido, dashed, double)
-para ser legibles en escala de grises. Controles ≥ 44px, foco visible
-grueso. Sidebar con las 8 secciones filtradas por rol. Bootstrap 5 fue
-evaluado y descartado: el CSS propio es más corto y permite aplicar la
-skill sin pelear con defaults.
+**Identidad visual "Editorial Data-Dense" (tercera iteración, 12 oct
+2026)**, elegida con la skill `ui-ux-pro-max`. Fuente de verdad:
+[`design-system/asilo-cabeza-de-algodon/MASTER.md`](design-system/asilo-cabeza-de-algodon/MASTER.md);
+los tokens viven como variables CSS en `:root` de `styles.css`.
+Reemplaza a la identidad "clínica" azul zafiro + verde bosque / IBM
+Plex Sans — no reintroducir esos colores.
+
+- **Paleta**: casi monocroma. Papel `#FAFAFA`, tarjeta `#FFFFFF`,
+  tinta `#09090B`/`#18181B`, líneas `#D4D4D8`, y **un solo acento
+  magenta `#D11A6D`** (hover `#A0144F`, tint `#FBE8F0`) para marca,
+  foco y la acción primaria. Semánticos: ok `#15803D`, aviso
+  `#A16207`, error `#B91C1C`, info `#1D4ED8`, cada uno con su tint.
+- **Tipografías** (Google Fonts, `@import` en `styles.css`): **Libre
+  Bodoni** para H1, marca del sidebar y valores de KPI; **Public
+  Sans** para cuerpo, tablas y formularios; **IBM Plex Mono** solo
+  para columnas numéricas (`td.num`) y contadores.
+- **Estados nunca solo por color**: los mensajes llevan prefijo
+  (`✓ Ok —`, `⚠ Aviso —`, `✕ Error —`) y cada chip combina símbolo +
+  patrón de borde: pendiente ◔ dashed, cita_asignada ● sólido 1px,
+  en_atencion ◉ sólido 2px, completada/pagada/disponible/dispensada
+  ✓ double 3px, cancelada ✕ sólido 1px. Verificado en escala de
+  grises.
+- **Layout**: login a dos paneles (lateral oscuro + formulario);
+  shell con sidebar de 248px (regleta magenta, grupos I. Cuidado /
+  II. Servicios / III. Administración) y `main.stage` con ancho
+  máximo 1280px. Panel con un KPI "hero" oscuro + 3 compactos.
+  Controles ≥ 44px, foco visible. Bajo 960px el sidebar pasa arriba.
+- `nginx.conf` sirve `index.html` con `no-store` y `*.css`/`*.js` con
+  `no-cache` (no llevan hash en el nombre; sin eso un redeploy
+  mezclaba HTML nuevo con CSS/JS viejos).
+
+Bootstrap 5 fue evaluado y descartado: el CSS propio es más corto y
+permite aplicar la skill sin pelear con defaults.
 
 **RBAC en la UI**: cada sección se oculta del menú si el rol no la usa
 y cada formulario de escritura se deshabilita si el rol no tiene
@@ -162,6 +185,11 @@ en [`scripts/README.md`](scripts/README.md).
 4. Flujo de "asociar medicamento del inventario a una prescripción ya
    emitida sin idMedicamento" (hoy hay que crear otra prescripción).
 5. Reportes extra o auto-paginación cuando una tabla supere N filas.
+6. Huecos de la UI detectados al probarla en navegador (12 oct 2026):
+   "Asignar cita" pide fecha/hora/ID de médico con `prompt()` nativo
+   (sin selector de especialista); no hay formulario para gastos
+   operativos ni pagos a fundación (solo API); no hay edición de
+   paciente en pantalla (solo `PUT /api/pacientes/:id`).
 
 ## Reglas de negocio críticas (no romper al tocar código existente)
 

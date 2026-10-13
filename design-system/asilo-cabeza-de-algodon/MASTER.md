@@ -42,7 +42,7 @@ propuestas). Justificacion:
 
 | Estado | Hex | Prefijo texto | Borde chip |
 |---|---|---|---|
-| Ok / completada / enviada | `#15803D` sobre `#DCFCE7` | `✓ Ok —` | `double` 1px verde |
+| Ok / completada / enviada | `#15803D` sobre `#DCFCE7` | `✓ Ok —` | `double` 3px verde |
 | Aviso / pendiente | `#A16207` sobre `#FEF3C7` | `⚠ Aviso —` | `dashed` 1px ambar |
 | Error / cancelada / fallida | `#B91C1C` sobre `#FEE2E2` | `✕ Error —` | `solid` 1px rojo |
 | Info / activa | `#1D4ED8` sobre `#DBEAFE` | `ℹ Info —` | `solid` 2px azul |
