@@ -1088,8 +1088,9 @@ async function onDispensar(e) {
   };
   try {
     const d = await api(API.farmacia, '/api/farmacia/dispensaciones', { method: 'POST', body });
-    ok(msg, `Dispensado "${d.medicamento}". Costo con descuento fundación: ${money(d.costoTotal)}`);
+    // Recargar primero: cargarFarmacia() limpia el mensaje del formulario.
     await cargarFarmacia();
+    ok(msg, `Dispensado "${d.medicamento}". Costo con descuento fundación: ${money(d.costoTotal)}`);
   } catch (err) { error(msg, err.message); }
 }
 
@@ -1112,6 +1113,16 @@ async function cargarLaboratorio() {
   if (!puedePrecios) warn($('#msgPrecio'), 'Solo administración puede modificar los precios.');
   else limpiar($('#msgPrecio'));
   cargarPrecios();
+
+  // Las ordenes pendientes solo las sirve el backend a laboratorio/admin;
+  // los demas roles con acceso a la seccion ven el catalogo de precios.
+  if (!puedeReg) {
+    $('#contadorOrdenes').textContent = '';
+    $('#vacioOrdenes').classList.add('hidden');
+    $('#tbodyOrdenes').innerHTML =
+      `<tr><td colspan="5" class="tiny">Las órdenes pendientes solo las ve el personal de laboratorio. El estado de cada examen aparece en la visita.</td></tr>`;
+    return;
+  }
 
   try {
     const ordenes = await api(API.laboratorio, '/api/laboratorio/ordenes-pendientes');
@@ -1229,9 +1240,10 @@ async function onRegistrarResultado(e) {
   };
   try {
     await api(API.laboratorio, `/api/laboratorio/resultados/examen/${idExamen}`, { method: 'POST', body });
-    ok(msg, 'Resultado registrado. La orden queda marcada como disponible.');
     e.target.reset();
-    cargarLaboratorio();
+    // Recargar primero: cargarLaboratorio() limpia el mensaje del formulario.
+    await cargarLaboratorio();
+    ok(msg, `Resultado del examen #${idExamen} registrado. La orden queda marcada como disponible.`);
   } catch (err) { error(msg, err.message); }
 }
 

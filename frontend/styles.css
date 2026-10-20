@@ -706,6 +706,8 @@ td.num, th.num { font-family: var(--font-mono); font-variant-numeric: tabular-nu
 }
 
 th.col-acciones, td.col-acciones { white-space: nowrap; width: 1%; }
+/* El atributo hidden debe ganarle a display de .btn y similares. */
+[hidden] { display: none !important; }
 
 /* ============ Dialogo propio (reemplaza prompt/confirm/alert) ============ */
 dialog.dialogo {
