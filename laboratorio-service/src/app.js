@@ -6,13 +6,15 @@ const cors = require('cors');
 const { inicializarEsquema } = require('./repositories/database');
 const ResultadoExamenRepository = require('./repositories/ResultadoExamenRepository');
 const PacienteReadRepository = require('./repositories/PacienteReadRepository');
+const PrecioExamenRepository = require('./repositories/PrecioExamenRepository');
 const LaboratorioService = require('./services/LaboratorioService');
 const LaboratorioController = require('./controllers/LaboratorioController');
 const crearRutasLaboratorio = require('./routes/laboratorioRoutes');
 
 const resultadoRepo = new ResultadoExamenRepository();
 const pacienteRepo = new PacienteReadRepository();
-const laboratorioService = new LaboratorioService(resultadoRepo, pacienteRepo);
+const precioRepo = new PrecioExamenRepository();
+const laboratorioService = new LaboratorioService(resultadoRepo, pacienteRepo, precioRepo);
 const laboratorioController = new LaboratorioController(laboratorioService);
 
 const app = express();

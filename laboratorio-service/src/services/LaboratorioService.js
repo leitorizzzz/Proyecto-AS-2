@@ -1,4 +1,5 @@
 const ResultadoExamen = require('../models/ResultadoExamen');
+const PrecioExamen = require('../models/PrecioExamen');
 
 const TIPOS_VALIDOS = new Set(Object.values(ResultadoExamen.TIPOS));
 
@@ -10,11 +11,13 @@ const TIPOS_VALIDOS = new Set(Object.values(ResultadoExamen.TIPOS));
  *   atomica desde la capa de servicio.
  * - Calcular costo de un examen aplicando el descuento de fundacion
  *   (RN-09: 20% por defecto, configurable en .env).
+ * - Mantener el catalogo de precios base por tipo de examen.
  */
 class LaboratorioService {
-  constructor(resultadoRepo, pacienteRepo) {
+  constructor(resultadoRepo, pacienteRepo, precioRepo) {
     this.repo = resultadoRepo;
     this.pacienteRepo = pacienteRepo;
+    this.precioRepo = precioRepo;
     this.descuento = Number(process.env.DESCUENTO_FUNDACION || 0.20);
   }
 
@@ -118,6 +121,54 @@ class LaboratorioService {
       descuentoFundacion: this._r(montoDescuento),
       porcentajeDescuento: this.descuento,
       total: this._r(total)
+    };
+  }
+
+  // --- Catalogo de precios ---
+
+  /** Cada precio incluye lo que paga el residente con RN-09 aplicado. */
+  async listarPrecios() {
+    const precios = await this.precioRepo.listar();
+    return precios.map(p => this._conDescuento(p));
+  }
+
+  async crearPrecio(datos) {
+    const precio = this._validarPrecio(datos);
+    if (await this.precioRepo.obtenerPorTipo(precio.tipo)) {
+      throw Object.assign(new Error(`Ya existe un precio para el examen "${precio.tipo}"`), { status: 409 });
+    }
+    return this._conDescuento(await this.precioRepo.guardar(precio));
+  }
+
+  async actualizarPrecio(id, datos) {
+    const actual = await this.precioRepo.obtenerPorId(Number(id));
+    if (!actual) throw Object.assign(new Error('Precio de examen no encontrado'), { status: 404 });
+    const precio = this._validarPrecio({ tipo: actual.tipo, ...datos });
+    const conMismoTipo = await this.precioRepo.obtenerPorTipo(precio.tipo);
+    if (conMismoTipo && conMismoTipo.id !== actual.id) {
+      throw Object.assign(new Error(`Ya existe un precio para el examen "${precio.tipo}"`), { status: 409 });
+    }
+    return this._conDescuento(await this.precioRepo.actualizar(actual.id, precio));
+  }
+
+  _validarPrecio({ tipo, precioBase }) {
+    const t = String(tipo || '').trim();
+    if (!t) throw Object.assign(new Error('tipo es requerido'), { status: 400 });
+    if (t.length > 200) throw Object.assign(new Error('tipo admite maximo 200 caracteres'), { status: 400 });
+    const p = Number(precioBase);
+    if (precioBase == null || precioBase === '' || !Number.isFinite(p) || p <= 0) {
+      throw Object.assign(new Error('precioBase debe ser un numero mayor a 0'), { status: 400 });
+    }
+    return new PrecioExamen({ tipo: t, precioBase: this._r(p) });
+  }
+
+  _conDescuento(precio) {
+    return {
+      id: precio.id,
+      tipo: precio.tipo,
+      precioBase: this._r(precio.precioBase),
+      porcentajeDescuento: this.descuento,
+      precioConDescuento: this._r(precio.precioBase * (1 - this.descuento))
     };
   }
 

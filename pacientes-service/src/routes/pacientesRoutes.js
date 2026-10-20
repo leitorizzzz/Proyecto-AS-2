@@ -1,5 +1,6 @@
 const express = require('express');
 const autenticar = require('../middleware/authMiddleware');
+const autorizarRoles = require('../middleware/autorizarRoles');
 
 function crearRutasPacientes(pacienteController) {
   const router = express.Router();
@@ -7,11 +8,15 @@ function crearRutasPacientes(pacienteController) {
   // Todas las rutas de pacientes requieren token valido
   router.use(autenticar);
 
+  // Lectura: cualquier autenticado. Alta y edicion del expediente:
+  // enfermeria y administracion. Borrado fisico: solo administracion.
+  const registraPacientes = autorizarRoles('enfermero', 'admin');
+
   router.get('/', pacienteController.listar);
   router.get('/:id', pacienteController.obtener);
-  router.post('/', pacienteController.crear);
-  router.put('/:id', pacienteController.actualizar);
-  router.delete('/:id', pacienteController.eliminar);
+  router.post('/', registraPacientes, pacienteController.crear);
+  router.put('/:id', registraPacientes, pacienteController.actualizar);
+  router.delete('/:id', autorizarRoles('admin'), pacienteController.eliminar);
 
   return router;
 }

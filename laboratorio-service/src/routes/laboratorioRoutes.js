@@ -15,6 +15,13 @@ function crearRutasLaboratorio(laboratorioController) {
   router.get('/resultados/examen/:idExamen', laboratorioController.obtenerResultadoPorExamen);
   router.get('/examenes/:idExamen/costo', laboratorioController.costoConDescuento);
 
+  // Catalogo de precios: lectura para cualquier autenticado (el especialista
+  // lo usa para elegir el examen); alta y cambio de precio solo admin.
+  const soloAdmin = autorizarRoles('admin');
+  router.get('/precios', laboratorioController.listarPrecios);
+  router.post('/precios', soloAdmin, laboratorioController.crearPrecio);
+  router.put('/precios/:id', soloAdmin, laboratorioController.actualizarPrecio);
+
   return router;
 }
 

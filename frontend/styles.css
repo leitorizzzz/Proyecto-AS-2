@@ -705,6 +705,8 @@ td.num, th.num { font-family: var(--font-mono); font-variant-numeric: tabular-nu
   50%      { opacity: 1; }
 }
 
+th.col-acciones, td.col-acciones { white-space: nowrap; width: 1%; }
+
 /* ============ Dialogo propio (reemplaza prompt/confirm/alert) ============ */
 dialog.dialogo {
   width: min(520px, calc(100vw - 32px));

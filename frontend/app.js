@@ -227,6 +227,7 @@ const RBAC = {
   // Acciones de escritura por rol
   acciones: {
     crearPaciente:       ['enfermero'],
+    editarPaciente:      ['enfermero'],
     crearSolicitud:      ['medico_general'],
     asignarCita:         ['coordinador_fundacion'],
     convertirAVisita:    ['medico_especialista'],
@@ -239,6 +240,9 @@ const RBAC = {
     registrarCuotaFin:   [],      // solo admin
     crearDonanteFin:     [],      // solo admin
     registrarDonacionFin:[],      // solo admin
+    registrarGastoFin:   [],      // solo admin
+    registrarPagoFundFin:[],      // solo admin
+    editarPreciosLab:    [],      // solo admin
   }
 };
 function rolActual() { return state.usuario?.rol || null; }
@@ -286,6 +290,9 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#formCuota').addEventListener('submit', onRegistrarCuota);
   $('#formDonante').addEventListener('submit', onRegistrarDonante);
   $('#formDonacion').addEventListener('submit', onRegistrarDonacion);
+  $('#formGasto').addEventListener('submit', onRegistrarGasto);
+  $('#formPagoFund').addEventListener('submit', onRegistrarPagoFundacion);
+  $('#formPrecio').addEventListener('submit', onCrearPrecio);
 
   $('#dPaciente').addEventListener('change', async () => {
     await cargarPrescripcionesPendientes();
@@ -516,7 +523,9 @@ async function cargarPacientes() {
   }
   try {
     const pacientes = await api(API.pacientes, '/api/pacientes');
+    state.pacientes = pacientes;
     $('#contadorPacientes').textContent = `${pacientes.length} personas`;
+    const puedeEditar = puedeAccion('editarPaciente');
     const rows = pacientes.map(p => `
       <tr>
         <td>
@@ -526,8 +535,13 @@ async function cargarPacientes() {
         <td class="num">${esc(p.dpi)}</td>
         <td>${fechaCorta(p.fechaNacimiento)}</td>
         <td>${fechaCorta(p.fechaIngreso)}</td>
+        <td class="col-acciones">${puedeEditar
+          ? `<button class="btn-link" data-editar-paciente="${p.id}">Editar</button>`
+          : '<span class="tiny">—</span>'}</td>
       </tr>`).join('');
     $('#tbodyPacientes').innerHTML = rows;
+    $$('#tbodyPacientes [data-editar-paciente]').forEach(b =>
+      b.addEventListener('click', () => editarPaciente(Number(b.dataset.editarPaciente))));
     $('#vacioPacientes').classList.toggle('hidden', pacientes.length > 0);
     // repoblar selects que dependen de pacientes
     llenarSelectPacientes($('#sPaciente'), pacientes);
@@ -537,6 +551,54 @@ async function cargarPacientes() {
     llenarSelectPacientes($('#qPaciente'), pacientes);
   } catch (err) {
     console.error('Pacientes:', err);
+  }
+}
+
+async function editarPaciente(id) {
+  const p = (state.pacientes || []).find(x => x.id === id);
+  if (!p) return;
+  const v = s => esc(s || '');
+  const generos = [['F', 'Femenino'], ['M', 'Masculino'], ['Otro', 'Otro']]
+    .map(([val, txt]) => `<option value="${val}"${p.genero === val ? ' selected' : ''}>${txt}</option>`).join('');
+
+  const guardado = await abrirDialogo({
+    eyebrow: 'Editar expediente',
+    titulo: `${p.nombres} ${p.apellidos}`,
+    cuerpo: `
+      <div class="fila-2">
+        <div><label for="epNombres">Nombres</label><input id="epNombres" name="nombres" required value="${v(p.nombres)}"></div>
+        <div><label for="epApellidos">Apellidos</label><input id="epApellidos" name="apellidos" required value="${v(p.apellidos)}"></div>
+      </div>
+      <div class="fila-2">
+        <div><label for="epFechaNac">Fecha de nacimiento</label>
+          <input type="date" id="epFechaNac" name="fechaNacimiento" required value="${String(p.fechaNacimiento || '').slice(0, 10)}"></div>
+        <div><label for="epGenero">Género</label><select id="epGenero" name="genero" required>${generos}</select></div>
+      </div>
+      <label for="epDpi">DPI (13 dígitos)</label>
+      <input id="epDpi" name="dpi" inputmode="numeric" maxlength="13" required value="${v(p.dpi)}">
+      <div class="fila-2">
+        <div><label for="epTelefono">Teléfono</label><input id="epTelefono" name="telefono" value="${v(p.telefono)}"></div>
+        <div><label for="epContacto">Contacto de emergencia</label><input id="epContacto" name="contactoEmergencia" value="${v(p.contactoEmergencia)}"></div>
+      </div>
+      <label for="epFamiliarEmail">Correo del familiar</label>
+      <input id="epFamiliarEmail" name="familiarEmail" type="email" value="${v(p.familiarEmail)}">
+      <label for="epDireccion">Dirección</label>
+      <input id="epDireccion" name="direccion" value="${v(p.direccion)}">
+      <label for="epPadecimientos">Padecimientos conocidos</label>
+      <textarea id="epPadecimientos" name="padecimientos" rows="2">${v(p.padecimientos)}</textarea>`,
+    textoConfirmar: 'Guardar cambios',
+    alEnviar: async datos => {
+      const body = Object.fromEntries(Object.entries(datos).map(([k, val]) => {
+        const t = String(val).trim();
+        return [k, t === '' ? null : t];
+      }));
+      body.fechaIngreso = p.fechaIngreso;
+      await api(API.pacientes, `/api/pacientes/${id}`, { method: 'PUT', body });
+    }
+  });
+  if (guardado) {
+    ok($('#msgPaciente'), `Expediente de ${p.nombres} ${p.apellidos} actualizado.`);
+    cargarPacientes();
   }
 }
 
@@ -822,6 +884,17 @@ async function cargarDetalleVisita() {
         <div class="tiny">${esc(rx.indicaciones || '')}${rx.idMedicamento ? ' · inventario #' + rx.idMedicamento : ' · sin inventario'}</div></li>`
     ).join('') || `<li class="tiny">Sin prescripciones.</li>`;
 
+    // Catalogo de examenes con precio: sugerencias para "Nuevo examen",
+    // asi laboratorio puede calcular el costo (RN-09).
+    if (puedeEditar) {
+      api(API.laboratorio, '/api/laboratorio/precios')
+        .then(precios => {
+          $('#catalogoExamenes').innerHTML =
+            precios.map(p => `<option value="${esc(p.tipo)}">`).join('');
+        })
+        .catch(() => { /* sin catalogo, el campo sigue siendo texto libre */ });
+    }
+
     // Cargar inventario de farmacia para la lista de medicamentos
     if (puedeEditar) {
       try {
@@ -1034,6 +1107,12 @@ async function cargarLaboratorio() {
   if (msgR && !puedeReg) warn(msgR, 'Solo personal de laboratorio puede registrar resultados.');
   else if (msgR) limpiar(msgR);
 
+  const puedePrecios = puedeAccion('editarPreciosLab');
+  $('#formPrecio').querySelectorAll('input, button').forEach(el => el.disabled = !puedePrecios);
+  if (!puedePrecios) warn($('#msgPrecio'), 'Solo administración puede modificar los precios.');
+  else limpiar($('#msgPrecio'));
+  cargarPrecios();
+
   try {
     const ordenes = await api(API.laboratorio, '/api/laboratorio/ordenes-pendientes');
     $('#contadorOrdenes').textContent = `${ordenes.length} pendientes`;
@@ -1059,6 +1138,65 @@ async function cargarLaboratorio() {
         }
       }));
   } catch (err) { console.error('Laboratorio:', err); }
+}
+
+async function cargarPrecios() {
+  try {
+    const precios = await api(API.laboratorio, '/api/laboratorio/precios');
+    state.preciosExamen = precios;
+    const puedeEditar = puedeAccion('editarPreciosLab');
+    $('#contadorPrecios').textContent = `${precios.length} exámenes`;
+    $('#tbodyPrecios').innerHTML = precios.map(p => `
+      <tr>
+        <td>${esc(p.tipo)}</td>
+        <td class="right num">${money(p.precioBase)}</td>
+        <td class="right num">${money(p.precioConDescuento)}</td>
+        <td class="col-acciones">${puedeEditar
+          ? `<button class="btn-link" data-editar-precio="${p.id}">Editar</button>`
+          : '<span class="tiny">—</span>'}</td>
+      </tr>`).join('');
+    $('#vacioPrecios').classList.toggle('hidden', precios.length > 0);
+    $$('#tbodyPrecios [data-editar-precio]').forEach(b =>
+      b.addEventListener('click', () => editarPrecio(Number(b.dataset.editarPrecio))));
+  } catch (err) {
+    $('#tbodyPrecios').innerHTML =
+      `<tr><td colspan="4"><div class="msg error">No se pudieron cargar los precios: ${esc(err.message)}</div></td></tr>`;
+  }
+}
+
+async function onCrearPrecio(e) {
+  e.preventDefault();
+  const msg = $('#msgPrecio'); limpiar(msg);
+  const body = { tipo: $('#prTipo').value.trim(), precioBase: Number($('#prPrecio').value) };
+  try {
+    const p = await api(API.laboratorio, '/api/laboratorio/precios', { method: 'POST', body });
+    ok(msg, `${p.tipo}: ${money(p.precioBase)} (con descuento ${money(p.precioConDescuento)}).`);
+    e.target.reset();
+    cargarPrecios();
+  } catch (err) { error(msg, err.message); }
+}
+
+async function editarPrecio(id) {
+  const p = (state.preciosExamen || []).find(x => x.id === id);
+  if (!p) return;
+  const guardado = await abrirDialogo({
+    eyebrow: 'Editar precio',
+    titulo: p.tipo,
+    cuerpo: `
+      <label for="dlgPrTipo">Examen</label>
+      <input id="dlgPrTipo" name="tipo" required maxlength="200" value="${esc(p.tipo)}">
+      <label for="dlgPrPrecio">Precio base (Q)</label>
+      <input type="number" id="dlgPrPrecio" name="precioBase" step="0.01" min="0.01" required value="${p.precioBase}">
+      <p class="tiny" style="margin-top:10px">El residente paga el precio base menos ${(p.porcentajeDescuento * 100).toFixed(0)} % de descuento de la fundación.</p>`,
+    textoConfirmar: 'Guardar precio',
+    alEnviar: v => api(API.laboratorio, `/api/laboratorio/precios/${id}`, {
+      method: 'PUT', body: { tipo: v.tipo.trim(), precioBase: Number(v.precioBase) }
+    })
+  });
+  if (guardado) {
+    ok($('#msgPrecio'), 'Precio actualizado.');
+    cargarPrecios();
+  }
 }
 
 async function verCostoLab(idExamen) {
@@ -1105,7 +1243,8 @@ async function cargarFinancieroTab() {
   // Habilitar formularios de escritura solo si admin
   const puedeEscribir = esAdmin();
   [['#formCargo', '#msgCargo'], ['#formCuota', '#msgCuota'],
-   ['#formDonante', '#msgDonante'], ['#formDonacion', '#msgDonacion']].forEach(([sel, msgSel]) => {
+   ['#formDonante', '#msgDonante'], ['#formDonacion', '#msgDonacion'],
+   ['#formGasto', '#msgGasto'], ['#formPagoFund', '#msgPagoFund']].forEach(([sel, msgSel]) => {
     const f = $(sel);
     if (!f) return;
     f.querySelectorAll('input, select, textarea, button').forEach(el => el.disabled = !puedeEscribir);
@@ -1121,7 +1260,66 @@ async function cargarFinancieroTab() {
     llenarSelectPacientes($('#qPaciente'), pacientes);
     cargarDonaciones();
     cargarDonantesSelect();
+    cargarGastos();
+    cargarPagosFundacion();
   } catch (err) { console.error(err); }
+}
+
+async function cargarGastos() {
+  try {
+    const list = await api(API.financiero, '/api/financiero/gastos');
+    $('#contadorGastos').textContent = `${list.length} registrados`;
+    $('#tbodyGastos').innerHTML = list.map(g => `
+      <tr>
+        <td class="tiny">${fechaHora(g.fecha)}</td>
+        <td>${esc(g.concepto)}</td>
+        <td>${esc(g.categoria)}</td>
+        <td class="right num">${money(g.monto)}</td>
+      </tr>`).join('');
+    $('#vacioGastos').classList.toggle('hidden', list.length > 0);
+  } catch (err) { console.error(err); }
+}
+
+async function cargarPagosFundacion() {
+  try {
+    const list = await api(API.financiero, '/api/financiero/pagos-fundacion');
+    $('#contadorPagosFund').textContent = `${list.length} registrados`;
+    $('#tbodyPagosFund').innerHTML = list.map(p => `
+      <tr>
+        <td class="tiny">${fechaHora(p.fecha)}</td>
+        <td>${esc(p.concepto)}</td>
+        <td class="right num">${money(p.monto)}</td>
+      </tr>`).join('');
+    $('#vacioPagosFund').classList.toggle('hidden', list.length > 0);
+  } catch (err) { console.error(err); }
+}
+
+async function onRegistrarGasto(e) {
+  e.preventDefault();
+  const msg = $('#msgGasto'); limpiar(msg);
+  const body = {
+    concepto: $('#gConcepto').value.trim(),
+    categoria: $('#gCategoria').value,
+    monto: Number($('#gMonto').value)
+  };
+  try {
+    await api(API.financiero, '/api/financiero/gastos', { method: 'POST', body });
+    ok(msg, `Gasto de ${money(body.monto)} registrado.`);
+    e.target.reset();
+    cargarGastos();
+  } catch (err) { error(msg, err.message); }
+}
+
+async function onRegistrarPagoFundacion(e) {
+  e.preventDefault();
+  const msg = $('#msgPagoFund'); limpiar(msg);
+  const body = { concepto: $('#pfConcepto').value.trim(), monto: Number($('#pfMonto').value) };
+  try {
+    await api(API.financiero, '/api/financiero/pagos-fundacion', { method: 'POST', body });
+    ok(msg, `Pago a la fundación de ${money(body.monto)} registrado.`);
+    e.target.reset();
+    cargarPagosFundacion();
+  } catch (err) { error(msg, err.message); }
 }
 
 async function cargarEstadoCuenta() {

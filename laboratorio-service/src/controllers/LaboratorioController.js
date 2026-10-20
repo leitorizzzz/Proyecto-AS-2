@@ -11,6 +11,24 @@ class LaboratorioController {
     res.status(status).json({ error: error.message });
   };
 
+  listarPrecios = async (req, res) => {
+    try {
+      res.json(await this.service.listarPrecios());
+    } catch (error) { this._fallo(res, error); }
+  };
+
+  crearPrecio = async (req, res) => {
+    try {
+      res.status(201).json(await this.service.crearPrecio(req.body));
+    } catch (error) { this._fallo(res, error); }
+  };
+
+  actualizarPrecio = async (req, res) => {
+    try {
+      res.json(await this.service.actualizarPrecio(Number(req.params.id), req.body));
+    } catch (error) { this._fallo(res, error); }
+  };
+
   ordenesPendientes = async (req, res) => {
     try {
       const ordenes = await this.service.ordenesPendientes();

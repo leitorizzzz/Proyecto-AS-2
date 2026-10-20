@@ -48,7 +48,7 @@ class PacienteController {
       await this.service.eliminar(Number(req.params.id));
       res.status(204).send();
     } catch (error) {
-      res.status(404).json({ error: error.message });
+      res.status(error.status || 404).json({ error: error.message });
     }
   };
 }

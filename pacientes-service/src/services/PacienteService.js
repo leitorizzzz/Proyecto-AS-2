@@ -64,7 +64,18 @@ class PacienteService {
 
   async eliminar(id) {
     await this.obtener(id);
-    return this.repo.eliminar(id);
+    try {
+      return await this.repo.eliminar(id);
+    } catch (err) {
+      // 547 = violacion de FK: el paciente ya tiene solicitudes o visitas.
+      if (err.number === 547) {
+        throw Object.assign(
+          new Error('No se puede eliminar: el paciente tiene solicitudes o visitas registradas'),
+          { status: 409 }
+        );
+      }
+      throw err;
+    }
   }
 }
 
