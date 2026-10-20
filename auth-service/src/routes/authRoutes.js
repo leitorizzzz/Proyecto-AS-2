@@ -12,6 +12,11 @@ function crearRutasAuth(authController) {
   router.post('/login', authController.login);
   router.get('/me', autenticar, authController.me);
 
+  // Directorio de personal (sin passwordHash). Lo usa coordinacion para
+  // elegir el medico especialista al asignar una cita.
+  router.get('/usuarios', autenticar, autorizarRoles('admin', 'coordinador_fundacion'),
+    authController.listarUsuarios);
+
   return router;
 }
 

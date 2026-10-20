@@ -66,6 +66,20 @@ class AuthService {
     return { token, usuario: usuario.toPublic() };
   }
 
+  /**
+   * Lista usuarios sin passwordHash. `rol` acepta uno o varios separados
+   * por coma (p. ej. "medico_especialista,especialista").
+   */
+  async listarUsuarios({ rol } = {}) {
+    const roles = rol ? String(rol).split(',').map(r => r.trim()).filter(Boolean) : [];
+    const invalidos = roles.filter(r => !ROLES_VALIDOS.includes(r));
+    if (invalidos.length) {
+      throw Object.assign(new Error(`Rol invalido: ${invalidos.join(', ')}`), { status: 400 });
+    }
+    const usuarios = await this.usuarioRepo.listar({ roles });
+    return usuarios.map(u => u.toPublic());
+  }
+
   async obtenerPerfil(idUsuario) {
     const usuario = await this.usuarioRepo.obtenerPorId(idUsuario);
     if (!usuario) throw new Error('Usuario no encontrado');

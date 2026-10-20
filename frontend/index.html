@@ -625,6 +625,22 @@
   </main>
 </div>
 
+<!-- ==================== DIALOGO PROPIO ====================
+     Reemplaza prompt()/confirm()/alert(). showModal() vuelve inerte el
+     resto de la pagina; app.js agrega el ciclo de Tab y Esc cierra. -->
+<dialog id="dlg" class="dialogo" aria-labelledby="dlgTitulo">
+  <form id="dlgForm" novalidate>
+    <div class="eyebrow" id="dlgEyebrow"></div>
+    <h2 id="dlgTitulo">—</h2>
+    <div id="dlgCuerpo"></div>
+    <div id="dlgMsg" role="status" aria-live="polite"></div>
+    <div class="dialogo-acciones">
+      <button type="button" class="btn ghost" id="dlgCancelar">Cancelar</button>
+      <button type="submit" class="btn" id="dlgConfirmar">Aceptar</button>
+    </div>
+  </form>
+</dialog>
+
 <script src="app.js"></script>
 </body>
 </html>

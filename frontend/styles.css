@@ -705,6 +705,35 @@ td.num, th.num { font-family: var(--font-mono); font-variant-numeric: tabular-nu
   50%      { opacity: 1; }
 }
 
+/* ============ Dialogo propio (reemplaza prompt/confirm/alert) ============ */
+dialog.dialogo {
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--accent);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+  color: var(--text-body);
+  box-shadow: 0 24px 60px rgba(9, 9, 11, 0.24);
+}
+dialog.dialogo::backdrop { background: rgba(9, 9, 11, 0.55); }
+dialog.dialogo form { padding: 26px 28px 22px; }
+dialog.dialogo h2 { font-size: var(--fs-title); line-height: 1.15; margin: 0 0 10px; }
+dialog.dialogo #dlgEyebrow:empty { display: none; }
+dialog.dialogo #dlgCuerpo > p { font-size: var(--fs-body); color: var(--text-soft); line-height: 1.5; }
+dialog.dialogo #dlgCuerpo table { margin-top: 8px; }
+.dialogo-acciones {
+  display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap;
+  margin-top: 8px;
+}
+.dialogo-acciones .btn { margin-top: 14px; }
+.btn.danger { background: var(--err); border-color: var(--err); }
+.btn.danger:hover { background: var(--err-ink); border-color: var(--err-ink); }
+@media (max-width: 640px) {
+  .dialogo-acciones .btn { flex: 1 1 100%; }
+}
+
 /* ============ Iconos ============ */
 .ico { stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 

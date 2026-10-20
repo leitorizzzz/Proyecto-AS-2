@@ -23,6 +23,22 @@ class UsuarioRepository {
     return result.recordset[0] ? new Usuario(result.recordset[0]) : null;
   }
 
+  /** Lista usuarios, opcionalmente filtrados por uno o varios roles. */
+  async listar({ roles = [] } = {}) {
+    const pool = await getPool();
+    const request = pool.request();
+    let where = '';
+    if (roles.length) {
+      const params = roles.map((rol, i) => {
+        request.input(`rol${i}`, sql.NVarChar(50), rol);
+        return `@rol${i}`;
+      });
+      where = `WHERE rol IN (${params.join(', ')})`;
+    }
+    const result = await request.query(`SELECT * FROM usuarios ${where} ORDER BY nombre`);
+    return result.recordset.map(r => new Usuario(r));
+  }
+
   async guardar(usuario) {
     const pool = await getPool();
     const result = await pool.request()

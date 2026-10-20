@@ -25,6 +25,14 @@ class AuthController {
     }
   };
 
+  listarUsuarios = async (req, res) => {
+    try {
+      res.json(await this.service.listarUsuarios({ rol: req.query.rol }));
+    } catch (error) {
+      res.status(error.status || 500).json({ error: error.message });
+    }
+  };
+
   me = async (req, res) => {
     try {
       const usuario = await this.service.obtenerPerfil(req.usuario.sub);

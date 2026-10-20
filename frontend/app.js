@@ -49,17 +49,30 @@ function money(n) {
   if (n == null || isNaN(Number(n))) return '';
   return 'Q ' + Number(n).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+/** Columnas DATE de SQL Server (nacimiento, cita) llegan como medianoche
+    UTC; formateadas en hora local (UTC-6) mostraban el dia anterior. */
+function esSoloFecha(v) {
+  return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}(T00:00:00(\.000)?Z)?$/.test(v);
+}
 function fechaCorta(v) {
   if (!v) return '';
   const d = new Date(v);
   if (isNaN(d)) return String(v);
-  return d.toLocaleDateString('es-GT', { year:'numeric', month:'short', day:'numeric' });
+  return d.toLocaleDateString('es-GT', {
+    year: 'numeric', month: 'short', day: 'numeric',
+    ...(esSoloFecha(v) ? { timeZone: 'UTC' } : {})
+  });
 }
 function fechaHora(v) {
   if (!v) return '';
   const d = new Date(v);
   if (isNaN(d)) return String(v);
   return d.toLocaleString('es-GT', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+/** YYYY-MM-DD en hora local. No usar toISOString(): en UTC-6 despues de
+    las 18:00 devuelve el dia siguiente. */
+function fechaLocalISO(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 function chip(estado) {
   const clase = String(estado || '').replace(/\s+/g, '_');
@@ -97,6 +110,93 @@ async function api(base, path, opts = {}) {
     throw err;
   }
   return body;
+}
+
+/* ---------- Dialogos propios ----------
+   Reemplazan prompt()/confirm()/alert(): mismo estilo que el resto de la
+   UI, Esc cierra, el foco queda atrapado dentro y vuelve al boton que lo
+   abrio. Si se pasa alEnviar(valores), el dialogo espera la respuesta y
+   muestra el error dentro sin cerrarse.
+   Resuelve con los valores del formulario (o true) al confirmar y con
+   null al cancelar. */
+function abrirDialogo({
+  eyebrow = '', titulo, cuerpo = '',
+  textoConfirmar = 'Aceptar', textoCancelar = 'Cancelar',
+  peligro = false, soloAceptar = false, alEnviar = null
+}) {
+  return new Promise(resolve => {
+    const dlg = $('#dlg');
+    const form = $('#dlgForm');
+    const btnOk = $('#dlgConfirmar');
+    const btnCancel = $('#dlgCancelar');
+    const msg = $('#dlgMsg');
+    const opener = document.activeElement;
+
+    $('#dlgEyebrow').textContent = eyebrow;
+    $('#dlgTitulo').textContent = titulo;
+    $('#dlgCuerpo').innerHTML = cuerpo;
+    btnOk.textContent = textoConfirmar;
+    btnOk.classList.toggle('danger', peligro);
+    btnOk.disabled = false;
+    btnCancel.textContent = textoCancelar;
+    btnCancel.hidden = soloAceptar;
+    limpiar(msg);
+
+    let resuelto = false;
+    const cerrar = valor => {
+      if (resuelto) return;
+      resuelto = true;
+      form.onsubmit = null; btnCancel.onclick = null;
+      dlg.oncancel = null; dlg.onkeydown = null;
+      dlg.close();
+      if (opener && document.contains(opener)) opener.focus();
+      resolve(valor);
+    };
+
+    form.onsubmit = async e => {
+      e.preventDefault();
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+      const valores = Object.fromEntries(new FormData(form));
+      const resultado = Object.keys(valores).length ? valores : true;
+      if (!alEnviar) return cerrar(resultado);
+      btnOk.disabled = true; limpiar(msg);
+      try {
+        await alEnviar(valores);
+        cerrar(resultado);
+      } catch (err) {
+        error(msg, err.message);
+        btnOk.disabled = false;
+      }
+    };
+    btnCancel.onclick = () => cerrar(null);
+    dlg.oncancel = e => { e.preventDefault(); cerrar(soloAceptar ? true : null); };
+    // Ciclo de Tab dentro del dialogo
+    dlg.onkeydown = e => {
+      if (e.key !== 'Tab') return;
+      const focos = [...dlg.querySelectorAll('input, select, textarea, button')]
+        .filter(el => !el.disabled && !el.hidden && el.offsetParent !== null);
+      if (!focos.length) return;
+      const primero = focos[0], ultimo = focos[focos.length - 1];
+      if (e.shiftKey && document.activeElement === primero) { e.preventDefault(); ultimo.focus(); }
+      else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primero.focus(); }
+    };
+
+    dlg.showModal();
+    // En acciones peligrosas el foco inicial va a Cancelar.
+    const campo = dlg.querySelector('#dlgCuerpo input, #dlgCuerpo select, #dlgCuerpo textarea');
+    (campo || (peligro ? btnCancel : btnOk)).focus();
+  });
+}
+
+function confirmar(titulo, texto, opciones = {}) {
+  return abrirDialogo({ titulo, cuerpo: `<p>${esc(texto)}</p>`, ...opciones });
+}
+
+function avisar(titulo, cuerpo, opciones = {}) {
+  return abrirDialogo({ titulo, cuerpo, soloAceptar: true, textoConfirmar: 'Cerrar', ...opciones });
 }
 
 function puede(...rolesPermitidos) {
@@ -236,12 +336,8 @@ function aplicarRangoDefectoReporte() {
   } else {
     desde = new Date(hoy); desde.setDate(hoy.getDate() - 90);
   }
-  // Fecha local, no toISOString(): en UTC-6 despues de las 18:00 el
-  // "hasta" saltaba al dia siguiente.
-  const isoLocal = d =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  $('#repDesde').value = isoLocal(desde);
-  $('#repHasta').value = isoLocal(hoy);
+  $('#repDesde').value = fechaLocalISO(desde);
+  $('#repHasta').value = fechaLocalISO(hoy);
 }
 
 async function onLogin(e) {
@@ -503,6 +599,8 @@ async function cargarSolicitudes() {
       api(API.pacientes, '/api/pacientes')
     ]);
     const mapa = Object.fromEntries(pacientes.map(p => [p.id, `${p.nombres} ${p.apellidos}`]));
+    state.solicitudes = solicitudes;
+    state.mapaPacientes = mapa;
     $('#contadorSolicitudes').textContent = `${solicitudes.length} en total`;
 
     const puedeAsignar   = puedeAccion('asignarCita');
@@ -566,42 +664,84 @@ async function onCrearSolicitud(e) {
 }
 
 async function onAccionSolicitud(accion, id) {
-  if (accion === 'asignar') return promptAsignarCita(id);
+  if (accion === 'asignar') return asignarCita(id);
   if (accion === 'convertir') return convertirEnVisita(id);
   if (accion === 'cancelar') return cancelarSolicitud(id);
 }
 
-async function promptAsignarCita(id) {
-  const fechaCita = prompt('Fecha de la cita (YYYY-MM-DD)');
-  if (!fechaCita) return;
-  const horaCita = prompt('Hora de la cita (HH:mm)', '10:00');
-  if (!horaCita) return;
-  const idEsp = prompt('ID del médico especialista');
-  if (!idEsp) return;
+/** "Rosa Gomez Cruz · cardiologia" para encabezar los dialogos. */
+function resumenSolicitud(id) {
+  const s = (state.solicitudes || []).find(x => x.id === id);
+  if (!s) return `Solicitud #${id}`;
+  const paciente = state.mapaPacientes?.[s.idPaciente] || `Paciente #${s.idPaciente}`;
+  return `${paciente} · ${s.especialidad}`;
+}
+
+async function asignarCita(id) {
+  let especialistas = [];
   try {
-    await api(API.pacientes, `/api/solicitudes/${id}/asignar-cita`, {
-      method: 'PATCH',
-      body: { fechaCita, horaCita, idMedicoEspecialista: Number(idEsp) }
-    });
-    cargarSolicitudes();
-  } catch (err) { alert(err.message); }
+    especialistas = await api(API.auth, '/api/auth/usuarios?rol=medico_especialista,especialista');
+  } catch { /* el dialogo avisa abajo si la lista queda vacia */ }
+
+  const opciones = especialistas.map(u =>
+    `<option value="${u.id}">${esc(u.nombre)} — ${esc(u.email)}</option>`).join('');
+  const manana = new Date(); manana.setDate(manana.getDate() + 1);
+
+  const ok = await abrirDialogo({
+    eyebrow: 'Asignar cita',
+    titulo: resumenSolicitud(id),
+    cuerpo: `
+      <div class="fila-2">
+        <div><label for="dlgFecha">Fecha de la cita</label>
+          <input type="date" id="dlgFecha" name="fechaCita" required min="${fechaLocalISO(new Date())}" value="${fechaLocalISO(manana)}"></div>
+        <div><label for="dlgHora">Hora</label>
+          <input type="time" id="dlgHora" name="horaCita" required value="10:00"></div>
+      </div>
+      <label for="dlgEsp">Médico especialista</label>
+      <select id="dlgEsp" name="idMedicoEspecialista" required>
+        <option value="">Elegir…</option>${opciones}
+      </select>
+      ${especialistas.length ? '' : '<p class="tiny">No se pudo cargar la lista de especialistas registrados.</p>'}`,
+    textoConfirmar: 'Asignar cita',
+    alEnviar: async v => {
+      await api(API.pacientes, `/api/solicitudes/${id}/asignar-cita`, {
+        method: 'PATCH',
+        body: { fechaCita: v.fechaCita, horaCita: v.horaCita, idMedicoEspecialista: Number(v.idMedicoEspecialista) }
+      });
+    }
+  });
+  if (ok) cargarSolicitudes();
 }
 
 async function convertirEnVisita(id) {
-  if (!confirm('¿Iniciar la visita médica para esta solicitud?')) return;
-  try {
-    await api(API.pacientes, `/api/solicitudes/${id}/convertir-a-visita`, { method: 'POST' });
-    cargarSolicitudes();
-    cambiarTab('visitas');
-  } catch (err) { alert(err.message); }
+  let visita = null;
+  const ok = await confirmar(
+    resumenSolicitud(id),
+    'Se abrirá la visita médica y la solicitud pasará a en_atencion.',
+    {
+      eyebrow: 'Iniciar visita',
+      textoConfirmar: 'Iniciar visita',
+      alEnviar: async () => {
+        visita = await api(API.pacientes, `/api/solicitudes/${id}/convertir-a-visita`, { method: 'POST' });
+      }
+    });
+  if (!ok) return;
+  if (visita?.id) state.visitaSeleccionada = visita.id;
+  cambiarTab('visitas');
 }
 
 async function cancelarSolicitud(id) {
-  if (!confirm('¿Cancelar esta solicitud? Esta acción es irreversible.')) return;
-  try {
-    await api(API.pacientes, `/api/solicitudes/${id}/cancelar`, { method: 'PATCH' });
-    cargarSolicitudes();
-  } catch (err) { alert(err.message); }
+  const ok = await confirmar(
+    resumenSolicitud(id),
+    'La solicitud quedará cancelada. Esta acción no se puede deshacer.',
+    {
+      eyebrow: 'Cancelar solicitud',
+      textoConfirmar: 'Cancelar solicitud',
+      textoCancelar: 'Volver',
+      peligro: true,
+      alEnviar: () => api(API.pacientes, `/api/solicitudes/${id}/cancelar`, { method: 'PATCH' })
+    });
+  if (ok) cargarSolicitudes();
 }
 
 /* ============================================================
@@ -713,12 +853,20 @@ async function onGuardarClinico() {
 
 async function onCompletarVisita() {
   const msg = $('#msgCompletar'); limpiar(msg);
-  if (!confirm('¿Marcar la visita como completa? La solicitud enlazada también quedará cerrada.')) return;
-  try {
-    await api(API.pacientes, `/api/visitas/${state.visitaSeleccionada}/completar`, { method: 'POST' });
-    ok(msg, 'Visita completada.');
-    cargarVisitasTab();
-  } catch (err) { error(msg, err.message); }
+  const idVisita = state.visitaSeleccionada;
+  const cerrada = await confirmar(
+    $('#visitaTitulo').textContent,
+    'La visita y su solicitud quedarán completadas y ya no se podrán editar. ' +
+    'Se usan el diagnóstico y las observaciones guardados: si cambió algo, use antes "Guardar cambios".',
+    {
+      eyebrow: 'Cerrar visita',
+      textoConfirmar: 'Marcar como completa',
+      textoCancelar: 'Volver',
+      alEnviar: () => api(API.pacientes, `/api/visitas/${idVisita}/completar`, { method: 'POST' })
+    });
+  if (!cerrada) return;
+  ok(msg, 'Visita completada.');
+  cargarVisitasTab();
 }
 
 async function onAgregarExamen() {
@@ -916,13 +1064,19 @@ async function cargarLaboratorio() {
 async function verCostoLab(idExamen) {
   try {
     const c = await api(API.laboratorio, `/api/laboratorio/examenes/${idExamen}/costo`);
-    alert(
-      `Examen ${c.tipo}\n\n` +
-      `Precio base:  ${money(c.precioBase)}\n` +
-      `Descuento fundación (${(c.porcentajeDescuento*100).toFixed(0)}%): -${money(c.descuentoFundacion)}\n` +
-      `Total a facturar: ${money(c.total)}`
-    );
-  } catch (err) { alert(err.message); }
+    await avisar(c.tipo, `
+      <table>
+        <tbody>
+          <tr><td>Precio base</td><td class="right num">${money(c.precioBase)}</td></tr>
+          <tr><td>Descuento fundación (${(c.porcentajeDescuento * 100).toFixed(0)} %)</td>
+              <td class="right num">− ${money(c.descuentoFundacion)}</td></tr>
+        </tbody>
+        <tfoot><tr><td>Total a facturar</td><td class="right num">${money(c.total)}</td></tr></tfoot>
+      </table>`, { eyebrow: `Costo del examen #${idExamen}` });
+  } catch (err) {
+    await avisar('No se pudo calcular el costo', `<div class="msg error">${esc(err.message)}</div>`,
+      { eyebrow: `Examen #${idExamen}` });
+  }
 }
 
 async function onRegistrarResultado(e) {
