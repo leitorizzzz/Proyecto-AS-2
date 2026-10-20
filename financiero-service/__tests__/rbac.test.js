@@ -1,0 +1,52 @@
+/**
+ * Pruebas RBAC de financiero-service: toda escritura de caja es solo
+ * admin; la lectura queda abierta a cualquier autenticado.
+ */
+process.env.JWT_SECRET = 'test-secret-rbac';
+
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const request = require('supertest');
+const crearRutasFinanciero = require('../src/routes/financieroRoutes');
+
+function tokenConRol(rol) {
+  return jwt.sign({ sub: 1, email: 'x@asilo.gt', rol }, process.env.JWT_SECRET, { expiresIn: '5m' });
+}
+
+function app() {
+  const lista = (_r, res) => res.json([]);
+  const creado = (_r, res) => res.status(201).json({ id: 1 });
+  const ctrlStub = {
+    estadoCuenta: (_r, res) => res.json({}),
+    crearCargo: creado, registrarPago: creado,
+    listarDonantes: lista, crearDonante: creado,
+    listarDonaciones: lista, registrarDonacion: creado,
+    listarGastos: lista, registrarGasto: creado,
+    listarPagosFundacion: lista, registrarPagoFundacion: creado
+  };
+  const a = express();
+  a.use(express.json());
+  a.use('/api/financiero', crearRutasFinanciero(ctrlStub));
+  return a;
+}
+
+describe('RBAC financiero-service', () => {
+  const srv = app();
+  const con = rol => ({ Authorization: `Bearer ${tokenConRol(rol)}` });
+
+  test('registrar gasto con rol coordinador_fundacion -> 403', async () => {
+    expect((await request(srv).post('/api/financiero/gastos').set(con('coordinador_fundacion')).send({})).status).toBe(403);
+  });
+
+  test('registrar pago a fundacion con rol farmacia -> 403', async () => {
+    expect((await request(srv).post('/api/financiero/pagos-fundacion').set(con('farmacia')).send({})).status).toBe(403);
+  });
+
+  test('registrar gasto con rol admin -> 201', async () => {
+    expect((await request(srv).post('/api/financiero/gastos').set(con('admin')).send({})).status).toBe(201);
+  });
+
+  test('listar gastos con rol coordinador_fundacion -> 200', async () => {
+    expect((await request(srv).get('/api/financiero/gastos').set(con('coordinador_fundacion'))).status).toBe(200);
+  });
+});

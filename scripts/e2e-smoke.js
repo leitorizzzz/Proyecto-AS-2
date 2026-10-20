@@ -349,6 +349,114 @@ async function asegurarUsuario(adminToken, u) {
     ok(`${tiposReporte.length} reportes Excel validos`);
   } catch (e) { falla(e.message); }
 
+  // 22..31 - reglas y RBAC que antes solo cubrian las pruebas unitarias
+  let solicitudCancelable;
+
+  paso('RN-02: segunda solicitud activa misma especialidad -> 409');
+  try {
+    const a = await req('POST', `${API.pacientes}/api/solicitudes`, {
+      body: { idPaciente: pacienteId, especialidad: 'rn02-e2e', motivo: 'RN-02 e2e' },
+      token: mgToken, esperarStatus: 201
+    });
+    solicitudCancelable = a.data.id;
+    await req('POST', `${API.pacientes}/api/solicitudes`, {
+      body: { idPaciente: pacienteId, especialidad: 'rn02-e2e', motivo: 'duplicada' },
+      token: mgToken, esperarStatus: 409
+    });
+    ok(`primera id=${solicitudCancelable}, duplicada rechazada`);
+  } catch (e) { falla(e.message); }
+
+  paso('medico_general: PATCH /api/solicitudes/:id/cancelar -> cancelada');
+  try {
+    const r = await req('PATCH', `${API.pacientes}/api/solicitudes/${solicitudCancelable}/cancelar`, {
+      token: mgToken, esperarStatus: 200
+    });
+    if (r.data.estado !== 'cancelada') throw new Error(`estado=${r.data.estado}`);
+    ok('estado=cancelada');
+  } catch (e) { falla(e.message); }
+
+  paso('inmutabilidad: cancelar una solicitud ya cancelada -> 409');
+  try {
+    await req('PATCH', `${API.pacientes}/api/solicitudes/${solicitudCancelable}/cancelar`, {
+      token: mgToken, esperarStatus: 409
+    });
+    ok('rechazo correcto');
+  } catch (e) { falla(e.message); }
+
+  paso('RBAC backend: farmacia crea paciente, laboratorio crea medicamento, especialista dispensa -> 403');
+  try {
+    await req('POST', `${API.pacientes}/api/pacientes`, { body: {}, token: farToken, esperarStatus: 403 });
+    await req('POST', `${API.farmacia}/api/farmacia/medicamentos`, { body: {}, token: labToken, esperarStatus: 403 });
+    await req('POST', `${API.farmacia}/api/farmacia/dispensaciones`, { body: {}, token: meToken, esperarStatus: 403 });
+    ok('3 rechazos 403');
+  } catch (e) { falla(e.message); }
+
+  paso('pacientes: DELETE de un paciente con solicitudes -> 409');
+  try {
+    const r = await req('DELETE', `${API.pacientes}/api/pacientes/${pacienteId}`, { token: adminToken, esperarStatus: 409 });
+    ok(String(r.data?.error || '').slice(0, 60));
+  } catch (e) { falla(e.message); }
+
+  paso('auth: GET /api/auth/usuarios?rol=medico_especialista (coordinador ok, farmacia 403)');
+  try {
+    const r = await req('GET', `${API.auth}/api/auth/usuarios?rol=medico_especialista`, { token: cfToken, esperarStatus: 200 });
+    if (!r.data.some(u => u.id === idEsp)) throw new Error('el especialista e2e no aparece en la lista');
+    if (r.data.some(u => 'passwordHash' in u)) throw new Error('la respuesta expone passwordHash');
+    await req('GET', `${API.auth}/api/auth/usuarios`, { token: farToken, esperarStatus: 403 });
+    ok(`${r.data.length} especialistas, sin passwordHash`);
+  } catch (e) { falla(e.message); }
+
+  paso('laboratorio: costo del examen = precio del catalogo con RN-09');
+  try {
+    const precios = (await req('GET', `${API.laboratorio}/api/laboratorio/precios`, { token: meToken, esperarStatus: 200 })).data;
+    const p = precios.find(x => x.tipo === 'Hematologia completa');
+    if (!p) throw new Error('no hay precio para Hematologia completa');
+    const esperado = Math.round(p.precioBase * 0.8 * 100) / 100;
+    if (p.precioConDescuento !== esperado) throw new Error(`catalogo: ${p.precioConDescuento} != ${esperado}`);
+    const c = (await req('GET', `${API.laboratorio}/api/laboratorio/examenes/${examenId}/costo`, { token: labToken, esperarStatus: 200 })).data;
+    if (c.total !== esperado) throw new Error(`costo del examen: ${c.total} != ${esperado}`);
+    ok(`base=${p.precioBase} total=${c.total}`);
+  } catch (e) { falla(e.message); }
+
+  paso('laboratorio: PUT /precios/:id (admin 200 sin cambiar el valor, laboratorio 403)');
+  try {
+    const precios = (await req('GET', `${API.laboratorio}/api/laboratorio/precios`, { token: adminToken, esperarStatus: 200 })).data;
+    const p = precios[0];
+    const r = await req('PUT', `${API.laboratorio}/api/laboratorio/precios/${p.id}`, {
+      body: { tipo: p.tipo, precioBase: p.precioBase }, token: adminToken, esperarStatus: 200
+    });
+    if (r.data.precioBase !== p.precioBase) throw new Error('el precio cambio');
+    await req('PUT', `${API.laboratorio}/api/laboratorio/precios/${p.id}`, {
+      body: { tipo: p.tipo, precioBase: p.precioBase }, token: labToken, esperarStatus: 403
+    });
+    ok(`${p.tipo} = ${p.precioBase}`);
+  } catch (e) { falla(e.message); }
+
+  paso('financiero: POST /gastos (admin 201 y aparece en el listado, farmacia 403)');
+  try {
+    const concepto = `E2E gasto ${Date.now()}`;
+    await req('POST', `${API.financiero}/api/financiero/gastos`, {
+      body: { concepto, monto: 1, categoria: 'otros' }, token: adminToken, esperarStatus: 201
+    });
+    const lista = (await req('GET', `${API.financiero}/api/financiero/gastos`, { token: adminToken, esperarStatus: 200 })).data;
+    if (!lista.some(g => g.concepto === concepto)) throw new Error('el gasto no aparece en el listado');
+    await req('POST', `${API.financiero}/api/financiero/gastos`, {
+      body: { concepto, monto: 1 }, token: farToken, esperarStatus: 403
+    });
+    ok('gasto Q1 registrado');
+  } catch (e) { falla(e.message); }
+
+  paso('financiero: POST /pagos-fundacion (admin 201 y aparece en el listado)');
+  try {
+    const concepto = `E2E pago fundacion ${Date.now()}`;
+    await req('POST', `${API.financiero}/api/financiero/pagos-fundacion`, {
+      body: { concepto, monto: 1 }, token: adminToken, esperarStatus: 201
+    });
+    const lista = (await req('GET', `${API.financiero}/api/financiero/pagos-fundacion`, { token: adminToken, esperarStatus: 200 })).data;
+    if (!lista.some(p => p.concepto === concepto)) throw new Error('el pago no aparece en el listado');
+    ok('pago Q1 registrado');
+  } catch (e) { falla(e.message); }
+
   finalizar();
 })().catch(err => {
   console.error('\nERROR INESPERADO:', err.message);
