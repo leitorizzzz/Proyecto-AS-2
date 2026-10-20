@@ -32,6 +32,7 @@ scripts/
 | POST   | `/api/auth/register`        | JWT  | admin    | Crear usuario (admin se encarga)      |
 | POST   | `/api/auth/login`           | —    | —        | Login → `{ token, usuario }`          |
 | GET    | `/api/auth/me`              | JWT  | —        | Perfil del usuario autenticado        |
+| GET    | `/api/auth/usuarios[?rol=a,b]` | JWT | admin, coordinador_fundacion | Directorio sin `passwordHash`, filtrable por uno o varios roles; rol desconocido → 400. Lo usa el dialogo "Asignar cita" para elegir especialista |
 
 ### Roles validos (10)
 

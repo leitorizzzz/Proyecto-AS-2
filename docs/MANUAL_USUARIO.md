@@ -38,13 +38,16 @@ punteado y un mensaje **Aviso —** que explica quién sí puede.
 
 | Perfil | Secciones en el menú | Qué puede registrar |
 |---|---|---|
-| `admin` | Las ocho | Todo. |
-| `enfermero` | Panel, Pacientes, Solicitudes, Visitas, Farmacia, Laboratorio, Reportes | Pacientes nuevos. |
+| `admin` | Las ocho | Pacientes, asignar y cancelar citas, dispensar, resultados de laboratorio, toda la caja (cargos, cuotas, donaciones, gastos, pagos a la fundación) y precios de exámenes. No crea solicitudes ni escribe en visitas: eso es solo del médico general y del especialista. |
+| `enfermero` | Panel, Pacientes, Solicitudes, Visitas, Farmacia, Laboratorio, Reportes | Registrar y editar pacientes. |
 | `medico_general` | Panel, Pacientes, Solicitudes, Visitas, Reportes | Crear y cancelar solicitudes. |
 | `coordinador_fundacion` | Panel, Pacientes, Solicitudes, Visitas, Financiero, Reportes | Asignar cita a las solicitudes. |
 | `medico_especialista` | Panel, Pacientes, Solicitudes, Visitas, Farmacia, Laboratorio, Reportes | Iniciar visitas, notas clínicas, exámenes, prescripciones, cerrar la visita. |
 | `laboratorio` | Panel, Pacientes, Laboratorio, Reportes | Resultados de exámenes. |
 | `farmacia` | Panel, Pacientes, Farmacia, Reportes | Dispensar prescripciones pendientes. |
+
+En **Laboratorio**, enfermería y el médico especialista ven el catálogo
+de precios, pero no las órdenes pendientes (solo las ve laboratorio).
 
 Los perfiles antiguos sin sufijo (`medico`, `especialista`,
 `fundacion`) existen por compatibilidad con usuarios creados antes del
@@ -74,6 +77,15 @@ pero solo consultan.
 
 - **Mensajes.** Después de cada acción aparece un mensaje bajo el
   botón, que empieza con **Ok —**, **Aviso —** o **Error —**.
+- **Ventanas de confirmación.** Las acciones que cambian un estado
+  (asignar cita, iniciar visita, cancelar, cerrar visita) y la edición
+  de pacientes y precios se hacen en una ventana sobre la pantalla. La
+  ventana se cierra con **Cancelar**/**Volver** o con la tecla **Esc**
+  sin guardar nada. Si el sistema rechaza la acción, el motivo aparece
+  dentro de la misma ventana como **Error —** y se puede corregir sin
+  volver a empezar.
+
+[CAPTURA: ventana "Asignar cita" con fecha, hora y médico especialista]
 
 [CAPTURA: detalle de las etiquetas de estado en la tabla "Solicitudes recientes"]
 
@@ -131,10 +143,12 @@ con paciente, especialidad, estado y fecha de creación.
 
 ### 4.2 Pacientes
 
-**Quién la ve:** todos. **Quién registra:** `enfermero`, `admin`.
+**Quién la ve:** todos. **Quién registra y edita:** `enfermero`,
+`admin`.
 
 A la izquierda, la tarjeta **Residentes** lista a cada paciente con el
-correo de su familiar, DPI, fecha de nacimiento y fecha de ingreso.
+correo de su familiar, DPI, fecha de nacimiento, fecha de ingreso y, para
+enfermería y administración, la acción **Editar**.
 
 A la derecha, la tarjeta **Registrar paciente**:
 
@@ -154,7 +168,14 @@ mismo DPI, el sistema muestra el motivo y no guarda.
 Para los demás perfiles el botón dice *Registro no permitido para su
 rol* y los campos están bloqueados.
 
+**Editar un expediente.** Presionar **Editar** en la fila del paciente.
+Se abre la ventana *Editar expediente* con los mismos campos del alta ya
+llenos; corregir lo necesario y presionar **Guardar cambios**. Las mismas
+reglas aplican: DPI de 13 dígitos y no repetido con otro paciente.
+
 [CAPTURA: pantalla Pacientes con la tabla "Residentes" y el formulario "Registrar paciente"]
+
+[CAPTURA: ventana "Editar expediente" de un paciente]
 
 ### 4.3 Solicitudes médicas
 
@@ -174,7 +195,7 @@ pendiente_asignacion → cita_asignada → en_atencion → completada
                                                 punto previo a completada)
 ```
 
-**Crear una solicitud** (`medico_general`, `admin`):
+**Crear una solicitud** (solo `medico_general`):
 
 1. En **Nueva solicitud**, elegir **Paciente**.
 2. Escribir **Especialidad** (el campo sugiere cardiologia,
@@ -189,18 +210,23 @@ y el sistema reintenta solo.
 su perfil puede usar):
 
 - **Asignar cita** (`coordinador_fundacion`, `admin`), en solicitudes
-  `pendiente_asignacion`. El navegador pregunta, en tres ventanas
-  seguidas: fecha (AAAA-MM-DD), hora (HH:mm) y el número (ID) del
-  médico especialista.
-- **Iniciar visita** (`medico_especialista`, `admin`), en solicitudes
-  `cita_asignada`. Tras confirmar, el sistema abre la pantalla
-  **Visitas**.
+  `pendiente_asignacion`. Se abre la ventana *Asignar cita* con el
+  paciente y la especialidad como título: elegir **Fecha de la cita**
+  (por defecto, mañana), **Hora** (por defecto 10:00) y **Médico
+  especialista** de la lista del personal registrado, y presionar
+  **Asignar cita**.
+- **Iniciar visita** (`medico_especialista`), en solicitudes
+  `cita_asignada`. La ventana *Iniciar visita* pide confirmar; al
+  presionar **Iniciar visita** el sistema abre la pantalla **Visitas**
+  con la visita nueva ya seleccionada.
 - **Cancelar** (`medico_general`, `admin`), mientras la solicitud no
-  esté completada. Pide confirmación y no se puede deshacer.
+  esté completada. La ventana *Cancelar solicitud* advierte que no se
+  puede deshacer; el botón rojo **Cancelar solicitud** confirma y
+  **Volver** sale sin cambios.
 
 [CAPTURA: pantalla Solicitudes médicas con la "Bandeja" en distintos estados y la tarjeta "Nueva solicitud"]
 
-[CAPTURA: ventana del navegador pidiendo la fecha al usar "Asignar cita"]
+[CAPTURA: ventana "Cancelar solicitud" con el botón rojo]
 
 **RN-02.** Si se intenta crear una segunda solicitud activa para el
 mismo paciente y la misma especialidad, el sistema responde: *"Ya
@@ -209,7 +235,7 @@ existe una solicitud activa para el paciente X en la especialidad Y"*.
 ### 4.4 Visitas médicas
 
 **Quién la ve:** los mismos perfiles que Solicitudes.
-**Quién escribe:** `medico_especialista`, `admin`.
+**Quién escribe:** solo `medico_especialista`.
 
 1. En la tarjeta **Elegir visita**, abrir la lista **Visita** y
    escoger una. Cada opción muestra paciente, especialidad y estado.
@@ -221,15 +247,21 @@ existe una solicitud activa para el paciente X en la especialidad Y"*.
      botón **Guardar cambios**.
    - **Exámenes solicitados**: escribir el tipo en **Nuevo examen** y
      presionar **Agregar examen**. Laboratorio lo recibe de inmediato.
+     El campo sugiere los exámenes del catálogo de precios; usar uno de
+     ellos permite que laboratorio calcule el costo.
    - **Prescripciones**: elegir **Medicamento del inventario** (el
      campo **Nombre y presentación** se completa solo), escribir
      **Dosis** e **Indicaciones**, y presionar **Agregar
      prescripción**. Si no se elige un medicamento del inventario,
      farmacia no podrá dispensarla (RN-06).
    - **Cerrar visita**: botón **Marcar visita como completa**.
-3. Para cerrar, diagnóstico y observaciones no pueden estar vacíos. Al
-   cerrar, la solicitud enlazada pasa a `completada` y todos los
-   campos de la visita quedan bloqueados.
+3. Para cerrar, presionar **Marcar visita como completa** y confirmar
+   en la ventana *Cerrar visita* con **Marcar como completa**. El
+   sistema usa el diagnóstico y las observaciones **guardados**: si se
+   cambiaron, presionar antes **Guardar cambios**. Si alguno está vacío,
+   la ventana muestra el error y no cierra. Al cerrar, la solicitud
+   enlazada pasa a `completada` y todos los campos de la visita quedan
+   bloqueados.
 
 [CAPTURA: detalle de una visita en atención con Notas clínicas, Exámenes solicitados y Prescripciones]
 
@@ -264,14 +296,17 @@ dispensaciones anteriores y el total.
 ### 4.6 Laboratorio
 
 **Quién la ve:** `laboratorio`, `medico_especialista`, `enfermero`,
-`admin`. **Quién registra:** `laboratorio`, `admin`.
+`admin`. **Quién registra resultados:** `laboratorio`, `admin`.
+**Quién cambia precios:** `admin`.
 
 A la izquierda, **Órdenes pendientes**: número, paciente, examen y
-fecha. Cada fila tiene dos acciones:
+fecha. Solo laboratorio y administración ven las órdenes; los demás
+perfiles ven un aviso en su lugar. Cada fila tiene dos acciones:
 
 - **Seleccionar** — copia el número al formulario de la derecha.
-- **Ver costo** — abre una ventana con precio base, descuento de la
-  fundación y total a facturar.
+- **Ver costo** — abre la ventana *Costo del examen* con precio base,
+  descuento de la fundación y total a facturar. Si el examen no está en
+  el catálogo de precios, la ventana lo indica.
 
 A la derecha, **Registrar resultado**:
 
@@ -287,6 +322,23 @@ Cuando no queda nada por procesar la tabla muestra *No hay órdenes
 pendientes*.
 
 [CAPTURA: pantalla Laboratorio con una orden pendiente y el formulario "Registrar resultado"]
+
+[CAPTURA: ventana "Costo del examen" con precio base, descuento y total]
+
+**Precios de exámenes.** Abajo, la tabla **Precios de exámenes** muestra
+cada examen con su **Precio base** y el precio **Con descuento** que paga
+el residente (RN-09). Administración puede:
+
+- Agregar uno nuevo en **Nuevo precio**: **Examen** y **Precio base
+  (Q)**, botón **Agregar precio**. Un examen ya existente se rechaza.
+- Cambiarlo con **Editar** en su fila: ventana *Editar precio*, botón
+  **Guardar precio**.
+
+El nombre del examen debe coincidir exactamente con el que el
+especialista pide en la visita; por eso la visita sugiere los nombres
+del catálogo.
+
+[CAPTURA: tabla "Precios de exámenes" y formulario "Nuevo precio"]
 
 ### 4.7 Financiero
 
@@ -309,13 +361,23 @@ pendientes*.
   luego elegirlo, escribir monto, tipo (Dinero, Bienes, Otro) y
   concepto, y presionar **Registrar donación**.
 
-Los gastos operativos y los pagos a la fundación todavía no tienen
-formulario en pantalla: se registran por la API del servicio
-financiero y aparecen en los reportes.
+- **Gastos operativos.** Tabla con los gastos registrados. En
+  **Registrar gasto**: **Concepto**, **Categoría** (Servicios,
+  Mantenimiento, Personal, Alimentación, Medicamentos, Otros) y **Monto
+  (Q)**; botón **Registrar gasto**.
+- **Pagos a la fundación.** Tabla con los pagos realizados. En
+  **Registrar pago a la fundación**: **Concepto** y **Monto (Q)**; botón
+  **Registrar pago**.
+
+Los pagos a la fundación aparecen también en el reporte *Pagos a la
+fundación*. Los gastos operativos solo se consultan en esta tabla:
+ninguno de los siete reportes los incluye.
 
 [CAPTURA: "Estado de cuenta" de un paciente con saldo pendiente y las tablas Cargos y Cuotas]
 
 [CAPTURA: formularios "Registrar cargo", "Registrar / pagar cuota" y "Nueva donación"]
+
+[CAPTURA: tarjetas "Gastos operativos" y "Pagos a la fundación" con sus formularios]
 
 ### 4.8 Reportes
 
@@ -384,12 +446,21 @@ puede forzar un reintento manual desde los endpoints de
 notificaciones.
 
 **¿Puedo editar un paciente ya dado de alta?**
-Todavía no desde la pantalla. La corrección se hace por la API de
-pacientes (`PUT /api/pacientes/:id`); pedirla a administración.
+Sí, enfermería y administración: **Pacientes** → **Editar** en la fila
+del paciente (ver 4.2).
+
+**¿Puedo borrar un paciente?**
+No desde la pantalla. Administración puede hacerlo por la API solo si
+el paciente no tiene solicitudes ni visitas; si las tiene, el sistema
+lo rechaza para no perder su historial.
 
 **¿Cómo cambio los precios de los exámenes?**
-Hoy están en la tabla `examenes_precios`. Pendiente: pantalla de
-administración para gestionarlos desde el frontend.
+Administración: **Laboratorio** → **Precios de exámenes** (ver 4.6).
+
+**El costo de un examen dice que no hay precio configurado.**
+El nombre del examen pedido en la visita no coincide con ninguno del
+catálogo. Administración puede agregarlo en **Nuevo precio** con ese
+mismo nombre.
 
 **¿Se puede exportar un reporte a Word?**
 No directamente. El PDF se puede abrir en Word para edición manual.

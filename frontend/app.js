@@ -209,7 +209,10 @@ function puede(...rolesPermitidos) {
    que el personal no se tope con 403 en el flujo normal. El backend
    sigue siendo la autoridad; esto solo es cortesia visual.
 
-   La tabla matchea CONTEXT_SISTEMA.md §3.3. 'admin' siempre pasa. */
+   La tabla matchea CONTEXT_SISTEMA.md §3.3. 'admin' ve todas las
+   secciones, pero en acciones solo pasa donde el backend lo acepta:
+   crear solicitud, iniciar visita y editar visita son exclusivas del
+   rol clinico (el backend responde 403 al admin). */
 const RBAC = {
   // Secciones visibles por rol (ademas de admin que ve todo)
   tabs: {
@@ -226,23 +229,17 @@ const RBAC = {
   },
   // Acciones de escritura por rol
   acciones: {
-    crearPaciente:       ['enfermero'],
-    editarPaciente:      ['enfermero'],
-    crearSolicitud:      ['medico_general'],
-    asignarCita:         ['coordinador_fundacion'],
-    convertirAVisita:    ['medico_especialista'],
-    cancelarSolicitud:   ['medico_general'],
-    editarVisita:        ['medico_especialista'],
-    dispensar:           ['farmacia'],
-    registrarResultadoLab:['laboratorio'],
-    editarInventarioFar: ['farmacia'],
-    registrarCargoFin:   [],      // solo admin
-    registrarCuotaFin:   [],      // solo admin
-    crearDonanteFin:     [],      // solo admin
-    registrarDonacionFin:[],      // solo admin
-    registrarGastoFin:   [],      // solo admin
-    registrarPagoFundFin:[],      // solo admin
-    editarPreciosLab:    [],      // solo admin
+    crearPaciente:        ['enfermero', 'admin'],
+    editarPaciente:       ['enfermero', 'admin'],
+    crearSolicitud:       ['medico_general'],
+    asignarCita:          ['coordinador_fundacion', 'admin'],
+    convertirAVisita:     ['medico_especialista'],
+    cancelarSolicitud:    ['medico_general', 'admin'],
+    editarVisita:         ['medico_especialista'],
+    dispensar:            ['farmacia', 'admin'],
+    registrarResultadoLab:['laboratorio', 'admin'],
+    escribirCajaFin:      ['admin'],
+    editarPreciosLab:     ['admin'],
   }
 };
 function rolActual() { return state.usuario?.rol || null; }
@@ -254,7 +251,6 @@ function tabVisible(tab) {
   return roles.includes(rolActual());
 }
 function puedeAccion(nombre) {
-  if (esAdmin()) return true;
   const roles = RBAC.acciones[nombre] || [];
   return roles.includes(rolActual());
 }
@@ -1253,7 +1249,7 @@ async function onRegistrarResultado(e) {
 
 async function cargarFinancieroTab() {
   // Habilitar formularios de escritura solo si admin
-  const puedeEscribir = esAdmin();
+  const puedeEscribir = puedeAccion('escribirCajaFin');
   [['#formCargo', '#msgCargo'], ['#formCuota', '#msgCuota'],
    ['#formDonante', '#msgDonante'], ['#formDonacion', '#msgDonacion'],
    ['#formGasto', '#msgGasto'], ['#formPagoFund', '#msgPagoFund']].forEach(([sel, msgSel]) => {

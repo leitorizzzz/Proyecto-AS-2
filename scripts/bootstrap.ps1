@@ -4,7 +4,7 @@
 #   2. docker compose up -d --build
 #   3. Espera a que SQL Server y los 7 /health respondan
 #   4. Semilla el admin inicial
-#   5. Instala jest/supertest en la raiz (idempotente)
+#   5. Instala las devDependencies de la raiz (idempotente)
 #   6. Semilla datos de demo
 #   7. Imprime URLs y credenciales
 #
@@ -61,14 +61,12 @@ docker compose exec -T auth-service npm run seed
 if ($LASTEXITCODE -ne 0) { Warn "seed del admin devolvio error (puede ser que ya exista)" }
 else                     { OK "admin seedeado" }
 
-Info "6/7 Instalando devDependencies de la raiz (jest + supertest)"
-if (-not (Test-Path node_modules\jest)) {
-    npm install --silent
-    if ($LASTEXITCODE -ne 0) { Fail "npm install fallo" }
-    OK "dependencias instaladas"
-} else {
-    OK "ya instaladas"
-}
+Info "6/7 Instalando devDependencies de la raiz (jest, supertest y deps de las pruebas RBAC)"
+# Siempre: npm install es idempotente y asi se instalan dependencias
+# agregadas despues de la primera corrida.
+npm install --silent
+if ($LASTEXITCODE -ne 0) { Fail "npm install fallo" }
+OK "dependencias al dia"
 
 Info "7/7 Semilla de datos de demo"
 npm run seed:demo

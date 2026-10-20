@@ -26,13 +26,14 @@ Tablas propias: `medicamentos`, `dispensaciones`. Lee + marca
 
 ## Endpoints
 
-| Metodo | Ruta | Descripcion |
-|---|---|---|
-| GET  | `/health` | Estado |
-| GET/POST/PUT/DELETE | `/api/farmacia/medicamentos[/:id]` | CRUD de inventario |
-| GET  | `/api/farmacia/prescripciones/pendientes/paciente/:idPaciente` | Prescripciones pendientes del paciente |
-| POST | `/api/farmacia/dispensaciones` | **Dispensar** (requiere idPrescripcion, cantidad) |
-| GET  | `/api/farmacia/dispensaciones/paciente/:idPaciente` | Historial + total gastado |
+| Metodo | Ruta | Rol | Descripcion |
+|---|---|---|---|
+| GET  | `/health` | — | Estado |
+| GET  | `/api/farmacia/medicamentos[/:id]` | autenticado | Inventario |
+| POST/PUT/DELETE | `/api/farmacia/medicamentos[/:id]` | farmacia, admin | Alta, cambio y baja de inventario |
+| GET  | `/api/farmacia/prescripciones/pendientes/paciente/:idPaciente` | autenticado | Prescripciones pendientes del paciente |
+| POST | `/api/farmacia/dispensaciones` | farmacia, admin | **Dispensar** (requiere idPrescripcion, cantidad) |
+| GET  | `/api/farmacia/dispensaciones/paciente/:idPaciente` | autenticado | Historial + total gastado |
 
 ### Reglas aplicadas al dispensar
 

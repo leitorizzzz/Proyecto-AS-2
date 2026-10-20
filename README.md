@@ -18,7 +18,10 @@ reportes.
 - Cada servicio sigue **4 capas obligatorias**: routes → controllers →
   services → repositories (+ models), sin ORM.
 - Autenticación por **JWT HS256** (`auth-service`), verificado por los
-  demás con el mismo `JWT_SECRET`. RBAC por rol en cada endpoint.
+  demás con el mismo `JWT_SECRET`. Toda escritura exige un rol concreto
+  (`autorizarRoles`); las lecturas quedan abiertas a cualquier usuario
+  autenticado salvo las órdenes de laboratorio. Tabla completa en
+  [CONTEXT_SISTEMA.md §3.3](CONTEXT_SISTEMA.md).
 - Dominio en español, estructura técnica en inglés.
 - Comunicación entre servicios **mixta** (ver
   [CONTEXT_SISTEMA.md §4.1](CONTEXT_SISTEMA.md)): HTTP + JWT para
@@ -56,13 +59,14 @@ El script:
 2. `docker compose up -d --build` (SQL Server + 7 microservicios + nginx).
 3. Espera a que los 7 `/health` respondan 200.
 4. Siembra el admin inicial.
-5. Instala jest + supertest.
+5. Instala las devDependencies de la raíz (jest, supertest y lo que
+   necesitan las pruebas RBAC: express, jsonwebtoken, bcryptjs).
 6. Siembra datos de demo (6 pacientes, solicitudes en cada estado,
    visitas, dispensaciones, donaciones).
 7. Imprime las URLs y credenciales.
 
 **Primera corrida:** ~3-5 minutos (descarga imágenes + SQL Server
-arranca). Siguientes: ~30 s.
+arranca); verificado el 19 oct 2026 en un clon limpio: 325 s. Siguientes: ~30 s.
 
 ## Credenciales de demo
 
@@ -97,8 +101,8 @@ Documentado en [scripts/README.md](scripts/README.md).
 ## Pruebas
 
 ```bash
-npm run test:todo    # suite unitaria + RBAC (45 casos, no requiere stack arriba)
-npm run test:e2e     # smoke end-to-end contra el stack (15 pasos)
+npm run test:todo    # suite unitaria + RBAC (102 casos, no requiere stack arriba)
+npm run test:e2e     # smoke end-to-end contra el stack (31 pasos)
 ```
 
 Ambas documentadas en [docs/PLAN_PRUEBAS.md](docs/PLAN_PRUEBAS.md).

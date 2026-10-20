@@ -54,13 +54,11 @@ done
 info "5/7 Semilla del admin inicial"
 docker compose exec -T auth-service npm run seed || warn "seed del admin devolvio error (puede ya existir)"
 
-info "6/7 Instalando devDependencies de la raiz (jest + supertest)"
-if [[ ! -d node_modules/jest ]]; then
-  npm install --silent
-  ok "dependencias instaladas"
-else
-  ok "ya instaladas"
-fi
+info "6/7 Instalando devDependencies de la raiz (jest, supertest y deps de las pruebas RBAC)"
+# Siempre: npm install es idempotente y asi se instalan dependencias
+# agregadas despues de la primera corrida.
+npm install --silent
+ok "dependencias al dia"
 
 info "7/7 Semilla de datos de demo"
 npm run seed:demo || warn "seed:demo devolvio error (puede ser idempotente)"

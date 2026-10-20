@@ -41,6 +41,8 @@ JWT (HS256) + bcrypt. Roles válidos: `enfermero, medico, medico_general,
 especialista, medico_especialista, farmacia, laboratorio, admin,
 fundacion, coordinador_fundacion`. Registro protegido (solo admin).
 Estructura: `AuthController`, `AuthService`, `UsuarioRepository`, `Usuario`.
+`GET /api/auth/usuarios?rol=a,b` (admin, coordinador_fundacion) devuelve el
+directorio sin `passwordHash`; lo usa el diálogo "Asignar cita".
 **`JWT_EXPIRES_IN` solo aplica aquí** (es quien firma); los demás servicios
 solo verifican con `JWT_SECRET` y respetan el `exp` embebido en el token.
 
@@ -51,6 +53,8 @@ con Paciente (crear visita ⇒ transiciona la solicitud). Cada dominio
 mantiene sus propias 4 capas dentro del mismo servicio:
 
 - **Paciente**: `PacienteController/Service/Repository`, modelo `Paciente`.
+  Alta y edición: `enfermero`, `admin`. DELETE: solo `admin`, y 409 si
+  el paciente ya tiene solicitudes o visitas (FK).
 - **SolicitudReferencia**: `SolicitudController/Service/Repository`, modelo
   `SolicitudReferencia`. Flujo: `medico_general` crea solicitud →
   `coordinador_fundacion`/`admin` asigna cita → `medico_especialista`
@@ -74,7 +78,8 @@ mantiene sus propias 4 capas dentro del mismo servicio:
 `visita_prescripciones` para RN-06, misma BD compartida). Modelos:
 `Medicamento`, `Dispensacion`, **`Prescripcion`**. Dispensación aplica
 20 % de descuento fundación (RN-09). Ya migrado de SQLite a SQL Server
-(`AsiloCabezaAlgodon`).
+(`AsiloCabezaAlgodon`). Escrituras de inventario y dispensación: solo
+`farmacia`, `admin` (antes del 19 oct cualquier autenticado podía).
 
 ### `laboratorio-service/` — ✅ funcional, puerto 3003
 `LaboratorioController` → `ordenesPendientes`, `identificarPaciente(dpi)`,
@@ -82,7 +87,11 @@ mantiene sus propias 4 capas dentro del mismo servicio:
 Tabla propia `resultados_examenes` (1 resultado por examen, UNIQUE); lee
 `visita_examenes` (mismo BD compartido) para saber qué está pendiente y la
 marca `disponible` al registrar. Precios base en `examenes_precios`,
-descuento fundación RN-09 configurable via `DESCUENTO_FUNDACION`.
+administrables con `GET/POST/PUT /api/laboratorio/precios` (lectura
+cualquier autenticado, escritura solo admin; `PrecioExamen`,
+`PrecioExamenRepository`). Descuento fundación RN-09 configurable via
+`DESCUENTO_FUNDACION`; el listado de precios ya trae `precioConDescuento`.
+El costo de un examen se busca por coincidencia exacta del `tipo`.
 
 ### `financiero-service/` — ✅ funcional, puerto 3004
 `FinancieroController` → `estadoCuenta`, `registrarCargo`,
@@ -149,11 +158,25 @@ Plex Sans — no reintroducir esos colores.
 Bootstrap 5 fue evaluado y descartado: el CSS propio es más corto y
 permite aplicar la skill sin pelear con defaults.
 
+**Diálogos propios**: no queda ningún `prompt()/confirm()/alert()`.
+`abrirDialogo()` / `confirmar()` / `avisar()` en `app.js` usan un
+`<dialog>` con `showModal()` (Esc cierra, Tab atrapado, foco vuelve al
+botón de origen); con `alEnviar` el error del backend se muestra dentro
+del diálogo sin cerrarlo. Los usan Asignar cita, Iniciar visita,
+Cancelar solicitud, Cerrar visita, Ver costo, Editar paciente y Editar
+precio.
+
 **RBAC en la UI**: cada sección se oculta del menú si el rol no la usa
 y cada formulario de escritura se deshabilita si el rol no tiene
 permiso (tabla centralizada en `RBAC.tabs` + `RBAC.acciones` de
-`app.js`, alineada con §3.3 de `CONTEXT_SISTEMA.md`). El backend sigue
+`app.js`, alineada con §3.3 de `CONTEXT_SISTEMA.md`). `admin` ve todas
+las secciones pero en acciones figura explícito solo donde el backend
+lo acepta (no crea solicitudes ni escribe en visitas). El backend sigue
 siendo la autoridad; la UI solo evita que el usuario se tope con 403.
+
+**Fechas**: las columnas `DATE` llegan como medianoche UTC; `fechaCorta()`
+las formatea en UTC y `fechaLocalISO()` arma YYYY-MM-DD local. No usar
+`toISOString().slice(0,10)` para "hoy" (en UTC-6 da el día siguiente).
 
 **Rangos de reportes contextuales**: financieros → mes en curso;
 operativos (exámenes, medicamentos) → últimos 30 días; análisis
@@ -161,8 +184,13 @@ operativos (exámenes, medicamentos) → últimos 30 días; análisis
 
 ### Pruebas automatizadas — ✅
 Suite jest+supertest a nivel raíz. Comando: `npm run test:todo` o
-`scripts/run-all-tests.sh|.ps1`. Última ejecución 45/45 pasando.
-Mapa de casos SQA ↔ pruebas en [`docs/PLAN_PRUEBAS.md`](docs/PLAN_PRUEBAS.md).
+`scripts/run-all-tests.sh|.ps1`. Última ejecución (19 oct 2026):
+**102/102** en 16 archivos, también en un clon limpio. `express`,
+`jsonwebtoken` y `bcryptjs` son devDependencies de la raíz para que las
+pruebas RBAC no dependan de los `node_modules` de cada servicio.
+E2E (`npm run test:e2e`, stack arriba): **31/31**. Mapa de casos SQA ↔
+pruebas, 1 a 1, en [`docs/PLAN_PRUEBAS.md`](docs/PLAN_PRUEBAS.md).
+Sin pruebas unitarias: reportes-service (solo e2e) y el frontend.
 
 ### Datos de demo — ✅
 `scripts/seed-demo.js` (`npm run seed:demo`). Idempotente, pobla
@@ -178,24 +206,33 @@ en [`scripts/README.md`](scripts/README.md).
 
 ## Pendiente de implementar
 
-1. Insertar las capturas reales en `docs/MANUAL_USUARIO.md`.
+1. Insertar las capturas reales en `docs/MANUAL_USUARIO.md` (23
+   marcadores `[CAPTURA: ...]`).
 2. Renderizar los `.mmd` a PNG con mermaid-cli para la entrega impresa
    (hoy sólo quedan como fuente .mmd).
-3. Pantalla de administración para `examenes_precios` (hoy sólo seed).
+3. **Decisión pendiente**: la regla "paciente activo" no existe en el
+   código (no hay campo `activo`; el DELETE es físico y solo lo frena la
+   FK). Implementarla cambia la semántica del DELETE y del e2e E2E-18.
 4. Flujo de "asociar medicamento del inventario a una prescripción ya
    emitida sin idMedicamento" (hoy hay que crear otra prescripción).
 5. Reportes extra o auto-paginación cuando una tabla supere N filas.
-6. Huecos de la UI detectados al probarla en navegador (12 oct 2026):
-   "Asignar cita" pide fecha/hora/ID de médico con `prompt()` nativo
-   (sin selector de especialista); no hay formulario para gastos
-   operativos ni pagos a fundación (solo API); no hay edición de
-   paciente en pantalla (solo `PUT /api/pacientes/:id`).
+   Los gastos operativos no aparecen en ningún reporte.
+6. Sin pantalla (solo API): alta/edición de inventario de farmacia,
+   alta de usuarios, log de notificaciones y su reintento manual.
+7. Sin `package-lock.json` en laboratorio, financiero, reportes y
+   notificaciones: el build resuelve versiones nuevas (ya avisa
+   `EBADENGINE`, dependencias de mssql piden Node 22 y la imagen es
+   Node 20).
+8. Brevo real nunca probado (procedimiento en
+   `notificaciones-service/README.md`).
 
 ## Reglas de negocio críticas (no romper al tocar código existente)
 
 - RN-02: no solicitudes duplicadas activas por paciente+especialidad.
 - Visita médica: diagnóstico + observaciones obligatorios para completar.
 - Paciente debe estar activo para cualquier operación sobre él.
+  **Ojo: hoy NO está implementada** (ver Pendiente #3); lo único que
+  existe es que el paciente debe existir.
 - RN-06: prescripción válida antes de permitir despacho en farmacia.
 - RN-09: descuento 20% fundación siempre aplicado en cálculos de costo.
 - Estados de solicitud/visita son inmutables una vez `completada`/`cancelada`.

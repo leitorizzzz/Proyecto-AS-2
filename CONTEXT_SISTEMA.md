@@ -133,9 +133,12 @@ idempotente al arrancar `pacientes-service`):
 - `visitas_medicas` (id, idSolicitudReferencia UNIQUE, idPaciente,
   idMedicoEspecialista, fecha, diagnostico, observaciones, estado,
   fechaCompletada).
-- `visita_examenes` (id, idVisita, tipo, estado='pendiente', fechaSolicitud).
+- `visita_examenes` (id, idVisita, tipo, estado `pendiente` → `disponible`
+  cuando laboratorio registra el resultado, fechaSolicitud).
 - `visita_prescripciones` (id, idVisita, medicamento, dosis, indicaciones,
-  fechaPrescripcion).
+  fechaPrescripcion, idMedicamento, estado `pendiente` → `dispensada`,
+  idDispensacion, fechaDispensacion). Las cuatro ultimas columnas se
+  agregan con `ALTER` idempotente y las marca `farmacia-service` (RN-06).
 
 ### 3.3 Roles
 
@@ -143,16 +146,32 @@ idempotente al arrancar `pacientes-service`):
 `enfermero, medico, medico_general, especialista, medico_especialista,
 farmacia, laboratorio, admin, fundacion, coordinador_fundacion`.
 
-RBAC por endpoint (aplicado con `autorizarRoles(...)`):
+RBAC por endpoint (aplicado con `autorizarRoles(...)`; el middleware es
+una copia identica en cada servicio). Toda escritura exige rol; los
+`GET` quedan abiertos a cualquier usuario autenticado salvo donde se
+indica.
 
 | Acción | Roles permitidos |
 |---|---|
+| `POST /api/auth/register` | `admin` |
+| `GET /api/auth/usuarios[?rol=]` (directorio, sin passwordHash) | `admin`, `coordinador_fundacion` |
+| `POST`, `PUT /api/pacientes[/:id]` | `enfermero`, `admin` |
+| `DELETE /api/pacientes/:id` (409 si tiene solicitudes o visitas) | `admin` |
 | `POST /api/solicitudes` | `medico_general` |
 | `PATCH /api/solicitudes/:id/asignar-cita` | `coordinador_fundacion`, `admin` |
 | `POST /api/solicitudes/:id/convertir-a-visita` | `medico_especialista` |
 | `PATCH /api/solicitudes/:id/cancelar` | `medico_general`, `admin` |
 | `PATCH /api/visitas/:id`, `POST /api/visitas/:id/{examenes,prescripciones,completar}` | `medico_especialista` |
-| Listar / obtener (`GET`) | cualquier usuario autenticado |
+| `POST`, `PUT`, `DELETE /api/farmacia/medicamentos[/:id]`, `POST /api/farmacia/dispensaciones` | `farmacia`, `admin` |
+| `GET /api/laboratorio/ordenes-pendientes`, `GET .../pacientes/dpi/:dpi`, `POST .../resultados/examen/:id` | `laboratorio`, `admin` (también el `GET`) |
+| `POST`, `PUT /api/laboratorio/precios[/:id]` | `admin` |
+| `POST /api/financiero/{cargos,pagos-cuota,donantes,donaciones,gastos,pagos-fundacion}` | `admin` |
+| `POST /api/notificaciones/:id/reintentar` | `admin` |
+| Resto de lecturas (`GET`) | cualquier usuario autenticado |
+
+La UI (`RBAC.tabs` + `RBAC.acciones` en `frontend/app.js`) oculta las
+secciones y deshabilita los formularios según esta tabla; el backend es
+la autoridad.
 
 ---
 
@@ -170,7 +189,7 @@ Stack realmente usado hoy en el repositorio:
 | Correo transaccional | **Brevo** (`fetch` nativo contra `/v3/smtp/email`) |
 | Reportes | **pdfkit** (PDF) + **exceljs** (Excel) |
 | Frontend | HTML/CSS/JS plano servido por **nginx** 1.27 (sin build, sin frameworks) |
-| Tipografías del frontend | Fuentes del sistema + Google Fonts cuando lo pide la skill de diseño |
+| Tipografías del frontend | Google Fonts: Libre Bodoni (títulos), Public Sans (cuerpo), IBM Plex Mono (cifras) — ver `design-system/asilo-cabeza-de-algodon/MASTER.md` |
 | Pruebas automatizadas | **Jest 29 + Supertest 7** (ver [docs/PLAN_PRUEBAS.md](docs/PLAN_PRUEBAS.md)) |
 | Contenedores / orquestación local | **Docker Compose** |
 | Despliegue | Servidor Debian (Lenovo) accesible por Tailscale (`100.96.172.77`) y LAN (`192.168.1.100`) |
@@ -283,9 +302,13 @@ Cada servicio tiene la **misma estructura interna de 4 capas**:
       compartida para los agregados transaccionales que viven en otra
       tabla (farmacia ↔ visita_prescripciones, laboratorio ↔
       visita_examenes, reportes lee todo).
-- [ ] Conectar prescripciones de visita a `farmacia-service` (hoy sólo
-      registro local en `visita_prescripciones` sin descontar inventario).
-- [ ] Reintentos automáticos para notificaciones fallidas (hoy: fire-and-forget).
+- [x] Conectar prescripciones de visita a `farmacia-service` (RN-06:
+      `idMedicamento` + estado `dispensada`, descuenta inventario).
+- [x] Reintentos automáticos para notificaciones fallidas (job interno
+      con espera creciente y estado `fallida_definitiva`).
+- [x] Catálogo de precios de exámenes administrable (`/api/laboratorio/precios`, solo admin escribe).
+- [ ] Regla "paciente activo": no existe campo `activo` ni baja lógica;
+      el `DELETE` es físico. Pendiente de decisión del equipo.
 
 ### Endpoints internos (para referencia rápida)
 
@@ -310,7 +333,6 @@ Cada servicio tiene la **misma estructura interna de 4 capas**:
   idempotente para no romper datos existentes).
 
 ### Infraestructura
-- [ ] Resolver instalación de Docker Desktop en la máquina de desarrollo
-      (en progreso — conflicto de virtualización con VMware).
+- [x] Docker Desktop funcionando en la máquina de desarrollo (WSL2).
 - [ ] Definir despliegue en Azure (Container Instance vs. AKS/Kubernetes).
 - [ ] Manifiestos de Kubernetes si se usa AKS.

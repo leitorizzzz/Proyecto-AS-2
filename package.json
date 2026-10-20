@@ -8,8 +8,7 @@
     "test": "jest --runInBand",
     "test:ci": "jest --runInBand --silent --json --outputFile=docs/jest-report.json",
     "test:e2e": "node scripts/e2e-smoke.js",
-    "seed:demo": "node scripts/seed-demo.js",
-    "bootstrap": "node scripts/bootstrap-node.js"
+    "seed:demo": "node scripts/seed-demo.js"
   },
   "devDependencies": {
     "bcryptjs": "^2.4.3",

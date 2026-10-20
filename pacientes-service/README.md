@@ -45,7 +45,9 @@ Todos requieren JWT. RBAC resumida (completa en CONTEXT_SISTEMA.md §3.3):
 | Metodo | Ruta | Rol |
 |---|---|---|
 | GET    | `/health` | publico |
-| GET/POST/PUT/DELETE | `/api/pacientes[...]` | autenticado para leer, admin / enfermero para escribir |
+| GET    | `/api/pacientes[/:id]` | autenticado |
+| POST, PUT | `/api/pacientes[/:id]` | enfermero, admin |
+| DELETE | `/api/pacientes/:id` | admin (409 si el paciente ya tiene solicitudes o visitas) |
 | POST   | `/api/solicitudes` | medico_general |
 | GET    | `/api/solicitudes[/:id\|/paciente/:id]` | autenticado |
 | PATCH  | `/api/solicitudes/:id/asignar-cita` | coordinador_fundacion, admin |
