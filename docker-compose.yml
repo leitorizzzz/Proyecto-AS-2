@@ -122,6 +122,8 @@ services:
       # Fire-and-forget al crear una solicitud. Si el servicio no responde,
       # la solicitud se crea igual y el error queda en el log.
       NOTIFICACIONES_URL: http://notificaciones-service:3006
+      # RN-09: descuento de la fundacion en el cargo automatico de la visita
+      DESCUENTO_FUNDACION: "0.20"
     ports:
       - "3002:3002"
     restart: unless-stopped

@@ -28,7 +28,18 @@ function crearRepoMock(visita) {
     actualizarClinico: jest.fn(async (_id, d) => ({ ...visita, ...d })),
     marcarCompletada: jest.fn(async () => ({ ...visita, estado: VisitaMedica.ESTADOS.COMPLETADA })),
     agregarExamen: jest.fn(async () => ({ id: 1 })),
-    agregarPrescripcion: jest.fn(async () => ({ id: 1 }))
+    agregarPrescripcion: jest.fn(async () => ({ id: 1 })),
+    // La transaccion real vive en el repositorio; aqui se ejecuta el
+    // calculo del cargo con datos de ejemplo y se simula el cierre.
+    completarConCargo: jest.fn(async (id, calcularCargo) => {
+      const cargo = calcularCargo({
+        visita,
+        tarifa: { codigo: 'consulta_especialista', descripcion: 'Consulta', precioBase: 150 },
+        examenes: [], dispensaciones: []
+      });
+      cargo.id = 77;
+      return { visita: { ...visita, estado: VisitaMedica.ESTADOS.COMPLETADA }, cargo };
+    })
   };
 }
 
@@ -54,11 +65,14 @@ describe('VisitaMedicaService', () => {
     const visita = new VisitaMedica({ id: 1, idSolicitudReferencia: 1, idPaciente: 1,
       idMedicoEspecialista: 2, estado: 'en_atencion',
       diagnostico: 'HTA', observaciones: 'Seguir' });
-    const solicSvc = crearSolicitudServiceMock('en_atencion');
-    const svc = new VisitaMedicaService(crearRepoMock(visita), solicSvc);
+    const repo = crearRepoMock(visita);
+    const svc = new VisitaMedicaService(repo, crearSolicitudServiceMock('en_atencion'), crearPacienteRepoMock());
     const r = await svc.completar(1);
     expect(r.estado).toBe(VisitaMedica.ESTADOS.COMPLETADA);
-    expect(solicSvc.marcarCompletada).toHaveBeenCalledWith(visita.idSolicitudReferencia);
+    // Cierre de visita + solicitud + cargo en una sola transaccion del repositorio.
+    expect(repo.completarConCargo).toHaveBeenCalledWith(1, expect.any(Function));
+    expect(repo.marcarCompletada).not.toHaveBeenCalled();
+    expect(r.cargo).toMatchObject({ id: 77, monto: 120 });
   });
 
   test('inmutabilidad: editar visita completada -> 409', async () => {

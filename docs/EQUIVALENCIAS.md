@@ -17,7 +17,10 @@ minúsculas con guion bajo.
 | Resultado de laboratorio | `resultados_examenes` | laboratorio-service |
 | Prescripción | `visita_prescripciones` | pacientes-service (farmacia la marca) |
 | Despacho de farmacia | `dispensaciones` | farmacia-service |
-| Cuenta / saldo | `cargos_servicio` + `cuotas_mensuales` por paciente; saldo = cargos pendientes + cuotas pendientes (calculado, no hay columna saldo) | financiero-service |
+| Cuenta / saldo | `cargos_servicio` + `cuotas_mensuales` por paciente; saldo = Σ(`monto` − `montoPagado`) de cargos no pagados + cuotas pendientes (calculado, no hay columna saldo) | financiero-service |
+| Cargo automático de la visita | `cargos_servicio` con `origen = 'visita'` e `idVisita` (índice único: un cargo por visita) | lo escribe pacientes-service al cerrar la visita, en la misma transacción |
+| Desglose del cargo (consulta / laboratorio / farmacia) | `cargos_detalle.rubro` = `consulta` / `laboratorio` / `farmacia` | financiero-service |
+| Tarifa de consulta | `tarifas_servicio` con `codigo = 'consulta_especialista'` (semilla Q150.00) | financiero-service |
 | Log de notificaciones | `notificaciones` | notificaciones-service |
 | Bitácora de auditoría | `auditoria` | la escriben auth, pacientes, farmacia y financiero; la lee reportes |
 | Usuario del sistema | `usuarios` | auth-service |

@@ -30,7 +30,20 @@ class CuentaRepository {
     const result = await pool.request()
       .input('idPaciente', sql.Int, idPaciente)
       .query('SELECT * FROM cargos_servicio WHERE idPaciente = @idPaciente ORDER BY fecha DESC');
-    return result.recordset.map(r => new CargoServicio(r));
+    const detalles = (await pool.request()
+      .input('idPaciente', sql.Int, idPaciente)
+      .query(`
+        SELECT cd.* FROM cargos_detalle cd
+        INNER JOIN cargos_servicio c ON c.id = cd.idCargo
+        WHERE c.idPaciente = @idPaciente
+        ORDER BY cd.id
+      `)).recordset;
+    return result.recordset.map(r => new CargoServicio({
+      ...r, detalles: detalles.filter(d => d.idCargo === r.id).map(d => ({
+        rubro: d.rubro, descripcion: d.descripcion, idReferencia: d.idReferencia,
+        montoBase: Number(d.montoBase), descuento: Number(d.descuento), monto: Number(d.monto)
+      }))
+    }));
   }
 
   async saldoPendientePorPaciente(idPaciente) {
@@ -39,7 +52,7 @@ class CuentaRepository {
       .input('idPaciente', sql.Int, idPaciente)
       .query(`
         SELECT
-          ISNULL(SUM(CASE WHEN estado = 'pendiente' THEN monto ELSE 0 END), 0) AS saldoCargos
+          ISNULL(SUM(CASE WHEN estado = 'pagado' THEN 0 ELSE monto - montoPagado END), 0) AS saldoCargos
         FROM cargos_servicio WHERE idPaciente = @idPaciente
       `);
     return Number(result.recordset[0].saldoCargos);

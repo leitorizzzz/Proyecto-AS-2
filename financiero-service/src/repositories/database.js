@@ -113,6 +113,77 @@ async function inicializarEsquema() {
       fecha DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
     );
   `);
+  // --- Cargo automatico al cerrar la visita (caso 19) -------------------
+  // Columnas nuevas de cargos_servicio, idempotentes. origen distingue el
+  // cargo manual del generado por una visita o por una dispensacion
+  // posterior al cierre; montoPagado lleva los abonos (saldo = monto -
+  // montoPagado, nunca negativo por el CHECK).
+  const columnasCargo = [
+    ['idVisita', 'INT NULL'],
+    ['idDispensacion', 'INT NULL'],
+    ['idFamiliar', 'INT NULL'],
+    ['origen', "NVARCHAR(20) NOT NULL CONSTRAINT DF_cargos_origen DEFAULT 'manual'"],
+    ['montoPagado', 'DECIMAL(10,2) NOT NULL CONSTRAINT DF_cargos_pagado DEFAULT 0']
+  ];
+  for (const [col, tipo] of columnasCargo) {
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT 1 FROM sys.columns
+                     WHERE object_id = OBJECT_ID('cargos_servicio') AND name = '${col}')
+      ALTER TABLE cargos_servicio ADD ${col} ${tipo};
+    `);
+  }
+  await pool.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_cargos_saldo_no_negativo')
+    ALTER TABLE cargos_servicio ADD CONSTRAINT CK_cargos_saldo_no_negativo
+      CHECK (monto > 0 AND montoPagado >= 0 AND montoPagado <= monto);
+  `);
+  // Un solo cargo por visita y uno por dispensacion posterior al cierre:
+  // reintentar el cierre no puede duplicar el cobro.
+  await pool.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_cargos_visita')
+    CREATE UNIQUE INDEX UX_cargos_visita ON cargos_servicio (idVisita)
+      WHERE idVisita IS NOT NULL AND idDispensacion IS NULL;
+  `);
+  await pool.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_cargos_dispensacion')
+    CREATE UNIQUE INDEX UX_cargos_dispensacion ON cargos_servicio (idDispensacion)
+      WHERE idDispensacion IS NOT NULL;
+  `);
+
+  await pool.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'cargos_detalle')
+    CREATE TABLE cargos_detalle (
+      id INT IDENTITY(1,1) PRIMARY KEY,
+      idCargo INT NOT NULL,
+      rubro NVARCHAR(20) NOT NULL,
+      descripcion NVARCHAR(300) NOT NULL,
+      idReferencia INT NULL,
+      montoBase DECIMAL(10,2) NOT NULL,
+      descuento DECIMAL(10,2) NOT NULL,
+      monto DECIMAL(10,2) NOT NULL,
+      CONSTRAINT FK_cargos_detalle_cargo FOREIGN KEY (idCargo) REFERENCES cargos_servicio(id),
+      CONSTRAINT CK_cargos_detalle_rubro CHECK (rubro IN ('consulta', 'laboratorio', 'farmacia')),
+      CONSTRAINT CK_cargos_detalle_montos CHECK (montoBase >= 0 AND descuento >= 0 AND monto >= 0)
+    );
+  `);
+
+  // Tarifas de servicios propios del cargo de visita (consulta del
+  // especialista). El precio de laboratorio y farmacia sale de sus catalogos.
+  await pool.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'tarifas_servicio')
+    CREATE TABLE tarifas_servicio (
+      id INT IDENTITY(1,1) PRIMARY KEY,
+      codigo NVARCHAR(50) NOT NULL UNIQUE,
+      descripcion NVARCHAR(200) NOT NULL,
+      precioBase DECIMAL(10,2) NOT NULL CHECK (precioBase > 0)
+    );
+  `);
+  await pool.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM tarifas_servicio WHERE codigo = 'consulta_especialista')
+    INSERT INTO tarifas_servicio (codigo, descripcion, precioBase)
+    VALUES ('consulta_especialista', 'Consulta con medico especialista de la fundacion', 150.00);
+  `);
+
   // Tabla compartida de auditoria (idempotente; ver AuditoriaRepository).
   // require diferido: AuditoriaRepository depende de este modulo.
   await require('./AuditoriaRepository').crearTablaAuditoria(pool);

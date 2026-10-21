@@ -103,6 +103,7 @@ async function asegurarUsuario(adminToken, u) {
   let adminToken, mgToken, cfToken, meToken, labToken, farToken;
   let pacienteId, solicitudId, visitaId, prescripcionId, examenId, idEsp;
   let medE2E;   // medicamento propio: no se toca el stock del inventario real
+  let cargoVisita; // cargo generado al cerrar la visita (caso 19)
   const TS = Date.now();
 
   // 00 - preparar usuarios (el smoke no depende de seed-demo)
@@ -252,7 +253,8 @@ async function asegurarUsuario(adminToken, u) {
     const r = await req('POST', `${API.pacientes}/api/visitas/${visitaId}/completar`, {
       token: meToken, esperarStatus: 200
     });
-    ok(`estado=${r.data.estado}`);
+    cargoVisita = r.data.cargo;
+    ok(`estado=${r.data.estado} cargo=${cargoVisita?.id} Q${cargoVisita?.monto}`);
   } catch (e) { falla(e.message); }
 
   // 12 - notificacion creada
@@ -605,6 +607,36 @@ async function asegurarUsuario(adminToken, u) {
     await req('GET', `${API.reportes}/api/auditoria`, { token: farToken, esperarStatus: 403 });
     await req('GET', `${API.reportes}/api/auditoria?entidad=planeta`, { token: adminToken, esperarStatus: 400 });
     ok('3 entidades verificadas, 403 y 400 correctos');
+  } catch (e) { falla(e.message); }
+
+  // 40..41 - caso 19 del plan del SQA: cargo automatico al cerrar la visita
+  paso('caso 19: el cierre genero un cargo desglosado con descuento en la cuenta');
+  try {
+    if (!cargoVisita) throw new Error('el cierre no devolvio cargo');
+    const cta = (await req('GET', `${API.financiero}/api/financiero/estado-cuenta/${pacienteId}`, { token: adminToken, esperarStatus: 200 })).data;
+    const c = cta.cargos.find(x => x.id === cargoVisita.id);
+    if (!c) throw new Error('el cargo no aparece en el estado de cuenta');
+    if (c.origen !== 'visita' || c.idVisita !== visitaId) throw new Error(`origen=${c.origen} idVisita=${c.idVisita}`);
+    const rubros = c.detalles.map(d => d.rubro);
+    for (const r of ['consulta', 'laboratorio', 'farmacia']) if (!rubros.includes(r)) throw new Error(`falta el rubro ${r}`);
+    for (const d of c.detalles) {
+      if (!(d.descuento > 0) || Math.abs(d.montoBase - d.descuento - d.monto) > 0.011) {
+        throw new Error(`linea sin descuento RN-09: ${JSON.stringify(d)}`);
+      }
+    }
+    const suma = Math.round(c.detalles.reduce((a, d) => a + d.monto, 0) * 100) / 100;
+    if (suma !== c.monto) throw new Error(`detalle ${suma} != total ${c.monto}`);
+    if (cta.saldoCargos < c.monto) throw new Error(`el saldo ${cta.saldoCargos} no incluye el cargo ${c.monto}`);
+    ok(`cargo ${c.id} = ${c.detalles.map(d => d.rubro + ' ' + d.monto).join(' + ')} = Q${c.monto}`);
+  } catch (e) { falla(e.message); }
+
+  paso('caso 19: reintentar el cierre -> 409 y sigue habiendo un solo cargo de la visita');
+  try {
+    await req('POST', `${API.pacientes}/api/visitas/${visitaId}/completar`, { token: meToken, esperarStatus: 409 });
+    const cta = (await req('GET', `${API.financiero}/api/financiero/estado-cuenta/${pacienteId}`, { token: adminToken, esperarStatus: 200 })).data;
+    const deLaVisita = cta.cargos.filter(x => x.idVisita === visitaId && x.origen === 'visita');
+    if (deLaVisita.length !== 1) throw new Error(`cargos de la visita = ${deLaVisita.length}`);
+    ok('sin duplicado');
   } catch (e) { falla(e.message); }
 
   paso('limpieza: desactivar el medicamento propio del smoke');

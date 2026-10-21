@@ -72,6 +72,10 @@ class VisitaMedicaController {
     try {
       const visita = await this.service.completar(Number(req.params.id));
       await this._auditar(req, 'modificar', 'visita', visita.id, 'completada');
+      if (visita.cargo) {
+        await this._auditar(req, 'crear', 'cargo', visita.cargo.id,
+          `automatico visita #${visita.id} · Q${visita.cargo.monto}`);
+      }
       res.json(visita);
     } catch (error) { this._fallo(res, error); }
   };

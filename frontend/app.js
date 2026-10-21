@@ -1109,6 +1109,7 @@ async function onGuardarClinico() {
 async function onCompletarVisita() {
   const msg = $('#msgCompletar'); limpiar(msg);
   const idVisita = state.visitaSeleccionada;
+  let resultado = null;
   const cerrada = await confirmar(
     $('#visitaTitulo').textContent,
     'La visita y su solicitud quedarán completadas y ya no se podrán editar. ' +
@@ -1117,11 +1118,22 @@ async function onCompletarVisita() {
       eyebrow: 'Cerrar visita',
       textoConfirmar: 'Marcar como completa',
       textoCancelar: 'Volver',
-      alEnviar: () => api(API.pacientes, `/api/visitas/${idVisita}/completar`, { method: 'POST' })
+      alEnviar: async () => {
+        resultado = await api(API.pacientes, `/api/visitas/${idVisita}/completar`, { method: 'POST' });
+      }
     });
   if (!cerrada) return;
-  ok(msg, 'Visita completada.');
+  const cg = resultado?.cargo;
+  ok(msg, cg
+    ? `Visita completada. Cargo #${cg.id} por ${money(cg.monto)} a la cuenta del familiar: ` +
+      CARGO_RUBROS.map(r => `${r} ${money(sumaRubro(cg, r))}`).join(', ') + ' (con descuento de la fundación).'
+    : 'Visita completada.');
   cargarVisitasTab();
+}
+
+const CARGO_RUBROS = ['consulta', 'laboratorio', 'farmacia'];
+function sumaRubro(cargo, rubro) {
+  return (cargo.detalles || []).filter(d => d.rubro === rubro).reduce((a, d) => a + Number(d.monto), 0);
 }
 
 async function onAgregarExamen() {
@@ -1578,9 +1590,10 @@ async function cargarEstadoCuenta() {
     $('#tbodyCargos').innerHTML = c.cargos.map(x => `
       <tr>
         <td class="tiny">${fechaHora(x.fecha)}</td>
-        <td>${esc(x.concepto)}</td>
+        <td>${esc(x.concepto)}${(x.detalles || []).length ? `<div class="tiny">${x.detalles.map(d =>
+          `${esc(d.rubro)}: ${esc(d.descripcion)} ${money(d.montoBase)} − ${money(d.descuento)} = ${money(d.monto)}`).join('<br>')}</div>` : ''}</td>
         <td>${chip(x.estado)}</td>
-        <td class="right num">${money(x.monto)}</td>
+        <td class="right num">${money(x.monto)}${x.saldo != null && x.saldo !== x.monto ? `<div class="tiny">saldo ${money(x.saldo)}</div>` : ''}</td>
       </tr>`).join('') || `<tr><td colspan="4" class="tiny">Sin cargos.</td></tr>`;
     $('#tbodyCuotas').innerHTML = c.cuotas.map(x => `
       <tr>

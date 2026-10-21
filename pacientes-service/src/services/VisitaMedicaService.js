@@ -1,5 +1,6 @@
 const VisitaMedica = require('../models/VisitaMedica');
 const SolicitudReferencia = require('../models/SolicitudReferencia');
+const CargoVisita = require('../models/CargoVisita');
 const { asegurarPacienteActivo } = require('./reglasPaciente');
 
 /**
@@ -13,6 +14,8 @@ class VisitaMedicaService {
     this.repo = visitaRepository;
     this.solicitudService = solicitudService;
     this.pacienteRepo = pacienteRepository;
+    // RN-09: descuento de la fundacion sobre el cargo de la visita.
+    this.descuento = Number(process.env.DESCUENTO_FUNDACION || 0.20);
   }
 
   obtener(id) { return this._obtener(id); }
@@ -134,9 +137,67 @@ class VisitaMedicaService {
       );
     }
 
-    const completada = await this.repo.marcarCompletada(id);
-    await this.solicitudService.marcarCompletada(visita.idSolicitudReferencia);
-    return completada;
+    // Cierre + cargo al familiar en una sola transaccion (caso 19).
+    const { visita: completada, cargo } = await this.repo.completarConCargo(
+      id, datos => this.construirCargoVisita(datos));
+    return { ...completada, cargo };
+  }
+
+  /**
+   * Regla de negocio del cargo de la visita (caso 19 + RN-09). Recibe lo que
+   * el repositorio leyo dentro de la transaccion y devuelve el CargoVisita.
+   *   - consulta: tarifa 'consulta_especialista' menos el descuento;
+   *   - laboratorio: cada examen pedido, a su precio de catalogo (o el
+   *     registrado al ordenarlo) menos el descuento;
+   *   - farmacia: cada dispensacion de la visita, cuyo costoTotal ya trae
+   *     el descuento aplicado por farmacia-service.
+   * Falla cerrado: sin tarifa o con un examen sin precio no se cierra la
+   * visita (no se cobra en cero en silencio).
+   */
+  construirCargoVisita({ visita, tarifa, examenes = [], dispensaciones = [], familiar = null }) {
+    if (!tarifa || !(Number(tarifa.precioBase) > 0)) {
+      throw Object.assign(
+        new Error("No hay tarifa de consulta configurada ('consulta_especialista'); no se puede generar el cargo de la visita"),
+        { status: 409 }
+      );
+    }
+    const r = n => Math.round(Number(n) * 100) / 100;
+    const conDescuento = (rubro, descripcion, base, idReferencia) => {
+      const descuento = r(Number(base) * this.descuento);
+      return { rubro, descripcion, idReferencia, montoBase: r(base), descuento, monto: r(Number(base) - descuento) };
+    };
+
+    const detalles = [conDescuento('consulta', tarifa.descripcion || 'Consulta con especialista', tarifa.precioBase, visita.id)];
+    for (const ex of examenes) {
+      const base = ex.precioBase ?? ex.precioCatalogo;
+      if (base == null) {
+        throw Object.assign(
+          new Error(`El examen "${ex.tipo}" (#${ex.id}) no tiene precio configurado; no se puede generar el cargo de la visita`),
+          { status: 409 }
+        );
+      }
+      detalles.push(ex.costo != null && ex.precioBase != null
+        ? { rubro: 'laboratorio', descripcion: ex.tipo, idReferencia: ex.id,
+            montoBase: r(ex.precioBase), descuento: r(ex.descuento), monto: r(ex.costo) }
+        : conDescuento('laboratorio', ex.tipo, base, ex.id));
+    }
+    for (const d of dispensaciones) {
+      const costo = r(d.costoTotal);
+      const base = d.montoBase != null ? r(d.montoBase) : r(costo / (1 - this.descuento));
+      detalles.push({ rubro: 'farmacia', descripcion: `${d.cantidad} x ${d.medicamento}`, idReferencia: d.id,
+                      montoBase: base, descuento: r(base - costo), monto: costo });
+    }
+
+    const monto = r(detalles.reduce((acc, d) => acc + d.monto, 0));
+    const nEx = examenes.length, nRx = dispensaciones.length;
+    return new CargoVisita({
+      idPaciente: visita.idPaciente,
+      idVisita: visita.id,
+      idFamiliar: familiar ? familiar.id : null,
+      concepto: `Visita medica #${visita.id}: consulta + ${nEx} examen(es) + ${nRx} dispensacion(es), con descuento fundacion`,
+      monto,
+      detalles
+    });
   }
 }
 
