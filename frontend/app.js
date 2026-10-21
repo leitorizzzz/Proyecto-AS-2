@@ -279,7 +279,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if (saved) {
     state.token = saved;
     state.usuario = decodificarJWT(saved);
-    if (state.usuario && state.usuario.exp * 1000 > Date.now()) {
+    if (state.usuario && state.usuario.exp * 1000 > Date.now() && sesionVencidaPorInactividad()) {
+      // Se cerro (o se recargo) la pestana y paso el limite sin actividad.
+      cerrarSesionPorInactividad();
+    } else if (state.usuario && state.usuario.exp * 1000 > Date.now()) {
       abrirApp();
     } else {
       localStorage.removeItem('asilo.token');
@@ -387,10 +390,111 @@ async function onLogin(e) {
 }
 
 function onLogout() {
+  detenerControlInactividad();
   localStorage.removeItem('asilo.token');
+  localStorage.removeItem(CLAVE_ULTIMA_ACTIVIDAD);
   state.token = null; state.usuario = null;
+  if ($('#dlg').open) $('#dlgCancelar').click();   // cierra cualquier dialogo pendiente
   $('#vistaApp').classList.add('hidden');
   $('#vistaLogin').classList.remove('hidden');
+}
+
+/* ============================================================
+ *   CIERRE DE SESION POR INACTIVIDAD
+ *   Sin teclado, mouse, scroll ni toque durante INACTIVIDAD_MIN minutos
+ *   se cierra la sesion y se borra el token. AVISO_ANTES_SEG antes se
+ *   abre un dialogo con cuenta regresiva y "Seguir trabajando".
+ *   La ultima actividad se guarda en localStorage para que la cuenten
+ *   todas las pestanas abiertas y sobreviva a una recarga.
+ * ============================================================ */
+const INACTIVIDAD_MIN = 30;
+const AVISO_ANTES_SEG = 60;
+const CLAVE_ULTIMA_ACTIVIDAD = 'asilo.ultimaActividad';
+const EVENTOS_ACTIVIDAD = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'wheel'];
+
+const inactividad = {
+  limiteMs: INACTIVIDAD_MIN * 60 * 1000,
+  avisoMs: AVISO_ANTES_SEG * 1000,
+  timer: null,
+  avisoAbierto: false,
+  ultimoGuardado: 0
+};
+
+function leerUltimaActividad() {
+  const v = Number(localStorage.getItem(CLAVE_ULTIMA_ACTIVIDAD));
+  return Number.isFinite(v) && v > 0 ? v : Date.now();
+}
+
+function registrarActividad() {
+  if (inactividad.avisoAbierto) return;  // con el aviso abierto solo cuenta el boton
+  const ahora = Date.now();
+  if (ahora - inactividad.ultimoGuardado < 1000) return;   // a lo mas 1 escritura por segundo
+  inactividad.ultimoGuardado = ahora;
+  localStorage.setItem(CLAVE_ULTIMA_ACTIVIDAD, String(ahora));
+}
+
+/** true si la sesion guardada ya supero el limite (p. ej. al recargar). */
+function sesionVencidaPorInactividad() {
+  const v = Number(localStorage.getItem(CLAVE_ULTIMA_ACTIVIDAD));
+  return Number.isFinite(v) && v > 0 && Date.now() - v >= inactividad.limiteMs;
+}
+
+/** Los parametros permiten probarlo con limites cortos desde la consola. */
+function iniciarControlInactividad({ limiteMs = INACTIVIDAD_MIN * 60 * 1000,
+                                     avisoMs = AVISO_ANTES_SEG * 1000 } = {}) {
+  detenerControlInactividad();
+  Object.assign(inactividad, { limiteMs, avisoMs, avisoAbierto: false, ultimoGuardado: 0 });
+  localStorage.setItem(CLAVE_ULTIMA_ACTIVIDAD, String(Date.now()));
+  EVENTOS_ACTIVIDAD.forEach(ev => window.addEventListener(ev, registrarActividad, { passive: true }));
+  inactividad.timer = setInterval(revisarInactividad, 1000);
+}
+
+function detenerControlInactividad() {
+  clearInterval(inactividad.timer);
+  inactividad.timer = null;
+  EVENTOS_ACTIVIDAD.forEach(ev => window.removeEventListener(ev, registrarActividad));
+}
+
+function revisarInactividad() {
+  const restante = inactividad.limiteMs - (Date.now() - leerUltimaActividad());
+  if (restante <= 0) return cerrarSesionPorInactividad();
+  if (restante <= inactividad.avisoMs) {
+    if (!inactividad.avisoAbierto) mostrarAvisoInactividad();
+    const seg = $('#dlgCuentaAtras');
+    if (seg) seg.textContent = String(Math.ceil(restante / 1000));
+  } else if (inactividad.avisoAbierto && $('#dlg').open) {
+    // Otra pestana registro actividad: el aviso ya no aplica.
+    $('#dlgConfirmar').click();
+  }
+}
+
+async function mostrarAvisoInactividad() {
+  inactividad.avisoAbierto = true;
+  if ($('#dlg').open) $('#dlgCancelar').click();   // cede el lugar a este aviso
+  const restante = Math.ceil((inactividad.limiteMs - (Date.now() - leerUltimaActividad())) / 1000);
+  await abrirDialogo({
+    eyebrow: 'Sesión inactiva',
+    titulo: 'Su sesión está por cerrarse',
+    cuerpo: `<p>No hubo actividad en ${Math.round(inactividad.limiteMs / 60000) || '<1'} minuto(s).
+      La sesión se cerrará en <strong id="dlgCuentaAtras" class="num">${restante}</strong> segundos
+      y tendrá que volver a iniciarla.</p>`,
+    soloAceptar: true,
+    textoConfirmar: 'Seguir trabajando'
+  });
+  // Al cerrar el aviso (boton, Esc u otra pestana) la sesion sigue, salvo
+  // que ya se haya cerrado por tiempo.
+  inactividad.avisoAbierto = false;
+  if (state.token) {
+    inactividad.ultimoGuardado = 0;
+    registrarActividad();
+  }
+}
+
+function cerrarSesionPorInactividad() {
+  const minutos = Math.round(inactividad.limiteMs / 60000);
+  inactividad.avisoAbierto = false;
+  onLogout();
+  warn($('#msgLogin'), `Sesión cerrada por inactividad${minutos ? ` (${minutos} min)` : ''}. Vuelva a iniciar sesión.`);
 }
 
 function abrirApp() {
@@ -406,6 +510,7 @@ function abrirApp() {
   });
   filtrarMenuPorRol();
   cambiarTab('dashboard');
+  iniciarControlInactividad();
 }
 
 /** Oculta en el menu lateral las secciones que el rol no puede usar. */
