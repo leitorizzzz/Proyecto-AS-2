@@ -16,7 +16,9 @@ minúsculas con guion bajo.
 | Orden de laboratorio | `visita_examenes` | pacientes-service (laboratorio la marca) |
 | Resultado de laboratorio | `resultados_examenes` | laboratorio-service |
 | Prescripción | `visita_prescripciones` | pacientes-service (farmacia la marca) |
-| Despacho de farmacia | `dispensaciones` | farmacia-service |
+| Despacho de farmacia | `dispensaciones` (`idPrescripcion`, `montoBase`, `costoTotal`) | farmacia-service |
+| Costo preferencial acumulado en la visita | `visitas_medicas.costoLaboratorio` y `costoFarmacia` | pacientes-service (farmacia suma al despachar) |
+| Cargo por despacho después del cierre | `cargos_servicio` con `origen = 'dispensacion'` e `idDispensacion` | farmacia-service, en la transacción del despacho |
 | Cuenta / saldo | `cargos_servicio` + `cuotas_mensuales` por paciente; saldo = Σ(`monto` − `montoPagado`) de cargos no pagados + cuotas pendientes (calculado, no hay columna saldo) | financiero-service |
 | Cargo automático de la visita | `cargos_servicio` con `origen = 'visita'` e `idVisita` (índice único: un cargo por visita) | lo escribe pacientes-service al cerrar la visita, en la misma transacción |
 | Desglose del cargo (consulta / laboratorio / farmacia) | `cargos_detalle.rubro` = `consulta` / `laboratorio` / `farmacia` | financiero-service |
@@ -31,7 +33,7 @@ minúsculas con guion bajo.
 |---|---|
 | PENDIENTE_ASIGNACION / CITA_ASIGNADA / EN_ATENCION | `pendiente_asignacion` / `cita_asignada` / `en_atencion` (solicitud) |
 | Visita COMPLETA | `completada` (`en_atencion` mientras se trabaja) |
-| Prescripción pendiente / despachada | `pendiente` / `dispensada` |
+| Prescripción pendiente / parcial / despachada | `pendiente` / `parcial` / `dispensada` (`visita_prescripciones.cantidadPrescrita` y `cantidadEntregada`) |
 | Examen pendiente / disponible | `pendiente` / `disponible` |
 | Notificación enviado / error | `enviada` / `fallida` (reintentable) y `fallida_definitiva` (agotó intentos) |
 | Cargo pendiente | `pendiente` |

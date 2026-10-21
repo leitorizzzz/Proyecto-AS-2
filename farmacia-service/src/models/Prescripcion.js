@@ -23,7 +23,10 @@ class Prescripcion {
     idDispensacion,
     fechaPrescripcion,
     fechaDispensacion,
-    pacienteActivo
+    pacienteActivo,
+    cantidadPrescrita,
+    cantidadEntregada,
+    estadoVisita
   }) {
     this.id = id;
     this.idVisita = idVisita;
@@ -39,14 +42,23 @@ class Prescripcion {
     // Leido de pacientes.activo (BD compartida): un paciente desactivado
     // no puede recibir dispensaciones.
     this.pacienteActivo = pacienteActivo === undefined || pacienteActivo === null ? true : Boolean(pacienteActivo);
+    // Despacho parcial: null = prescripcion anterior sin cantidad (se
+    // despacha completa en una sola entrega).
+    this.cantidadPrescrita = cantidadPrescrita != null ? Number(cantidadPrescrita) : null;
+    this.cantidadEntregada = Number(cantidadEntregada || 0);
+    this.cantidadRestante = this.cantidadPrescrita != null ? this.cantidadPrescrita - this.cantidadEntregada : null;
+    this.estadoVisita = estadoVisita || null;
   }
 
+  /** Puede recibir una entrega (RN-06): pendiente o parcialmente despachada. */
+  admiteDespacho() { return this.estado === 'pendiente' || this.estado === 'parcial'; }
   estaPendiente() { return this.estado === 'pendiente'; }
   estaDispensada() { return this.estado === 'dispensada'; }
 }
 
 Prescripcion.ESTADOS = Object.freeze({
   PENDIENTE: 'pendiente',
+  PARCIAL: 'parcial',
   DISPENSADA: 'dispensada'
 });
 

@@ -496,6 +496,10 @@ td.num, th.num { font-family: var(--font-mono); font-variant-numeric: tabular-nu
 .chip.disponible::before, .chip.enviada::before,
 .chip.dispensada::before { content: "✓"; }
 
+/* Despacho parcial: borde punteado grueso y medio circulo. */
+.chip.parcial { background: var(--info-tint); border: 2px dashed var(--info); color: var(--info-ink); }
+.chip.parcial::before { content: "◑"; }
+
 .chip.cancelada,
 .chip.fallida,
 .chip.fallida_definitiva { background: var(--err-tint); border: 1px solid var(--err); color: var(--err-ink); }

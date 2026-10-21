@@ -88,9 +88,19 @@ describe('VisitaMedicaService', () => {
       idMedicoEspecialista: 2, estado: 'en_atencion' });
     const repo = crearRepoMock(visita);
     const svc = new VisitaMedicaService(repo, crearSolicitudServiceMock('en_atencion'), crearPacienteRepoMock());
-    await svc.agregarPrescripcion(1, { medicamento: 'Losartan', idMedicamento: 2, dosis: '1/24h' });
+    await svc.agregarPrescripcion(1, { medicamento: 'Losartan', idMedicamento: 2, dosis: '1/24h', cantidadPrescrita: 30 });
     expect(repo.agregarPrescripcion).toHaveBeenCalledWith(1, expect.objectContaining({
-      medicamento: 'Losartan', idMedicamento: 2
+      medicamento: 'Losartan', idMedicamento: 2, cantidadPrescrita: 30
     }));
+  });
+
+  test('prescripcion sin cantidadPrescrita (o no entera) -> 400', async () => {
+    const visita = new VisitaMedica({ id: 1, idSolicitudReferencia: 1, idPaciente: 1,
+      idMedicoEspecialista: 2, estado: 'en_atencion' });
+    const repo = crearRepoMock(visita);
+    const svc = new VisitaMedicaService(repo, crearSolicitudServiceMock('en_atencion'), crearPacienteRepoMock());
+    await expect(svc.agregarPrescripcion(1, { medicamento: 'Losartan', idMedicamento: 2 })).rejects.toMatchObject({ status: 400 });
+    await expect(svc.agregarPrescripcion(1, { medicamento: 'Losartan', cantidadPrescrita: 2.5 })).rejects.toMatchObject({ status: 400 });
+    expect(repo.agregarPrescripcion).not.toHaveBeenCalled();
   });
 });

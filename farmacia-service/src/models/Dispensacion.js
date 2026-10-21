@@ -4,7 +4,7 @@
  * ligada a una visita medica, con el costo aplicado (con descuento de fundacion).
  */
 class Dispensacion {
-  constructor({ id, idPaciente, idVisita, idMedicamento, cantidad, costoTotal, fecha }) {
+  constructor({ id, idPaciente, idVisita, idMedicamento, cantidad, costoTotal, fecha, idPrescripcion, montoBase }) {
     this.id = id || null;
     this.idPaciente = idPaciente;
     this.idVisita = idVisita || null;
@@ -12,6 +12,8 @@ class Dispensacion {
     this.cantidad = cantidad;
     this.costoTotal = costoTotal;
     this.fecha = fecha || new Date().toISOString();
+    this.idPrescripcion = idPrescripcion ?? null;
+    this.montoBase = montoBase != null ? Number(montoBase) : null;   // antes del descuento RN-09
   }
 }
 

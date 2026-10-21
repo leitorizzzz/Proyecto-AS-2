@@ -187,6 +187,31 @@ async function inicializarEsquema() {
     )
     ALTER TABLE visita_prescripciones ADD fechaDispensacion DATETIME2 NULL;
   `);
+
+  // Despacho parcial (caso 18): cantidad prescrita y entregada. Estados de
+  // la prescripcion: pendiente -> parcial -> dispensada. Las prescripciones
+  // anteriores quedan con cantidadPrescrita NULL (se despachan completas).
+  const columnas = [
+    ['visita_prescripciones', 'cantidadPrescrita', 'INT NULL'],
+    ['visita_prescripciones', 'cantidadEntregada', 'INT NOT NULL CONSTRAINT DF_vp_entregada DEFAULT 0'],
+    // Costo preferencial acumulado en la visita (laboratorio al ordenar,
+    // farmacia al despachar). Lo suman los servicios dentro de su transaccion.
+    ['visitas_medicas', 'costoLaboratorio', 'DECIMAL(10,2) NOT NULL CONSTRAINT DF_vm_costo_lab DEFAULT 0'],
+    ['visitas_medicas', 'costoFarmacia', 'DECIMAL(10,2) NOT NULL CONSTRAINT DF_vm_costo_far DEFAULT 0']
+  ];
+  for (const [tabla, col, tipo] of columnas) {
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT 1 FROM sys.columns
+                     WHERE object_id = OBJECT_ID('${tabla}') AND name = '${col}')
+      ALTER TABLE ${tabla} ADD ${col} ${tipo};
+    `);
+  }
+  await pool.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CK_vp_cantidades')
+    ALTER TABLE visita_prescripciones ADD CONSTRAINT CK_vp_cantidades
+      CHECK (cantidadEntregada >= 0 AND (cantidadPrescrita IS NULL
+             OR (cantidadPrescrita > 0 AND cantidadEntregada <= cantidadPrescrita)));
+  `);
   // Tabla compartida de auditoria (idempotente; ver AuditoriaRepository).
   // require diferido: AuditoriaRepository depende de este modulo.
   await require('./AuditoriaRepository').crearTablaAuditoria(pool);

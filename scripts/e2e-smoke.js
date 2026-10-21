@@ -210,7 +210,7 @@ async function asegurarUsuario(adminToken, u) {
     })).data;
     const med = medE2E;
     const r = await req('POST', `${API.pacientes}/api/visitas/${visitaId}/prescripciones`, {
-      body: { medicamento: med.nombre, dosis: '1/24h', indicaciones: 'con agua', idMedicamento: med.id },
+      body: { medicamento: med.nombre, dosis: '1/24h', indicaciones: 'con agua', idMedicamento: med.id, cantidadPrescrita: 2 },
       token: meToken, esperarStatus: 201
     });
     prescripcionId = r.data.id;
@@ -506,7 +506,7 @@ async function asegurarUsuario(adminToken, u) {
     });
     visitaB = (await req('POST', `${API.pacientes}/api/solicitudes/${sol.id}/convertir-a-visita`, { token: meToken, esperarStatus: 201 })).data;
     rxB = (await req('POST', `${API.pacientes}/api/visitas/${visitaB.id}/prescripciones`, {
-      body: { medicamento: medE2E.nombre, dosis: '1/24h', idMedicamento: medE2E.id }, token: meToken, esperarStatus: 201
+      body: { medicamento: medE2E.nombre, dosis: '1/24h', idMedicamento: medE2E.id, cantidadPrescrita: 5 }, token: meToken, esperarStatus: 201
     })).data;
     ok(`paciente=${pacB.id} visita=${visitaB.id} prescripcion=${rxB.id}`);
   } catch (e) { falla(e.message); return finalizar(); }
@@ -637,6 +637,57 @@ async function asegurarUsuario(adminToken, u) {
     const deLaVisita = cta.cargos.filter(x => x.idVisita === visitaId && x.origen === 'visita');
     if (deLaVisita.length !== 1) throw new Error(`cargos de la visita = ${deLaVisita.length}`);
     ok('sin duplicado');
+  } catch (e) { falla(e.message); }
+
+  // 42..45 - caso 18: despacho parcial (rxB: 5 prescritas, ya se entrego 1)
+  paso('caso 18: tras entregar 1 de 5 la prescripcion queda parcial y la visita acumula el costo');
+  try {
+    const v = (await req('GET', `${API.pacientes}/api/visitas/${visitaB.id}`, { token: meToken, esperarStatus: 200 })).data;
+    const p = v.prescripciones.find(x => x.id === rxB.id);
+    if (p.estado !== 'parcial' || p.cantidadEntregada !== 1 || p.cantidadPrescrita !== 5) {
+      throw new Error(`estado=${p.estado} entregado=${p.cantidadEntregada}/${p.cantidadPrescrita}`);
+    }
+    if (Number(v.costoFarmacia) !== 0.96) throw new Error(`costoFarmacia=${v.costoFarmacia}`);
+    const pend = (await req('GET', `${API.farmacia}/api/farmacia/prescripciones/pendientes/paciente/${pacB.id}`, { token: farToken, esperarStatus: 200 })).data;
+    if (!pend.some(x => x.id === rxB.id && x.cantidadRestante === 4)) throw new Error('farmacia no la lista como pendiente con 4 restantes');
+    ok('parcial 1/5, costo visita Q0.96');
+  } catch (e) { falla(e.message); }
+
+  paso('caso 18: entregar mas de lo que falta (5 de 4) -> 409 sin tocar el stock');
+  try {
+    const antes = (await req('GET', `${API.farmacia}/api/farmacia/medicamentos/${medE2E.id}`, { token: farToken, esperarStatus: 200 })).data.stock;
+    await req('POST', `${API.farmacia}/api/farmacia/dispensaciones`, {
+      body: { idPrescripcion: rxB.id, cantidad: 5 }, token: farToken, esperarStatus: 409
+    });
+    const despues = (await req('GET', `${API.farmacia}/api/farmacia/medicamentos/${medE2E.id}`, { token: farToken, esperarStatus: 200 })).data.stock;
+    if (antes !== despues) throw new Error(`el stock cambio: ${antes} -> ${despues}`);
+    ok(`stock intacto (${despues})`);
+  } catch (e) { falla(e.message); }
+
+  paso('caso 18/19: cerrar la visita B cobra lo entregado hasta ese momento');
+  try {
+    await req('PATCH', `${API.pacientes}/api/visitas/${visitaB.id}`, {
+      body: { diagnostico: 'E2E dx B', observaciones: 'E2E obs B' }, token: meToken, esperarStatus: 200
+    });
+    const r = await req('POST', `${API.pacientes}/api/visitas/${visitaB.id}/completar`, { token: meToken, esperarStatus: 200 });
+    const far = r.data.cargo.detalles.filter(d => d.rubro === 'farmacia').reduce((a, d) => a + d.monto, 0);
+    if (Math.round(far * 100) / 100 !== 0.96) throw new Error(`farmacia en el cargo = ${far}`);
+    ok(`cargo ${r.data.cargo.id} Q${r.data.cargo.monto} (farmacia 0.96)`);
+  } catch (e) { falla(e.message); }
+
+  paso('caso 18: completar la entrega despues del cierre -> dispensada y cargo complementario');
+  try {
+    const d = (await req('POST', `${API.farmacia}/api/farmacia/dispensaciones`, {
+      body: { idPrescripcion: rxB.id, cantidad: 4 }, token: farToken, esperarStatus: 201
+    })).data;
+    if (d.estadoPrescripcion !== 'dispensada' || d.cantidadRestante !== 0) throw new Error(`estado=${d.estadoPrescripcion}`);
+    if (!d.cargoComplementario) throw new Error('no se genero el cargo complementario');
+    const cta = (await req('GET', `${API.financiero}/api/financiero/estado-cuenta/${pacB.id}`, { token: adminToken, esperarStatus: 200 })).data;
+    const comp = cta.cargos.find(c => c.id === d.cargoComplementario.id);
+    if (!comp || comp.origen !== 'dispensacion' || comp.monto !== 3.84) throw new Error(`cargo complementario ${JSON.stringify(comp)}`);
+    const v = (await req('GET', `${API.pacientes}/api/visitas/${visitaB.id}`, { token: meToken, esperarStatus: 200 })).data;
+    if (Number(v.costoFarmacia) !== 4.8) throw new Error(`costoFarmacia=${v.costoFarmacia}`);
+    ok('cargo complementario Q3.84; costo farmacia de la visita Q4.80');
   } catch (e) { falla(e.message); }
 
   paso('limpieza: desactivar el medicamento propio del smoke');

@@ -1,5 +1,4 @@
 const Medicamento = require('../models/Medicamento');
-const Dispensacion = require('../models/Dispensacion');
 const Prescripcion = require('../models/Prescripcion');
 
 /** Descuento que la fundacion otorga a los miembros del asilo (RN-09) */
@@ -105,8 +104,8 @@ class FarmaciaService {
         { status: 400 }
       );
     }
-    if (!cantidad || Number(cantidad) <= 0) {
-      throw Object.assign(new Error('La cantidad debe ser mayor a 0'), { status: 400 });
+    if (!Number.isInteger(Number(cantidad)) || Number(cantidad) <= 0) {
+      throw Object.assign(new Error('La cantidad debe ser un entero mayor a 0'), { status: 400 });
     }
 
     const prescripcion = await this.prescripcionRepo.obtenerPorId(Number(idPrescripcion));
@@ -116,7 +115,7 @@ class FarmaciaService {
         { status: 404 }
       );
     }
-    if (prescripcion.estado !== Prescripcion.ESTADOS.PENDIENTE) {
+    if (!prescripcion.admiteDespacho()) {
       throw Object.assign(
         new Error(`La prescripcion ${idPrescripcion} ya fue dispensada o no esta activa (estado: '${prescripcion.estado}')`),
         { status: 409 }
@@ -157,28 +156,40 @@ class FarmaciaService {
       );
     }
 
+    // Despacho parcial (caso 18): no se entrega mas de lo que falta.
+    if (prescripcion.cantidadRestante != null && Number(cantidad) > prescripcion.cantidadRestante) {
+      throw Object.assign(
+        new Error(`La cantidad ${cantidad} excede lo pendiente de la prescripcion ${idPrescripcion}: ` +
+                  `faltan ${prescripcion.cantidadRestante} de ${prescripcion.cantidadPrescrita}`),
+        { status: 409 }
+      );
+    }
+
+    const montoBase = Math.round(medicamento.getPrecioUnitario() * Number(cantidad) * 100) / 100;
     const costoTotal = this.calcularCosto(medicamento.getPrecioUnitario(), Number(cantidad));
 
-    await this.medicamentoRepo.actualizarStock(
-      prescripcion.idMedicamento,
-      medicamento.getStock() - Number(cantidad)
-    );
-
-    const dispensacion = new Dispensacion({
-      idPaciente: prescripcion.idPaciente,
+    // Stock, entregado, estado de la prescripcion, costo acumulado de la
+    // visita y (si la visita ya cerro) cargo complementario: todo o nada.
+    const r = await this.dispensacionRepo.registrarDespacho({
+      idPrescripcion: prescripcion.id,
       idVisita: prescripcion.idVisita,
+      idPaciente: prescripcion.idPaciente,
       idMedicamento: prescripcion.idMedicamento,
+      medicamento: medicamento.getNombre(),
       cantidad: Number(cantidad),
+      montoBase,
       costoTotal
     });
-    const guardada = await this.dispensacionRepo.guardar(dispensacion);
-
-    await this.prescripcionRepo.marcarDispensada(prescripcion.id, guardada.id);
 
     return {
-      ...guardada,
+      ...r.dispensacion,
       idPrescripcion: prescripcion.id,
-      medicamento: medicamento.getNombre()
+      medicamento: medicamento.getNombre(),
+      estadoPrescripcion: r.estadoPrescripcion,
+      cantidadPrescrita: r.cantidadPrescrita,
+      cantidadEntregada: r.cantidadEntregada,
+      cantidadRestante: r.cantidadPrescrita != null ? r.cantidadPrescrita - r.cantidadEntregada : 0,
+      cargoComplementario: r.cargoComplementario
     };
   }
 

@@ -13,7 +13,7 @@ function nuevo({ medicamento, prescripcion }) {
     obtenerTodos: jest.fn(async () => []),
     cambiarActivo: jest.fn(async (id, activo) => new Medicamento({ ...medicamento, id, activo }))
   };
-  const dispRepo = { guardar: jest.fn(async d => ({ ...d, id: 1 })) };
+  const dispRepo = { registrarDespacho: jest.fn() };
   const presRepo = {
     obtenerPorId: jest.fn(async () => prescripcion || null),
     marcarDispensada: jest.fn(async () => {})
@@ -32,15 +32,14 @@ describe('FarmaciaService — borrado logico', () => {
     const { svc, medRepo, dispRepo } = nuevo({ prescripcion: rx({ pacienteActivo: false }), medicamento: losartan() });
     await expect(svc.dispensarMedicamento({ idPrescripcion: 1, cantidad: 1 }))
       .rejects.toMatchObject({ status: 409, message: expect.stringMatching(/paciente 10 esta desactivado/) });
-    expect(medRepo.actualizarStock).not.toHaveBeenCalled();
-    expect(dispRepo.guardar).not.toHaveBeenCalled();
+    expect(dispRepo.registrarDespacho).not.toHaveBeenCalled();
   });
 
   test('dispensar un medicamento desactivado -> 409', async () => {
-    const { svc, medRepo } = nuevo({ prescripcion: rx(), medicamento: losartan({ activo: false }) });
+    const { svc, dispRepo } = nuevo({ prescripcion: rx(), medicamento: losartan({ activo: false }) });
     await expect(svc.dispensarMedicamento({ idPrescripcion: 1, cantidad: 1 }))
       .rejects.toMatchObject({ status: 409, message: expect.stringMatching(/desactivado en el inventario/) });
-    expect(medRepo.actualizarStock).not.toHaveBeenCalled();
+    expect(dispRepo.registrarDespacho).not.toHaveBeenCalled();
   });
 
   test('desactivar medicamento activo -> cambiarActivo(id, false)', async () => {

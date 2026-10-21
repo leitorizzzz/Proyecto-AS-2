@@ -221,7 +221,7 @@ class VisitaMedicaRepository {
     return result.recordset[0];
   }
 
-  async agregarPrescripcion(idVisita, { medicamento, dosis, indicaciones, idMedicamento }) {
+  async agregarPrescripcion(idVisita, { medicamento, dosis, indicaciones, idMedicamento, cantidadPrescrita }) {
     const pool = await getPool();
     const result = await pool.request()
       .input('idVisita', sql.Int, idVisita)
@@ -229,12 +229,13 @@ class VisitaMedicaRepository {
       .input('dosis', sql.NVarChar(200), dosis || null)
       .input('indicaciones', sql.NVarChar(500), indicaciones || null)
       .input('idMedicamento', sql.Int, idMedicamento || null)
+      .input('cantidadPrescrita', sql.Int, cantidadPrescrita)
       .query(`
         INSERT INTO visita_prescripciones
-          (idVisita, medicamento, dosis, indicaciones, idMedicamento, estado)
+          (idVisita, medicamento, dosis, indicaciones, idMedicamento, estado, cantidadPrescrita, cantidadEntregada)
         OUTPUT INSERTED.*
         VALUES
-          (@idVisita, @medicamento, @dosis, @indicaciones, @idMedicamento, 'pendiente')
+          (@idVisita, @medicamento, @dosis, @indicaciones, @idMedicamento, 'pendiente', @cantidadPrescrita, 0)
       `);
     return result.recordset[0];
   }

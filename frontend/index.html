@@ -333,6 +333,8 @@
                 <div><label for="rxDosis">Dosis</label><input id="rxDosis" placeholder="1 tab / 24h"></div>
                 <div><label for="rxIndicaciones">Indicaciones</label><input id="rxIndicaciones" placeholder="Con agua, en ayunas"></div>
               </div>
+              <label for="rxCantidad">Cantidad prescrita (unidades)</label>
+              <input type="number" id="rxCantidad" min="1" step="1" inputmode="numeric" placeholder="30">
               <button class="btn ghost small" id="btnAgregarPrescripcion" style="margin-top:10px">Agregar prescripción</button>
               <div id="msgRx" role="status" aria-live="polite"></div>
             </div>

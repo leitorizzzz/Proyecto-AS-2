@@ -46,6 +46,16 @@ async function inicializarEsquema() {
     );
   `);
 
+  // Despacho parcial (caso 18): cada dispensacion apunta a su prescripcion
+  // y guarda el precio base (antes del descuento) para el desglose del cargo.
+  for (const [col, tipo] of [['idPrescripcion', 'INT NULL'], ['montoBase', 'DECIMAL(10,2) NULL']]) {
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT 1 FROM sys.columns
+                     WHERE object_id = OBJECT_ID('dispensaciones') AND name = '${col}')
+      ALTER TABLE dispensaciones ADD ${col} ${tipo};
+    `);
+  }
+
   // Borrado logico: un medicamento desactivado sale del inventario visible
   // pero sus dispensaciones siguen apuntando a el. Existentes = activos.
   await pool.request().query(`

@@ -11,7 +11,8 @@ const Prescripcion = require('../models/Prescripcion');
  * Expone solo las operaciones que farmacia necesita:
  *   - listar pendientes por paciente
  *   - obtener una por id
- *   - marcar una como dispensada vinculandola a una dispensacion
+ * El despacho (stock, entregado, estado, costo de la visita y cargo) se
+ * escribe en DispensacionRepository.registrarDespacho, en una transaccion.
  */
 class PrescripcionReadRepository {
 
@@ -31,11 +32,14 @@ class PrescripcionReadRepository {
           vp.estado,
           vp.idDispensacion,
           vp.fechaPrescripcion,
-          vp.fechaDispensacion
+          vp.fechaDispensacion,
+          vp.cantidadPrescrita,
+          vp.cantidadEntregada,
+          vm.estado AS estadoVisita
         FROM visita_prescripciones vp
         INNER JOIN visitas_medicas vm ON vm.id = vp.idVisita
         WHERE vm.idPaciente = @idPaciente
-          AND vp.estado = 'pendiente'
+          AND vp.estado IN ('pendiente', 'parcial')
         ORDER BY vp.fechaPrescripcion DESC
       `);
     return r.recordset.map(f => new Prescripcion(f));
@@ -58,6 +62,9 @@ class PrescripcionReadRepository {
           vp.idDispensacion,
           vp.fechaPrescripcion,
           vp.fechaDispensacion,
+          vp.cantidadPrescrita,
+          vp.cantidadEntregada,
+          vm.estado AS estadoVisita,
           p.activo AS pacienteActivo
         FROM visita_prescripciones vp
         INNER JOIN visitas_medicas vm ON vm.id = vp.idVisita
@@ -67,20 +74,6 @@ class PrescripcionReadRepository {
     return r.recordset[0] ? new Prescripcion(r.recordset[0]) : null;
   }
 
-  async marcarDispensada(idPrescripcion, idDispensacion) {
-    const pool = await getPool();
-    await pool.request()
-      .input('idPrescripcion', sql.Int, idPrescripcion)
-      .input('idDispensacion', sql.Int, idDispensacion)
-      .query(`
-        UPDATE visita_prescripciones
-        SET estado = 'dispensada',
-            idDispensacion = @idDispensacion,
-            fechaDispensacion = SYSUTCDATETIME()
-        WHERE id = @idPrescripcion
-          AND estado = 'pendiente'
-      `);
-  }
 }
 
 module.exports = PrescripcionReadRepository;

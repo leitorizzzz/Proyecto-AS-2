@@ -14,8 +14,13 @@ function nuevoServicio({ medicamento, prescripcion } = {}) {
     obtenerTodos: jest.fn(async () => [])
   };
   const dispRepo = {
-    guardar: jest.fn(async d => ({ ...d, id: 1 })),
-    obtenerPorPaciente: jest.fn(async () => [])
+    obtenerPorPaciente: jest.fn(async () => []),
+    // Transaccion real en el repositorio; aqui devuelve lo que escribiria.
+    registrarDespacho: jest.fn(async d => ({
+      dispensacion: { ...d, id: 1 },
+      estadoPrescripcion: 'dispensada', cantidadPrescrita: null, cantidadEntregada: d.cantidad,
+      cargoComplementario: null
+    }))
   };
   const presRepo = {
     obtenerPorId: jest.fn(async () => prescripcion || null),
@@ -94,10 +99,14 @@ describe('FarmaciaService', () => {
       estado: 'pendiente'
     });
     const med = new Medicamento({ id: 2, nombre: 'Losartan', stock: 100, precioUnitario: 1.20 });
-    const { svc, medRepo, presRepo } = nuevoServicio({ prescripcion, medicamento: med });
+    const { svc, dispRepo } = nuevoServicio({ prescripcion, medicamento: med });
     const r = await svc.dispensarMedicamento({ idPrescripcion: 1, cantidad: 5 });
     expect(r.costoTotal).toBe(4.80);   // 5 * 1.20 * 0.8
-    expect(medRepo.actualizarStock).toHaveBeenCalledWith(2, 95);
-    expect(presRepo.marcarDispensada).toHaveBeenCalledWith(1, expect.any(Number));
+    // Stock, prescripcion y costo de la visita se escriben en una sola
+    // transaccion del repositorio, con estos valores:
+    expect(dispRepo.registrarDespacho).toHaveBeenCalledWith(expect.objectContaining({
+      idPrescripcion: 1, idMedicamento: 2, cantidad: 5, montoBase: 6, costoTotal: 4.8
+    }));
+    expect(r.estadoPrescripcion).toBe('dispensada');
   });
 });

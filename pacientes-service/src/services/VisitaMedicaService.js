@@ -100,7 +100,14 @@ class VisitaMedicaService {
       throw Object.assign(new Error('medicamento es requerido'), { status: 400 });
     }
     await asegurarPacienteActivo(this.pacienteRepo, visita.idPaciente, 'prescribirle medicamentos');
+    // Despacho parcial (caso 18): farmacia lleva la cuenta de lo entregado
+    // contra esta cantidad, asi que es obligatoria y entera.
+    const cantidadPrescrita = Number(datos.cantidadPrescrita);
+    if (!Number.isInteger(cantidadPrescrita) || cantidadPrescrita < 1 || cantidadPrescrita > 10000) {
+      throw Object.assign(new Error('cantidadPrescrita es requerida: entero entre 1 y 10000'), { status: 400 });
+    }
     return this.repo.agregarPrescripcion(id, {
+      cantidadPrescrita,
       medicamento: String(datos.medicamento).trim(),
       dosis: datos.dosis ? String(datos.dosis) : null,
       indicaciones: datos.indicaciones ? String(datos.indicaciones) : null,

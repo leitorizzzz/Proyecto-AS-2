@@ -321,6 +321,13 @@ document.addEventListener('DOMContentLoaded', () => {
     await cargarPrescripcionesPendientes();
     await cargarHistorialFarmacia();
   });
+  // Al elegir la prescripcion, la cantidad propuesta es lo que falta entregar.
+  $('#dPrescripcion').addEventListener('change', () => {
+    const opt = $('#dPrescripcion').selectedOptions[0];
+    const restante = opt ? Number(opt.dataset.restante) : NaN;
+    $('#dCantidad').max = Number.isFinite(restante) && restante > 0 ? String(restante) : '';
+    if (Number.isFinite(restante) && restante > 0) $('#dCantidad').value = String(restante);
+  });
   $('#rxIdMedicamento').addEventListener('change', () => {
     const sel = $('#rxIdMedicamento');
     const opt = sel.options[sel.selectedIndex];
@@ -1043,7 +1050,8 @@ async function cargarDetalleVisita() {
     $('#visitaEstadoChip').className = `chip ${v.estado}`;
     $('#visitaEstadoChip').textContent = v.estado;
     $('#visitaMeta').textContent =
-      `Paciente #${v.idPaciente} · Médico especialista #${v.idMedicoEspecialista} · Fecha ${fechaHora(v.fecha)}`;
+      `Paciente #${v.idPaciente} · Médico especialista #${v.idMedicoEspecialista} · Fecha ${fechaHora(v.fecha)}` +
+      ` · Costo acumulado con descuento: laboratorio ${money(v.costoLaboratorio || 0)}, farmacia ${money(v.costoFarmacia || 0)}`;
     $('#vDiagnostico').value = v.diagnostico || '';
     $('#vObservaciones').value = v.observaciones || '';
 
@@ -1054,7 +1062,7 @@ async function cargarDetalleVisita() {
     $('#btnCompletarVisita').disabled = !puedeEditar;
     $('#btnAgregarExamen').disabled = !puedeEditar;
     $('#btnAgregarPrescripcion').disabled = !puedeEditar;
-    ['#exTipo', '#rxIdMedicamento', '#rxMedicamento', '#rxDosis', '#rxIndicaciones']
+    ['#exTipo', '#rxIdMedicamento', '#rxMedicamento', '#rxDosis', '#rxIndicaciones', '#rxCantidad']
       .forEach(sel => { $(sel).disabled = !puedeEditar; });
 
     $('#listaExamenes').innerHTML = (v.examenes || []).map(ex =>
@@ -1063,7 +1071,8 @@ async function cargarDetalleVisita() {
 
     $('#listaPrescripciones').innerHTML = (v.prescripciones || []).map(rx =>
       `<li><strong>${esc(rx.medicamento)}</strong>${rx.dosis ? ' — ' + esc(rx.dosis) : ''} ${chip(rx.estado || 'pendiente')}
-        <div class="tiny">${esc(rx.indicaciones || '')}${rx.idMedicamento ? ' · inventario #' + rx.idMedicamento : ' · sin inventario'}</div></li>`
+        <div class="tiny">${esc(rx.indicaciones || '')}${rx.idMedicamento ? ' · inventario #' + rx.idMedicamento : ' · sin inventario'}${
+          rx.cantidadPrescrita != null ? ` · entregado ${rx.cantidadEntregada || 0} de ${rx.cantidadPrescrita}` : ''}</div></li>`
     ).join('') || `<li class="tiny">Sin prescripciones.</li>`;
 
     // Catalogo de examenes con precio: sugerencias para "Nuevo examen",
@@ -1157,14 +1166,18 @@ async function onAgregarPrescripcion() {
     medicamento: $('#rxMedicamento').value.trim(),
     dosis: $('#rxDosis').value.trim() || null,
     indicaciones: $('#rxIndicaciones').value.trim() || null,
-    idMedicamento: idMedSel
+    idMedicamento: idMedSel,
+    cantidadPrescrita: Number($('#rxCantidad').value)
   };
   if (!body.medicamento) return error(msg, 'Escribe el medicamento.');
+  if (!Number.isInteger(body.cantidadPrescrita) || body.cantidadPrescrita < 1) {
+    return error(msg, 'Escribe la cantidad prescrita (unidades enteras).');
+  }
   try {
     await api(API.pacientes, `/api/visitas/${state.visitaSeleccionada}/prescripciones`, {
       method: 'POST', body
     });
-    $('#rxMedicamento').value = ''; $('#rxDosis').value = '';
+    $('#rxMedicamento').value = ''; $('#rxDosis').value = ''; $('#rxCantidad').value = '';
     $('#rxIndicaciones').value = ''; $('#rxIdMedicamento').value = '';
     ok(msg, idMedSel
       ? 'Prescripción registrada y lista para dispensar.'
@@ -1277,8 +1290,10 @@ async function cargarPrescripcionesPendientes() {
       $('#btnDispensar').disabled = !puedeDisp;
       sel.innerHTML = `<option value="">Elegir…</option>` + prescripciones.map(p => {
         const sinMed = p.idMedicamento == null;
-        const etiqueta = `${esc(p.medicamento)}${p.dosis ? ' · ' + esc(p.dosis) : ''}${sinMed ? ' (sin medicamento de inventario)' : ''}`;
-        return `<option value="${p.id}" data-sinmed="${sinMed}">${etiqueta}</option>`;
+        const pendiente = p.cantidadRestante != null
+          ? ` · faltan ${p.cantidadRestante} de ${p.cantidadPrescrita}${p.estado === 'parcial' ? ' (parcial)' : ''}` : '';
+        const etiqueta = `${esc(p.medicamento)}${p.dosis ? ' · ' + esc(p.dosis) : ''}${pendiente}${sinMed ? ' (sin medicamento de inventario)' : ''}`;
+        return `<option value="${p.id}" data-sinmed="${sinMed}" data-restante="${p.cantidadRestante ?? ''}">${etiqueta}</option>`;
       }).join('');
       hint.textContent = `${prescripciones.length} prescripción(es) pendiente(s) para este paciente.`;
     }
@@ -1322,7 +1337,11 @@ async function onDispensar(e) {
     const d = await api(API.farmacia, '/api/farmacia/dispensaciones', { method: 'POST', body });
     // Recargar primero: cargarFarmacia() limpia el mensaje del formulario.
     await cargarFarmacia();
-    ok(msg, `Dispensado "${d.medicamento}". Costo con descuento fundación: ${money(d.costoTotal)}`);
+    ok(msg, `Dispensado ${d.cantidad} de "${d.medicamento}". Costo con descuento fundación: ${money(d.costoTotal)}.` +
+      (d.estadoPrescripcion === 'parcial'
+        ? ` Despacho parcial: faltan ${d.cantidadRestante} de ${d.cantidadPrescrita}.`
+        : ' Prescripción completa.') +
+      (d.cargoComplementario ? ` La visita ya estaba cerrada: cargo #${d.cargoComplementario.id} a la cuenta del familiar.` : ''));
   } catch (err) { error(msg, err.message); }
 }
 
