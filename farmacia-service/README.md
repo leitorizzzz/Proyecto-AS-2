@@ -30,12 +30,19 @@ Tablas propias: `medicamentos`, `dispensaciones`. Lee + marca
 |---|---|---|---|
 | GET  | `/health` | — | Estado |
 | GET  | `/api/farmacia/medicamentos[/:id]` | autenticado | Inventario |
-| POST/PUT/DELETE | `/api/farmacia/medicamentos[/:id]` | farmacia, admin | Alta, cambio y baja de inventario |
+| POST/PUT | `/api/farmacia/medicamentos[/:id]` | farmacia, admin | Alta y cambio de inventario |
+| DELETE | `/api/farmacia/medicamentos/:id` | farmacia, admin | **Borrado logico** (`activo = 0`): sale del inventario, no se dispensa |
+| PATCH | `/api/farmacia/medicamentos/:id/reactivar` | admin | Reactiva; `GET ?incluirInactivos=true` tambien es solo admin |
 | GET  | `/api/farmacia/prescripciones/pendientes/paciente/:idPaciente` | autenticado | Prescripciones pendientes del paciente |
 | POST | `/api/farmacia/dispensaciones` | farmacia, admin | **Dispensar** (requiere idPrescripcion, cantidad) |
 | GET  | `/api/farmacia/dispensaciones/paciente/:idPaciente` | autenticado | Historial + total gastado |
 
 ### Reglas aplicadas al dispensar
+
+- Paciente desactivado (`pacientes.activo = 0`, leido de la BD compartida) → 409.
+- Medicamento desactivado → 409.
+- Alta, cambio, (des)activacion de medicamentos y cada dispensacion se
+  registran en `auditoria`.
 
 - **RN-06**: la prescripcion debe existir, estar `pendiente`, tener
   `idMedicamento` asociado y pertenecer al mismo paciente. Si no, 400/404/409.

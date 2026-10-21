@@ -60,4 +60,12 @@ describe('RBAC /api/pacientes', () => {
   test('listar pacientes con rol laboratorio -> 200', async () => {
     expect((await request(srv).get('/api/pacientes').set(con('laboratorio'))).status).toBe(200);
   });
+
+  test('reactivar paciente con rol enfermero -> 403 (solo admin)', async () => {
+    expect((await request(srv).patch('/api/pacientes/1/reactivar').set(con('enfermero'))).status).toBe(403);
+  });
+
+  test('reactivar paciente con rol admin -> 200', async () => {
+    expect((await request(srv).patch('/api/pacientes/1/reactivar').set(con('admin'))).status).toBe(200);
+  });
 });

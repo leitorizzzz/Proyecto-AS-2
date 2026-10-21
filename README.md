@@ -101,8 +101,8 @@ Documentado en [scripts/README.md](scripts/README.md).
 ## Pruebas
 
 ```bash
-npm run test:todo    # suite unitaria + RBAC (102 casos, no requiere stack arriba)
-npm run test:e2e     # smoke end-to-end contra el stack (31 pasos)
+npm run test:todo    # suite unitaria + RBAC (156 casos, no requiere stack arriba)
+npm run test:e2e     # smoke end-to-end contra el stack (39 pasos; solo toca registros que crea)
 ```
 
 Ambas documentadas en [docs/PLAN_PRUEBAS.md](docs/PLAN_PRUEBAS.md).

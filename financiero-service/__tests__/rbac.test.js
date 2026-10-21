@@ -50,4 +50,12 @@ describe('RBAC financiero-service', () => {
   test('listar gastos con rol coordinador_fundacion -> 200', async () => {
     expect((await request(srv).get('/api/financiero/gastos').set(con('coordinador_fundacion'))).status).toBe(200);
   });
+
+  test('desactivar donante con rol coordinador_fundacion -> 403', async () => {
+    expect((await request(srv).patch('/api/financiero/donantes/1/desactivar').set(con('coordinador_fundacion'))).status).toBe(403);
+  });
+
+  test('reactivar donante con rol admin -> 200', async () => {
+    expect((await request(srv).patch('/api/financiero/donantes/1/reactivar').set(con('admin'))).status).toBe(200);
+  });
 });

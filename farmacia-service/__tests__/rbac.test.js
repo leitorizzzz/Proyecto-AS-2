@@ -51,4 +51,12 @@ describe('RBAC farmacia-service', () => {
   test('listar inventario con rol medico_especialista -> 200', async () => {
     expect((await request(srv).get('/api/farmacia/medicamentos').set(con('medico_especialista'))).status).toBe(200);
   });
+
+  test('reactivar medicamento con rol farmacia -> 403 (solo admin)', async () => {
+    expect((await request(srv).patch('/api/farmacia/medicamentos/1/reactivar').set(con('farmacia'))).status).toBe(403);
+  });
+
+  test('desactivar medicamento con rol farmacia -> 200', async () => {
+    expect((await request(srv).delete('/api/farmacia/medicamentos/1').set(con('farmacia'))).status).toBe(200);
+  });
 });

@@ -20,6 +20,11 @@
  * Imprime un paso por linea con [ OK ] / [FALLA] y sale con codigo
  * distinto de 0 si al menos un paso falla.
  *
+ * REGLA: el smoke solo crea, modifica, desactiva o reactiva registros que
+ * creo el mismo (pacientes "E2E ...", medicamento "E2E medicamento <ts>",
+ * precio "E2E examen (no usar)", donantes y usuarios "e2e.*"). Los datos
+ * existentes (demo o reales) solo se LEEN.
+ *
  * Precondiciones (todas las cumple `npm run bootstrap`):
  *   - docker compose up corriendo
  *   - admin seedeado (seed-admin del auth-service)
@@ -97,6 +102,8 @@ async function asegurarUsuario(adminToken, u) {
 
   let adminToken, mgToken, cfToken, meToken, labToken, farToken;
   let pacienteId, solicitudId, visitaId, prescripcionId, examenId, idEsp;
+  let medE2E;   // medicamento propio: no se toca el stock del inventario real
+  const TS = Date.now();
 
   // 00 - preparar usuarios (el smoke no depende de seed-demo)
   paso('login admin');
@@ -192,12 +199,15 @@ async function asegurarUsuario(adminToken, u) {
     ok(`examenId=${examenId}`);
   } catch (e) { falla(e.message); return finalizar(); }
 
-  // 07 - agregar prescripcion asociada al losartan del inventario
+  // 07 - prescripcion asociada a un medicamento PROPIO del smoke (antes usaba
+  // el Losartan del inventario y le descontaba stock real)
   paso('especialista: POST /api/visitas/:id/prescripciones con idMedicamento');
   try {
-    const invResp = await req('GET', `${API.farmacia}/api/farmacia/medicamentos`, { token: adminToken, esperarStatus: 200 });
-    const med = invResp.data.find(m => /losartan/i.test(m.nombre)) || invResp.data[0];
-    if (!med) throw new Error('no hay medicamentos en inventario');
+    medE2E = (await req('POST', `${API.farmacia}/api/farmacia/medicamentos`, {
+      body: { nombre: `E2E medicamento ${TS}`, presentacion: 'tableta (prueba e2e)', stock: 20, precioUnitario: 1.20 },
+      token: farToken, esperarStatus: 201
+    })).data;
+    const med = medE2E;
     const r = await req('POST', `${API.pacientes}/api/visitas/${visitaId}/prescripciones`, {
       body: { medicamento: med.nombre, dosis: '1/24h', indicaciones: 'con agua', idMedicamento: med.id },
       token: meToken, esperarStatus: 201
@@ -426,10 +436,18 @@ async function asegurarUsuario(adminToken, u) {
     ok(`base=${p.precioBase} total=${c.total}`);
   } catch (e) { falla(e.message); }
 
-  paso('laboratorio: PUT /precios/:id (admin 200 sin cambiar el valor, laboratorio 403)');
+  // Precio PROPIO del smoke (antes hacia PUT sobre precios[0], un precio real).
+  // Se reutiliza entre corridas porque los precios no se pueden borrar.
+  paso('laboratorio: PUT /precios/:id sobre un precio propio (admin 200, laboratorio 403)');
   try {
+    const TIPO_E2E = 'E2E examen (no usar)';
     const precios = (await req('GET', `${API.laboratorio}/api/laboratorio/precios`, { token: adminToken, esperarStatus: 200 })).data;
-    const p = precios[0];
+    let p = precios.find(x => x.tipo === TIPO_E2E);
+    if (!p) {
+      p = (await req('POST', `${API.laboratorio}/api/laboratorio/precios`, {
+        body: { tipo: TIPO_E2E, precioBase: 10 }, token: adminToken, esperarStatus: 201
+      })).data;
+    }
     const r = await req('PUT', `${API.laboratorio}/api/laboratorio/precios/${p.id}`, {
       body: { tipo: p.tipo, precioBase: p.precioBase }, token: adminToken, esperarStatus: 200
     });
@@ -463,6 +481,136 @@ async function asegurarUsuario(adminToken, u) {
     const lista = (await req('GET', `${API.financiero}/api/financiero/pagos-fundacion`, { token: adminToken, esperarStatus: 200 })).data;
     if (!lista.some(p => p.concepto === concepto)) throw new Error('el pago no aparece en el listado');
     ok('pago Q1 registrado');
+  } catch (e) { falla(e.message); }
+
+  // 32..39 - borrado logico, cuentas desactivadas y auditoria. Todo sobre
+  // registros creados aqui mismo.
+  let pacB, visitaB, rxB;
+
+  paso('paciente B propio con visita y prescripcion pendiente (preparacion)');
+  try {
+    const dpi = String(TS + 7).padStart(13, '0').slice(-13);
+    pacB = (await req('POST', `${API.pacientes}/api/pacientes`, {
+      body: { nombres: 'E2E', apellidos: `Inactivable ${new Date().toISOString().slice(0, 10)}`,
+              fechaNacimiento: '1944-04-04', genero: 'F', dpi },
+      token: adminToken, esperarStatus: 201
+    })).data;
+    const sol = (await req('POST', `${API.pacientes}/api/solicitudes`, {
+      body: { idPaciente: pacB.id, especialidad: 'inactivable-e2e', motivo: 'e2e borrado logico' },
+      token: mgToken, esperarStatus: 201
+    })).data;
+    await req('PATCH', `${API.pacientes}/api/solicitudes/${sol.id}/asignar-cita`, {
+      body: { fechaCita: '2026-12-02', horaCita: '09:00', idMedicoEspecialista: idEsp }, token: cfToken, esperarStatus: 200
+    });
+    visitaB = (await req('POST', `${API.pacientes}/api/solicitudes/${sol.id}/convertir-a-visita`, { token: meToken, esperarStatus: 201 })).data;
+    rxB = (await req('POST', `${API.pacientes}/api/visitas/${visitaB.id}/prescripciones`, {
+      body: { medicamento: medE2E.nombre, dosis: '1/24h', idMedicamento: medE2E.id }, token: meToken, esperarStatus: 201
+    })).data;
+    ok(`paciente=${pacB.id} visita=${visitaB.id} prescripcion=${rxB.id}`);
+  } catch (e) { falla(e.message); return finalizar(); }
+
+  paso('paciente desactivado: no recibe examenes ni dispensaciones (409); listados lo ocultan');
+  try {
+    await req('DELETE', `${API.pacientes}/api/pacientes/${pacB.id}`, { token: adminToken, esperarStatus: 200 });
+    await req('POST', `${API.pacientes}/api/visitas/${visitaB.id}/examenes`, {
+      body: { tipo: 'Uroanalisis' }, token: meToken, esperarStatus: 409
+    });
+    const d = await req('POST', `${API.farmacia}/api/farmacia/dispensaciones`, {
+      body: { idPrescripcion: rxB.id, cantidad: 1 }, token: farToken, esperarStatus: 409
+    });
+    const visibles = (await req('GET', `${API.pacientes}/api/pacientes`, { token: mgToken, esperarStatus: 200 })).data;
+    if (visibles.some(p => p.id === pacB.id)) throw new Error('el listado por defecto muestra al desactivado');
+    await req('GET', `${API.pacientes}/api/pacientes?incluirInactivos=true`, { token: mgToken, esperarStatus: 403 });
+    const todos = (await req('GET', `${API.pacientes}/api/pacientes?incluirInactivos=true`, { token: adminToken, esperarStatus: 200 })).data;
+    if (!todos.some(p => p.id === pacB.id && p.activo === false)) throw new Error('admin no ve al desactivado');
+    ok(String(d.data?.error || '').slice(0, 60));
+  } catch (e) { falla(e.message); }
+
+  paso('medicamento propio desactivado: no se dispensa (409) y sale del inventario');
+  try {
+    await req('PATCH', `${API.pacientes}/api/pacientes/${pacB.id}/reactivar`, { token: adminToken, esperarStatus: 200 });
+    await req('DELETE', `${API.farmacia}/api/farmacia/medicamentos/${medE2E.id}`, { token: farToken, esperarStatus: 200 });
+    const inv = (await req('GET', `${API.farmacia}/api/farmacia/medicamentos`, { token: farToken, esperarStatus: 200 })).data;
+    if (inv.some(m => m.id === medE2E.id)) throw new Error('el inventario muestra el medicamento desactivado');
+    await req('POST', `${API.farmacia}/api/farmacia/dispensaciones`, {
+      body: { idPrescripcion: rxB.id, cantidad: 1 }, token: farToken, esperarStatus: 409
+    });
+    await req('PATCH', `${API.farmacia}/api/farmacia/medicamentos/${medE2E.id}/reactivar`, { token: farToken, esperarStatus: 403 });
+    await req('PATCH', `${API.farmacia}/api/farmacia/medicamentos/${medE2E.id}/reactivar`, { token: adminToken, esperarStatus: 200 });
+    const disp = await req('POST', `${API.farmacia}/api/farmacia/dispensaciones`, {
+      body: { idPrescripcion: rxB.id, cantidad: 1 }, token: farToken, esperarStatus: 201
+    });
+    ok(`reactivado y dispensado, costo=${disp.data.costoTotal}`);
+  } catch (e) { falla(e.message); }
+
+  paso('cuenta desactivada: login 403, admin no se desactiva a si mismo (409), reactivada vuelve a entrar');
+  try {
+    const email = `e2e.desactivable.${TS}@asilo.gt`;
+    const u = (await req('POST', `${API.auth}/api/auth/register`, {
+      body: { nombre: 'E2E Desactivable', email, password: 'E2eDemo1234', rol: 'enfermero' },
+      token: adminToken, esperarStatus: 201
+    })).data;
+    await req('PATCH', `${API.auth}/api/auth/usuarios/${u.id}/desactivar`, { token: adminToken, esperarStatus: 200 });
+    const l = await req('POST', `${API.auth}/api/auth/login`, { body: { email, password: 'E2eDemo1234' }, esperarStatus: 403 });
+    const yo = (await req('GET', `${API.auth}/api/auth/me`, { token: adminToken, esperarStatus: 200 })).data;
+    await req('PATCH', `${API.auth}/api/auth/usuarios/${yo.id}/desactivar`, { token: adminToken, esperarStatus: 409 });
+    await req('PATCH', `${API.auth}/api/auth/usuarios/${u.id}/desactivar`, { token: farToken, esperarStatus: 403 });
+    await req('PATCH', `${API.auth}/api/auth/usuarios/${u.id}/reactivar`, { token: adminToken, esperarStatus: 200 });
+    await req('POST', `${API.auth}/api/auth/login`, { body: { email, password: 'E2eDemo1234' }, esperarStatus: 200 });
+    // Se deja desactivada: es una cuenta de prueba que nadie debe usar.
+    await req('PATCH', `${API.auth}/api/auth/usuarios/${u.id}/desactivar`, { token: adminToken, esperarStatus: 200 });
+    ok(String(l.data?.error || '').slice(0, 50));
+  } catch (e) { falla(e.message); }
+
+  paso('donante propio desactivado: donacion 409; reactivado: 201');
+  try {
+    const dn = (await req('POST', `${API.financiero}/api/financiero/donantes`, {
+      body: { nombre: `E2E donante ${TS}` }, token: adminToken, esperarStatus: 201
+    })).data;
+    await req('PATCH', `${API.financiero}/api/financiero/donantes/${dn.id}/desactivar`, { token: adminToken, esperarStatus: 200 });
+    await req('POST', `${API.financiero}/api/financiero/donaciones`, {
+      body: { idDonante: dn.id, monto: 1, concepto: 'E2E' }, token: adminToken, esperarStatus: 409
+    });
+    await req('PATCH', `${API.financiero}/api/financiero/donantes/${dn.id}/reactivar`, { token: adminToken, esperarStatus: 200 });
+    await req('POST', `${API.financiero}/api/financiero/donaciones`, {
+      body: { idDonante: dn.id, monto: 1, concepto: 'E2E' }, token: adminToken, esperarStatus: 201
+    });
+    await req('PATCH', `${API.financiero}/api/financiero/donantes/${dn.id}/desactivar`, { token: adminToken, esperarStatus: 200 });
+    ok(`donante=${dn.id}`);
+  } catch (e) { falla(e.message); }
+
+  paso('auditoria: el paciente B tiene crear, desactivar y reactivar con el usuario admin');
+  try {
+    const hoy = new Date();
+    const desde = new Date(hoy.getTime() - 24 * 3600 * 1000).toISOString();
+    const hasta = new Date(hoy.getTime() + 60 * 1000).toISOString();
+    const qs = `desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}&entidad=paciente&idEntidad=${pacB.id}`;
+    const filas = (await req('GET', `${API.reportes}/api/auditoria?${qs}`, { token: adminToken, esperarStatus: 200 })).data;
+    const acciones = filas.map(f => f.accion).sort().join(',');
+    if (acciones !== 'crear,desactivar,reactivar') throw new Error(`acciones=${acciones}`);
+    if (!filas.every(f => f.usuario === ADMIN.email)) throw new Error('usuario de auditoria incorrecto');
+    ok(acciones);
+  } catch (e) { falla(e.message); }
+
+  paso('auditoria: dispensacion, visita y solicitud registradas; RBAC y validacion');
+  try {
+    const desde = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const qs = e => `desde=${encodeURIComponent(desde)}&entidad=${e}&limite=50`;
+    const disp = (await req('GET', `${API.reportes}/api/auditoria?${qs('dispensacion')}`, { token: adminToken, esperarStatus: 200 })).data;
+    if (!disp.some(f => (f.detalle || '').includes(`prescripcion #${rxB.id}`))) throw new Error('falta la dispensacion');
+    const vis = (await req('GET', `${API.reportes}/api/auditoria?${qs('visita')}&idEntidad=${visitaId}`, { token: adminToken, esperarStatus: 200 })).data;
+    if (!vis.some(f => f.detalle === 'completada')) throw new Error('falta completar visita');
+    const sol = (await req('GET', `${API.reportes}/api/auditoria?${qs('solicitud')}&idEntidad=${solicitudId}`, { token: adminToken, esperarStatus: 200 })).data;
+    if (sol.map(f => f.accion).sort().join(',') !== 'crear,modificar') throw new Error('faltan crear/asignar cita de la solicitud');
+    await req('GET', `${API.reportes}/api/auditoria`, { token: farToken, esperarStatus: 403 });
+    await req('GET', `${API.reportes}/api/auditoria?entidad=planeta`, { token: adminToken, esperarStatus: 400 });
+    ok('3 entidades verificadas, 403 y 400 correctos');
+  } catch (e) { falla(e.message); }
+
+  paso('limpieza: desactivar el medicamento propio del smoke');
+  try {
+    await req('DELETE', `${API.farmacia}/api/farmacia/medicamentos/${medE2E.id}`, { token: farToken, esperarStatus: 200 });
+    ok(`medicamento ${medE2E.id} desactivado`);
   } catch (e) { falla(e.message); }
 
   finalizar();

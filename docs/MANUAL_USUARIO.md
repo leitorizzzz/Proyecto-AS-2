@@ -38,7 +38,7 @@ punteado y un mensaje **Aviso —** que explica quién sí puede.
 
 | Perfil | Secciones en el menú | Qué puede registrar |
 |---|---|---|
-| `admin` | Las ocho | Pacientes, asignar y cancelar citas, dispensar, resultados de laboratorio, toda la caja (cargos, cuotas, donaciones, gastos, pagos a la fundación) y precios de exámenes. No crea solicitudes ni escribe en visitas: eso es solo del médico general y del especialista. |
+| `admin` | Las ocho, más **Usuarios** y **Auditoría** | Desactivar y reactivar pacientes, medicamentos, donantes y cuentas; crear cuentas; pacientes, asignar y cancelar citas, dispensar, resultados de laboratorio, toda la caja (cargos, cuotas, donaciones, gastos, pagos a la fundación) y precios de exámenes. No crea solicitudes ni escribe en visitas: eso es solo del médico general y del especialista. |
 | `enfermero` | Panel, Pacientes, Solicitudes, Visitas, Farmacia, Laboratorio, Reportes | Registrar y editar pacientes. |
 | `medico_general` | Panel, Pacientes, Solicitudes, Visitas, Reportes | Crear y cancelar solicitudes. |
 | `coordinador_fundacion` | Panel, Pacientes, Solicitudes, Visitas, Financiero, Reportes | Asignar cita a las solicitudes. |
@@ -74,6 +74,8 @@ pero solo consultan.
   | `en_atencion` | ◉ | línea gruesa |
   | `completada`, `pagada`, `disponible`, `dispensada` | ✓ | doble línea |
   | `cancelada` | ✕ | línea fina |
+  | `activo` | ● | línea fina verde |
+  | `desactivado` | ⊘ | punteada gris; la fila se ve atenuada |
 
 - **Mensajes.** Después de cada acción aparece un mensaje bajo el
   botón, que empieza con **Ok —**, **Aviso —** o **Error —**.
@@ -102,11 +104,22 @@ pero solo consultan.
 [CAPTURA: pantalla de inicio de sesión con los campos Correo y Contraseña y el botón Entrar]
 
 Si los datos no son correctos aparece un mensaje **Error —** bajo el
-botón.
+botón. Si la cuenta fue desactivada por administración, el mensaje es
+*Cuenta desactivada. Pida a administración que la reactive.*
 
 **Importante.** La sesión dura 8 horas. Pasado ese tiempo el sistema
 pide volver a iniciar sesión. Para salir antes, usar **Cerrar sesión**
 al pie del menú lateral.
+
+**Cierre por inactividad.** Si durante **30 minutos** no se usa el
+teclado, el mouse ni la pantalla táctil, la sesión se cierra sola. Un
+minuto antes aparece la ventana *Su sesión está por cerrarse* con una
+cuenta regresiva: presionar **Seguir trabajando** (o la tecla Esc) para
+continuar. Si se cierra, la pantalla de inicio muestra *Sesión cerrada
+por inactividad*. Cuenta la actividad en cualquier pestaña del sistema
+abierta en el mismo navegador.
+
+[CAPTURA: ventana "Su sesión está por cerrarse" con la cuenta regresiva]
 
 **Primer acceso al sistema recién desplegado.** Correr una sola vez
 desde el servidor:
@@ -131,7 +144,8 @@ la fecha del día.
 
 Cuatro indicadores:
 
-- **Pacientes registrados** (tarjeta oscura, a la izquierda).
+- **Pacientes registrados** (tarjeta oscura, a la izquierda) — solo
+  los activos.
 - **Solicitudes activas** — pendientes, con cita o en atención.
 - **Visitas abiertas** — solicitudes en atención.
 - **Alertas de saldo** — pacientes cuyo saldo supera el umbral.
@@ -146,11 +160,11 @@ con paciente, especialidad, estado y fecha de creación.
 **Quién la ve:** todos. **Quién registra y edita:** `enfermero`,
 `admin`.
 
-A la izquierda, la tarjeta **Residentes** lista a cada paciente con el
-correo de su familiar, DPI, fecha de nacimiento, fecha de ingreso y, para
-enfermería y administración, la acción **Editar**.
+Arriba, la tarjeta **Residentes** lista a cada paciente activo con el
+correo de su familiar, DPI, fecha de nacimiento, fecha de ingreso,
+**Estado** y, para enfermería y administración, la acción **Editar**.
 
-A la derecha, la tarjeta **Registrar paciente**:
+Debajo, la tarjeta **Registrar paciente**:
 
 | Campo | Notas |
 |---|---|
@@ -173,9 +187,24 @@ Se abre la ventana *Editar expediente* con los mismos campos del alta ya
 llenos; corregir lo necesario y presionar **Guardar cambios**. Las mismas
 reglas aplican: DPI de 13 dígitos y no repetido con otro paciente.
 
+**Desactivar y reactivar** (solo `admin`). Los pacientes no se borran:
+se desactivan. Presionar **Desactivar** en la fila y confirmar en la
+ventana *Desactivar paciente* (botón rojo **Desactivar**; **Volver**
+sale sin cambios). El paciente deja de aparecer en los listados y en
+los selectores, y el sistema rechaza crearle solicitudes, asignarle
+citas, iniciarle visitas, pedirle exámenes, prescribirle o dispensarle
+medicamentos, con el mensaje *El paciente … está desactivado*. Su
+historial (solicitudes, visitas, dispensaciones, cuenta) se conserva.
+
+Para verlo de nuevo, marcar **Ver también desactivados** (solo
+administración) sobre la tabla: aparece con la etiqueta *desactivado*,
+la fila atenuada y la acción **Reactivar**.
+
 [CAPTURA: pantalla Pacientes con la tabla "Residentes" y el formulario "Registrar paciente"]
 
 [CAPTURA: ventana "Editar expediente" de un paciente]
+
+[CAPTURA: tabla "Residentes" con "Ver también desactivados" marcado y un paciente desactivado]
 
 ### 4.3 Solicitudes médicas
 
@@ -272,10 +301,15 @@ existe una solicitud activa para el paciente X en la especialidad Y"*.
 **Quién la ve:** `farmacia`, `enfermero`, `medico_especialista`,
 `admin`. **Quién dispensa:** `farmacia`, `admin`.
 
-A la izquierda, **Inventario**: medicamento, presentación, stock y
-precio. Un stock menor a 20 unidades se marca con la etiqueta *bajo*.
+Arriba, **Inventario**: medicamento, presentación, stock, precio y
+**Estado**. Un stock menor a 20 unidades se marca con la etiqueta *bajo*.
+Farmacia y administración pueden **Desactivar** un medicamento (ventana
+de confirmación): sale del inventario visible, ya no se puede prescribir
+ni dispensar, y sus dispensaciones anteriores se conservan. Solo
+administración ve los desactivados (**Ver también desactivados**) y
+puede **Reactivarlos**.
 
-A la derecha, **Dispensar contra prescripción**:
+Debajo, **Dispensar contra prescripción**:
 
 1. Elegir **Paciente**.
 2. En **Prescripción pendiente** aparecen las que emitió el médico en
@@ -285,7 +319,8 @@ A la derecha, **Dispensar contra prescripción**:
    otra eligiendo el medicamento del inventario.
 3. Escribir **Cantidad a entregar** y presionar **Dispensar**.
 4. El sistema descuenta el inventario y muestra el costo con el 20 %
-   de descuento de la fundación (RN-09).
+   de descuento de la fundación (RN-09). Si el paciente o el
+   medicamento están desactivados, rechaza la dispensación.
 5. La prescripción queda `dispensada` y no se puede repetir.
 
 Abajo, **Historial del paciente seleccionado** muestra sus
@@ -379,6 +414,15 @@ ninguno de los siete reportes los incluye.
 
 [CAPTURA: tarjetas "Gastos operativos" y "Pagos a la fundación" con sus formularios]
 
+**Donantes.** La tarjeta **Donantes** lista a los donantes con teléfono,
+correo, fecha de registro y **Estado**. Administración puede
+**Desactivar** un donante: deja de aparecer en el selector de **Nueva
+donación** y el sistema rechaza registrarle donaciones; las anteriores
+se conservan. Con **Ver también desactivados** se ve y se puede
+**Reactivar**.
+
+[CAPTURA: tarjeta "Donantes" con un donante desactivado]
+
 ### 4.8 Reportes
 
 **Quién la ve:** todos.
@@ -404,6 +448,49 @@ de totales.
 
 ---
 
+### 4.9 Usuarios
+
+**Quién la ve:** solo `admin`.
+
+- **Cuentas**: nombre, correo, rol, fecha de registro y **Estado** de
+  cada cuenta. **Desactivar** (ventana de confirmación) impide que esa
+  persona inicie sesión; lo que registró se conserva con su nombre. Con
+  **Ver también desactivadas** aparecen las desactivadas con
+  **Reactivar**. La cuenta propia dice *su cuenta*: un administrador no
+  puede desactivarse a sí mismo.
+- **Nueva cuenta**: **Nombre**, **Correo**, **Contraseña inicial**
+  (mínimo 6 caracteres) y **Rol**; botón **Crear cuenta**.
+
+Una persona que ya tenía la sesión abierta cuando se desactivó su
+cuenta puede seguir trabajando hasta que la sesión venza (8 horas) o
+la cierre; a partir de ahí ya no puede volver a entrar.
+
+[CAPTURA: pantalla Usuarios con la lista de cuentas y el formulario "Nueva cuenta"]
+
+### 4.10 Auditoría
+
+**Quién la ve:** solo `admin`.
+
+Bitácora de quién **creó**, **modificó**, **canceló**, **desactivó** o
+**reactivó** cada registro y cuándo: pacientes, solicitudes (incluida
+la asignación de cita), visitas, exámenes, prescripciones,
+medicamentos, dispensaciones, cargos, cuotas, donantes, donaciones,
+gastos, pagos a la fundación y cuentas de usuario.
+
+1. Elegir **Desde** y **Hasta** (por defecto, los últimos 7 días) y,
+   si se quiere, una **Entidad**.
+2. Presionar **Consultar**.
+
+La tabla **Registros** muestra fecha y hora, usuario, acción (con su
+símbolo), entidad con su número y un detalle (por ejemplo, la fecha y
+hora de la cita asignada). Se muestran como máximo 200 registros, del
+más reciente al más antiguo. Laboratorio (resultados y precios) y
+notificaciones no se registran en la auditoría.
+
+[CAPTURA: pantalla Auditoría con registros filtrados por entidad]
+
+---
+
 ## 5. Reglas de negocio que el sistema aplica (nombres SQA)
 
 - **RN-02**: no se permiten dos solicitudes activas para el mismo
@@ -414,6 +501,11 @@ de totales.
   del asilo llevan 20 % de descuento de la fundación.
 - Completar una visita exige diagnóstico y observaciones no vacíos.
 - Estados `completada` y `cancelada` son definitivos.
+- **Paciente activo**: a un paciente desactivado no se le crean
+  solicitudes, citas, visitas, exámenes, prescripciones ni
+  dispensaciones.
+- No se borra nada: pacientes, medicamentos, donantes y cuentas se
+  desactivan y se pueden reactivar.
 
 Si el sistema rechaza una operación, muestra el motivo en un mensaje
 **Error —** bajo el botón correspondiente.
@@ -450,9 +542,16 @@ Sí, enfermería y administración: **Pacientes** → **Editar** en la fila
 del paciente (ver 4.2).
 
 **¿Puedo borrar un paciente?**
-No desde la pantalla. Administración puede hacerlo por la API solo si
-el paciente no tiene solicitudes ni visitas; si las tiene, el sistema
-lo rechaza para no perder su historial.
+No: se desactiva (ver 4.2). Administración lo hace desde **Pacientes**;
+el historial se conserva y se puede reactivar en cualquier momento.
+
+**No puedo entrar: "Cuenta desactivada".**
+Administración desactivó su cuenta. Pida que la reactiven en
+**Usuarios** (ver 4.9).
+
+**Me sacó del sistema sin que cerrara sesión.**
+Pasaron 30 minutos sin actividad (ver 3) o venció la sesión de 8 horas.
+Vuelva a iniciar sesión; lo guardado no se pierde.
 
 **¿Cómo cambio los precios de los exámenes?**
 Administración: **Laboratorio** → **Precios de exámenes** (ver 4.6).

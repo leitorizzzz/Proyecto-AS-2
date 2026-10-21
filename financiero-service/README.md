@@ -27,10 +27,15 @@ src/
 | GET | `/api/financiero/estado-cuenta/:idPaciente` | autenticado |
 | POST | `/api/financiero/cargos` | admin |
 | POST | `/api/financiero/pagos-cuota` | admin |
-| GET/POST | `/api/financiero/donantes` | GET autenticado / POST admin |
+| GET/POST | `/api/financiero/donantes` | GET autenticado (solo activos; `?incluirInactivos=true` solo admin) / POST admin |
+| PATCH | `/api/financiero/donantes/:id/desactivar`, `/reactivar` | admin — borrado logico; donacion a donante desactivado → 409 |
 | GET/POST | `/api/financiero/donaciones` | GET autenticado / POST admin |
 | GET/POST | `/api/financiero/gastos` | GET autenticado / POST admin |
 | GET/POST | `/api/financiero/pagos-fundacion` | GET autenticado / POST admin |
+
+Toda escritura (cargo, cuota, donante, donacion, gasto, pago a fundacion
+y la (des)activacion de donantes) se registra en la tabla compartida
+`auditoria`.
 
 ## Alerta de saldo
 Si el saldo pendiente del paciente (cargos + cuotas) supera

@@ -49,4 +49,14 @@ describe('RBAC auth-service', () => {
   test('GET /usuarios con rol coordinador_fundacion -> 200', async () => {
     expect((await get('coordinador_fundacion')).status).toBe(200);
   });
+
+  test('PATCH /usuarios/:id/desactivar con rol coordinador_fundacion -> 403', async () => {
+    expect((await request(srv).patch('/api/auth/usuarios/2/desactivar')
+      .set('Authorization', `Bearer ${tokenConRol('coordinador_fundacion')}`)).status).toBe(403);
+  });
+
+  test('PATCH /usuarios/:id/reactivar con rol admin -> 200', async () => {
+    expect((await request(srv).patch('/api/auth/usuarios/2/reactivar')
+      .set('Authorization', `Bearer ${tokenConRol('admin')}`)).status).toBe(200);
+  });
 });

@@ -42,7 +42,11 @@ especialista, medico_especialista, farmacia, laboratorio, admin,
 fundacion, coordinador_fundacion`. Registro protegido (solo admin).
 Estructura: `AuthController`, `AuthService`, `UsuarioRepository`, `Usuario`.
 `GET /api/auth/usuarios?rol=a,b` (admin, coordinador_fundacion) devuelve el
-directorio sin `passwordHash`; lo usa el diálogo "Asignar cita".
+directorio sin `passwordHash` (solo cuentas activas); lo usa el diálogo
+"Asignar cita". `PATCH /api/auth/usuarios/:id/{desactivar,reactivar}`
+(admin; no puede desactivarse a sí mismo). Login de cuenta desactivada →
+**403** "Cuenta desactivada" (solo con password correcta). Ojo: un JWT ya
+emitido sigue válido hasta su `exp` en los demás servicios.
 **`JWT_EXPIRES_IN` solo aplica aquí** (es quien firma); los demás servicios
 solo verifican con `JWT_SECRET` y respetan el `exp` embebido en el token.
 
@@ -53,8 +57,12 @@ con Paciente (crear visita ⇒ transiciona la solicitud). Cada dominio
 mantiene sus propias 4 capas dentro del mismo servicio:
 
 - **Paciente**: `PacienteController/Service/Repository`, modelo `Paciente`.
-  Alta y edición: `enfermero`, `admin`. DELETE: solo `admin`, y 409 si
-  el paciente ya tiene solicitudes o visitas (FK).
+  Alta y edición: `enfermero`, `admin`. **DELETE = borrado lógico**
+  (`activo = 0`, solo `admin`), `PATCH /:id/reactivar` (admin). Los
+  listados filtran activos; `?incluirInactivos=true` solo admin (403).
+  Regla **paciente activo** en `services/reglasPaciente.js`: a un
+  desactivado no se le crean solicitudes, citas, visitas, exámenes ni
+  prescripciones → 409.
 - **SolicitudReferencia**: `SolicitudController/Service/Repository`, modelo
   `SolicitudReferencia`. Flujo: `medico_general` crea solicitud →
   `coordinador_fundacion`/`admin` asigna cita → `medico_especialista`
@@ -80,6 +88,9 @@ mantiene sus propias 4 capas dentro del mismo servicio:
 20 % de descuento fundación (RN-09). Ya migrado de SQLite a SQL Server
 (`AsiloCabezaAlgodon`). Escrituras de inventario y dispensación: solo
 `farmacia`, `admin` (antes del 19 oct cualquier autenticado podía).
+`DELETE /medicamentos/:id` = borrado lógico; reactivar solo admin. No se
+dispensa a pacientes desactivados (lee `pacientes.activo` en la BD
+compartida) ni medicamentos desactivados → 409.
 
 ### `laboratorio-service/` — ✅ funcional, puerto 3003
 `LaboratorioController` → `ordenesPendientes`, `identificarPaciente(dpi)`,
@@ -99,12 +110,30 @@ El costo de un examen se busca por coincidencia exacta del `tipo`.
 `registrarPagoFundacion`. `FinancieroService` implementa
 `generarAlertaSaldo` con umbral `UMBRAL_ALERTA_SALDO`. Repositorios:
 `CuentaRepository`, `DonanteRepository`, `MovimientosRepository`.
+Donantes con borrado lógico (`PATCH /donantes/:id/{desactivar,reactivar}`,
+admin); donación a donante desactivado → 409.
 
 ### `reportes-service/` — ✅ funcional, puerto 3005
 Los 7 reportes del enunciado exportables a JSON, PDF (pdfkit) o Excel
 (exceljs). No crea tablas propias; consulta todas las demás en la BD
 compartida vía `ReportesRepository`. `GET /api/reportes/tipos` lista los
 identificadores; `GET /api/reportes/:tipo?desde=&hasta=&formato=` genera.
+También sirve **`GET /api/auditoria`** (solo admin, solo lectura):
+`AuditoriaController/Service/Repository`, filtros `desde`, `hasta`
+(YYYY-MM-DD inclusivo o instante ISO), `entidad`, `idEntidad`, `limite`.
+
+### Borrado lógico y auditoría (20 oct 2026)
+- `activo BIT NOT NULL DEFAULT 1` (ALTER idempotente) en `pacientes`,
+  `usuarios`, `medicamentos`, `donantes`. No hay DELETE físico en ellas.
+- Tabla compartida `auditoria` (id, usuario = email del JWT, idUsuario,
+  accion, entidad, idEntidad, detalle, fecha UTC). La crean auth,
+  pacientes, farmacia y financiero al arrancar (DDL que tolera la carrera,
+  errores 2714/1913) y la escriben desde sus **controladores** con
+  `AuditoriaService` — copia idéntica de `RegistroAuditoria` +
+  `AuditoriaRepository` + `AuditoriaService` en los cuatro, como
+  `autorizarRoles`. Registrar nunca rompe la operación (solo avisa en log).
+  Acciones: crear, modificar, cancelar, desactivar, reactivar. Laboratorio
+  y notificaciones no auditan. Detalle en `CONTEXT_SISTEMA.md` §3.4 y §3.5.
 
 ### `notificaciones-service/` — ✅ funcional, puerto 3006
 Correo transaccional vía Brevo (`api-key` + JSON a `/v3/smtp/email`).
@@ -163,8 +192,23 @@ permite aplicar la skill sin pelear con defaults.
 `<dialog>` con `showModal()` (Esc cierra, Tab atrapado, foco vuelve al
 botón de origen); con `alEnviar` el error del backend se muestra dentro
 del diálogo sin cerrarlo. Los usan Asignar cita, Iniciar visita,
-Cancelar solicitud, Cerrar visita, Ver costo, Editar paciente y Editar
-precio.
+Cancelar solicitud, Cerrar visita, Ver costo, Editar paciente, Editar
+precio, Desactivar/Reactivar (pacientes, medicamentos, donantes, cuentas)
+y el aviso de inactividad. Cuidado al editar `app.js` con scripts: en
+`String.replace` el texto de reemplazo interpreta `$$` como `$` (rompe
+los `$$(...)`); usar una función como reemplazo.
+
+**Secciones solo admin**: **Usuarios** (lista con estado, desactivar /
+reactivar, alta de cuenta) y **Auditoría** (rango + entidad; los límites
+del día local se mandan como instantes ISO). Pacientes, inventario y
+donantes muestran chip `activo` / `desactivado` (⊘, borde punteado) y
+"Ver también desactivados" solo para admin.
+
+**Cierre por inactividad**: `INACTIVIDAD_MIN = 30`, `AVISO_ANTES_SEG = 60`
+en `app.js`; la última actividad vive en `localStorage`
+(`asilo.ultimaActividad`) y la comparten las pestañas;
+`iniciarControlInactividad({ limiteMs, avisoMs })` permite probarlo con
+límites cortos desde la consola.
 
 **RBAC en la UI**: cada sección se oculta del menú si el rol no la usa
 y cada formulario de escritura se deshabilita si el rol no tiene
@@ -184,13 +228,16 @@ operativos (exámenes, medicamentos) → últimos 30 días; análisis
 
 ### Pruebas automatizadas — ✅
 Suite jest+supertest a nivel raíz. Comando: `npm run test:todo` o
-`scripts/run-all-tests.sh|.ps1`. Última ejecución (19 oct 2026):
-**102/102** en 16 archivos, también en un clon limpio. `express`,
+`scripts/run-all-tests.sh|.ps1`. Última ejecución (20 oct 2026):
+**156/156** en 22 archivos. `express`,
 `jsonwebtoken` y `bcryptjs` son devDependencies de la raíz para que las
 pruebas RBAC no dependan de los `node_modules` de cada servicio.
-E2E (`npm run test:e2e`, stack arriba): **31/31**. Mapa de casos SQA ↔
+E2E (`npm run test:e2e`, stack arriba): **39/39**. **Regla: el e2e solo
+toca registros que crea** (pacientes "E2E …", medicamento "E2E
+medicamento <ts>", precio "E2E examen (no usar)", donantes y cuentas
+"e2e.*"); los datos existentes solo se leen. Mapa de casos SQA ↔
 pruebas, 1 a 1, en [`docs/PLAN_PRUEBAS.md`](docs/PLAN_PRUEBAS.md).
-Sin pruebas unitarias: reportes-service (solo e2e) y el frontend.
+Sin pruebas unitarias: los 7 reportes (solo e2e) y el frontend.
 
 ### Datos de demo — ✅
 `scripts/seed-demo.js` (`npm run seed:demo`). Idempotente, pobla
@@ -206,19 +253,20 @@ en [`scripts/README.md`](scripts/README.md).
 
 ## Pendiente de implementar
 
-1. Insertar las capturas reales en `docs/MANUAL_USUARIO.md` (23
+1. Insertar las capturas reales en `docs/MANUAL_USUARIO.md` (28
    marcadores `[CAPTURA: ...]`).
 2. Renderizar los `.mmd` a PNG con mermaid-cli para la entrega impresa
    (hoy sólo quedan como fuente .mmd).
-3. **Decisión pendiente**: la regla "paciente activo" no existe en el
-   código (no hay campo `activo`; el DELETE es físico y solo lo frena la
-   FK). Implementarla cambia la semántica del DELETE y del e2e E2E-18.
+3. Un JWT emitido antes de desactivar una cuenta sigue valiendo hasta su
+   `exp` (8 h): los servicios no consultan `usuarios.activo` en cada
+   request. Cerrar ese hueco requiere lista de revocación o tokens cortos.
 4. Flujo de "asociar medicamento del inventario a una prescripción ya
    emitida sin idMedicamento" (hoy hay que crear otra prescripción).
 5. Reportes extra o auto-paginación cuando una tabla supere N filas.
    Los gastos operativos no aparecen en ningún reporte.
-6. Sin pantalla (solo API): alta/edición de inventario de farmacia,
-   alta de usuarios, log de notificaciones y su reintento manual.
+6. Sin pantalla (solo API): alta/edición de inventario de farmacia, log
+   de notificaciones y su reintento manual. (El alta de usuarios ya está
+   en la sección Usuarios.)
 7. Sin `package-lock.json` en laboratorio, financiero, reportes y
    notificaciones: el build resuelve versiones nuevas (ya avisa
    `EBADENGINE`, dependencias de mssql piden Node 22 y la imagen es
@@ -230,9 +278,10 @@ en [`scripts/README.md`](scripts/README.md).
 
 - RN-02: no solicitudes duplicadas activas por paciente+especialidad.
 - Visita médica: diagnóstico + observaciones obligatorios para completar.
-- Paciente debe estar activo para cualquier operación sobre él.
-  **Ojo: hoy NO está implementada** (ver Pendiente #3); lo único que
-  existe es que el paciente debe existir.
+- Paciente activo: a un paciente desactivado no se le crean
+  solicitudes, citas, visitas, exámenes, prescripciones ni
+  dispensaciones (409). Implementada el 20 oct 2026.
+- No hay borrado físico de pacientes, usuarios, medicamentos ni donantes.
 - RN-06: prescripción válida antes de permitir despacho en farmacia.
 - RN-09: descuento 20% fundación siempre aplicado en cálculos de costo.
 - Estados de solicitud/visita son inmutables una vez `completada`/`cancelada`.

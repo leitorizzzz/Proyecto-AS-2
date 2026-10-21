@@ -22,6 +22,7 @@ src/
 | GET | `/health` | Estado |
 | GET | `/api/reportes/tipos` | Lista los 7 tipos disponibles |
 | GET | `/api/reportes/:tipo?desde=&hasta=&formato=json\|pdf\|excel[&idPaciente=]` | Genera el reporte |
+| GET | `/api/auditoria?desde=&hasta=&entidad=&idEntidad=&limite=` | **Solo admin.** Bitacora de la tabla `auditoria` (la escriben auth, pacientes, farmacia y financiero). `desde`/`hasta` en YYYY-MM-DD (`hasta` incluye el dia) o instante ISO; entidad desconocida → 400; limite 200 por defecto, 1000 maximo |
 
 **Tipos disponibles:** `costos-por-paciente`, `analisis-medico`,
 `cobros-por-rango`, `pagos-fundacion`, `entradas`, `examenes`,

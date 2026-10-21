@@ -76,7 +76,7 @@ todo el sistema sea consistente.
 | **Entradas, Salidas y Caja** | Donaciones, cobros a familiares, gastos, pagos a fundación, estado de cuenta con alerta de saldo | ✅ `financiero-service/` |
 | **Reportes** | Los 7 reportes del enunciado, exportables a JSON, PDF (pdfkit) o Excel (exceljs) | ✅ `reportes-service/` |
 | **Notificaciones** | Correo automático al familiar (Brevo) al crear una solicitud médica; modo simulación para dev | ✅ `notificaciones-service/` |
-| **Frontend** | Login + Dashboard + 7 pantallas (Pacientes, Solicitudes, Visitas, Farmacia, Laboratorio, Financiero, Reportes) | ✅ `frontend/` (nginx, HTML/CSS/JS plano) |
+| **Frontend** | Login + Panel + 7 pantallas (Pacientes, Solicitudes, Visitas, Farmacia, Laboratorio, Financiero, Reportes) + 2 de administración (Usuarios, Auditoría) | ✅ `frontend/` (nginx, HTML/CSS/JS plano) |
 
 ### 3.1 Nota sobre agrupación en `pacientes-service`
 
@@ -154,24 +154,75 @@ indica.
 | Acción | Roles permitidos |
 |---|---|
 | `POST /api/auth/register` | `admin` |
-| `GET /api/auth/usuarios[?rol=]` (directorio, sin passwordHash) | `admin`, `coordinador_fundacion` |
+| `GET /api/auth/usuarios[?rol=]` (directorio, sin passwordHash; solo activos) | `admin`, `coordinador_fundacion` |
+| `PATCH /api/auth/usuarios/:id/{desactivar,reactivar}` | `admin` (no puede desactivarse a si mismo) |
 | `POST`, `PUT /api/pacientes[/:id]` | `enfermero`, `admin` |
-| `DELETE /api/pacientes/:id` (409 si tiene solicitudes o visitas) | `admin` |
+| `DELETE /api/pacientes/:id` (borrado logico: desactiva), `PATCH /api/pacientes/:id/reactivar` | `admin` |
 | `POST /api/solicitudes` | `medico_general` |
 | `PATCH /api/solicitudes/:id/asignar-cita` | `coordinador_fundacion`, `admin` |
 | `POST /api/solicitudes/:id/convertir-a-visita` | `medico_especialista` |
 | `PATCH /api/solicitudes/:id/cancelar` | `medico_general`, `admin` |
 | `PATCH /api/visitas/:id`, `POST /api/visitas/:id/{examenes,prescripciones,completar}` | `medico_especialista` |
-| `POST`, `PUT`, `DELETE /api/farmacia/medicamentos[/:id]`, `POST /api/farmacia/dispensaciones` | `farmacia`, `admin` |
+| `POST`, `PUT`, `DELETE /api/farmacia/medicamentos[/:id]` (DELETE desactiva), `POST /api/farmacia/dispensaciones` | `farmacia`, `admin` |
+| `PATCH /api/farmacia/medicamentos/:id/reactivar` | `admin` |
 | `GET /api/laboratorio/ordenes-pendientes`, `GET .../pacientes/dpi/:dpi`, `POST .../resultados/examen/:id` | `laboratorio`, `admin` (también el `GET`) |
 | `POST`, `PUT /api/laboratorio/precios[/:id]` | `admin` |
-| `POST /api/financiero/{cargos,pagos-cuota,donantes,donaciones,gastos,pagos-fundacion}` | `admin` |
+| `POST /api/financiero/{cargos,pagos-cuota,donantes,donaciones,gastos,pagos-fundacion}`, `PATCH /api/financiero/donantes/:id/{desactivar,reactivar}` | `admin` |
+| `GET /api/auditoria` (reportes-service) | `admin` |
+| `?incluirInactivos=true` en los listados de pacientes, usuarios, medicamentos y donantes | `admin` (403 para los demas) |
 | `POST /api/notificaciones/:id/reintentar` | `admin` |
 | Resto de lecturas (`GET`) | cualquier usuario autenticado |
 
 La UI (`RBAC.tabs` + `RBAC.acciones` en `frontend/app.js`) oculta las
 secciones y deshabilita los formularios según esta tabla; el backend es
 la autoridad.
+
+### 3.4 Borrado lógico y regla "paciente activo"
+
+`pacientes`, `usuarios`, `medicamentos` y `donantes` tienen
+`activo BIT NOT NULL DEFAULT 1` (`ALTER` idempotente; las filas
+existentes quedan activas). No hay borrado físico en ninguna de las
+cuatro: desactivar conserva el historial (solicitudes, visitas,
+dispensaciones, donaciones, auditoría) y un administrador puede
+reactivar.
+
+- Los listados devuelven solo activos; `?incluirInactivos=true` es solo
+  para `admin`. `GET /:id` sigue devolviendo el registro desactivado.
+- **Paciente activo** (`pacientes-service/src/services/reglasPaciente.js`):
+  un paciente desactivado no recibe solicitudes, asignación de cita,
+  visitas, exámenes ni prescripciones → `409` con su nombre y la
+  acción. `farmacia-service` aplica la misma regla al dispensar
+  leyendo `pacientes.activo` en la BD compartida.
+- Medicamento desactivado: sale del inventario y no se dispensa (409).
+  Donante desactivado: no recibe donaciones (409).
+- Cuenta desactivada: `POST /api/auth/login` responde `403`
+  "Cuenta desactivada" (solo si la contraseña es correcta; si no, el
+  `401` genérico). **Limitación:** un JWT ya emitido sigue siendo
+  válido hasta su `exp` (8 h) en los demás servicios, que solo verifican
+  la firma.
+
+### 3.5 Auditoría
+
+Tabla compartida `auditoria` (id, usuario = email del JWT, idUsuario,
+accion, entidad, idEntidad, detalle, fecha UTC). La crean al arrancar
+auth, pacientes, farmacia y financiero (DDL idempotente que tolera la
+carrera entre servicios) y la escriben desde sus controladores con
+`AuditoriaService` (copia idéntica en los cuatro, como
+`autorizarRoles`). Registrar nunca hace fallar la operación auditada.
+
+| Servicio | Entidad | Acciones |
+|---|---|---|
+| auth | usuario | crear, desactivar, reactivar |
+| pacientes | paciente | crear, modificar, desactivar, reactivar |
+| pacientes | solicitud | crear, modificar (asignar cita), cancelar |
+| pacientes | visita / examen / prescripcion | crear (iniciar visita, pedir examen, prescribir), modificar (notas, completar) |
+| farmacia | medicamento / dispensacion | crear, modificar, desactivar, reactivar / crear |
+| financiero | cargo, cuota, donante, donacion, gasto, pago_fundacion | crear; donante además desactivar y reactivar |
+
+La lee `reportes-service` en `GET /api/auditoria?desde&hasta&entidad&idEntidad&limite`
+(solo admin; `hasta` en YYYY-MM-DD incluye el día; también acepta
+instantes ISO; límite 200 por defecto, 1000 máximo). Laboratorio y
+notificaciones no registran auditoría.
 
 ---
 
@@ -307,8 +358,10 @@ Cada servicio tiene la **misma estructura interna de 4 capas**:
 - [x] Reintentos automáticos para notificaciones fallidas (job interno
       con espera creciente y estado `fallida_definitiva`).
 - [x] Catálogo de precios de exámenes administrable (`/api/laboratorio/precios`, solo admin escribe).
-- [ ] Regla "paciente activo": no existe campo `activo` ni baja lógica;
-      el `DELETE` es físico. Pendiente de decisión del equipo.
+- [x] Borrado lógico (`activo`) en pacientes, usuarios, medicamentos y
+      donantes, y regla "paciente activo" (§3.4).
+- [x] Auditoría mínima con consulta para el admin (§3.5).
+- [x] Cierre de sesión por inactividad en el frontend (30 min, aviso 60 s antes).
 
 ### Endpoints internos (para referencia rápida)
 
@@ -319,7 +372,7 @@ Cada servicio tiene la **misma estructura interna de 4 capas**:
 | pacientes-service | 3002 | `/api/pacientes`, `/api/solicitudes`, `/api/visitas` |
 | laboratorio-service | 3003 | `/api/laboratorio/*` |
 | financiero-service | 3004 | `/api/financiero/*` |
-| reportes-service | 3005 | `/api/reportes/*` |
+| reportes-service | 3005 | `/api/reportes/*`, `/api/auditoria` |
 | notificaciones-service | 3006 | `/api/notificaciones/*` |
 | frontend (nginx) | 8090 | HTML estático |
 
@@ -331,6 +384,8 @@ Cada servicio tiene la **misma estructura interna de 4 capas**:
 - `notificaciones` (notificaciones).
 - Columna `familiarEmail` en `pacientes` (bootstrap con `ALTER TABLE`
   idempotente para no romper datos existentes).
+- Columna `activo` en `pacientes`, `usuarios`, `medicamentos` y
+  `donantes`; tabla compartida `auditoria` (20 oct 2026).
 
 ### Infraestructura
 - [x] Docker Desktop funcionando en la máquina de desarrollo (WSL2).

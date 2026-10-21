@@ -47,7 +47,15 @@ Todos requieren JWT. RBAC resumida (completa en CONTEXT_SISTEMA.md §3.3):
 | GET    | `/health` | publico |
 | GET    | `/api/pacientes[/:id]` | autenticado |
 | POST, PUT | `/api/pacientes[/:id]` | enfermero, admin |
-| DELETE | `/api/pacientes/:id` | admin (409 si el paciente ya tiene solicitudes o visitas) |
+| DELETE | `/api/pacientes/:id` | admin — **borrado logico**: `activo = 0`, conserva el historial |
+| PATCH  | `/api/pacientes/:id/reactivar` | admin |
+| GET    | `/api/pacientes?incluirInactivos=true` | admin (403 para los demas) |
+
+**Paciente activo** (`services/reglasPaciente.js`): un paciente
+desactivado no recibe solicitudes, asignacion de cita, visitas, examenes
+ni prescripciones → 409. Crear / modificar / cancelar / desactivar /
+reactivar pacientes, solicitudes y visitas se registra en `auditoria`
+(`AuditoriaService`).
 | POST   | `/api/solicitudes` | medico_general |
 | GET    | `/api/solicitudes[/:id\|/paciente/:id]` | autenticado |
 | PATCH  | `/api/solicitudes/:id/asignar-cita` | coordinador_fundacion, admin |

@@ -32,7 +32,14 @@ scripts/
 | POST   | `/api/auth/register`        | JWT  | admin    | Crear usuario (admin se encarga)      |
 | POST   | `/api/auth/login`           | —    | —        | Login → `{ token, usuario }`          |
 | GET    | `/api/auth/me`              | JWT  | —        | Perfil del usuario autenticado        |
-| GET    | `/api/auth/usuarios[?rol=a,b]` | JWT | admin, coordinador_fundacion | Directorio sin `passwordHash`, filtrable por uno o varios roles; rol desconocido → 400. Lo usa el dialogo "Asignar cita" para elegir especialista |
+| GET    | `/api/auth/usuarios[?rol=a,b][&incluirInactivos=true]` | JWT | admin, coordinador_fundacion | Directorio sin `passwordHash`, solo cuentas activas, filtrable por uno o varios roles; rol desconocido → 400; `incluirInactivos` solo admin. Lo usa el dialogo "Asignar cita" para elegir especialista |
+| PATCH  | `/api/auth/usuarios/:id/desactivar` | JWT | admin | Desactiva la cuenta (no la propia → 409). Su login responde 403 "Cuenta desactivada" |
+| PATCH  | `/api/auth/usuarios/:id/reactivar` | JWT | admin | Reactiva la cuenta |
+
+Columna `usuarios.activo` (BIT, default 1). Un JWT emitido antes de
+desactivar la cuenta sigue siendo valido hasta su `exp`: los demas
+servicios solo verifican la firma. El alta y la (des)activacion de
+cuentas se registran en la tabla `auditoria`.
 
 ### Roles validos (10)
 

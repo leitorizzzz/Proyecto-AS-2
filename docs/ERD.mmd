@@ -12,6 +12,7 @@ erDiagram
         NVARCHAR passwordHash
         NVARCHAR rol
         DATETIME2 fechaRegistro
+        BIT activo "borrado logico, default 1"
     }
 
     pacientes {
@@ -27,6 +28,7 @@ erDiagram
         NVARCHAR familiarEmail
         NVARCHAR padecimientos
         DATETIME2 fechaIngreso
+        BIT activo "borrado logico, default 1"
     }
 
     solicitudes_referencia {
@@ -82,6 +84,7 @@ erDiagram
         NVARCHAR presentacion
         INT stock
         DECIMAL precioUnitario
+        BIT activo "borrado logico, default 1"
     }
 
     dispensaciones {
@@ -138,6 +141,7 @@ erDiagram
         NVARCHAR email
         NVARCHAR direccion
         DATETIME2 fechaRegistro
+        BIT activo "borrado logico, default 1"
     }
 
     donaciones {
@@ -181,6 +185,17 @@ erDiagram
         NVARCHAR mensajeError
     }
 
+    auditoria {
+        INT id PK
+        NVARCHAR usuario "email del JWT"
+        INT idUsuario FK
+        NVARCHAR accion "crear|modificar|cancelar|desactivar|reactivar"
+        NVARCHAR entidad
+        INT idEntidad "id del registro auditado"
+        NVARCHAR detalle
+        DATETIME2 fecha "UTC"
+    }
+
     pacientes ||--o{ solicitudes_referencia : "tiene"
     pacientes ||--o{ visitas_medicas       : "recibe"
     pacientes ||--o{ cargos_servicio       : "le aplican"
@@ -195,3 +210,4 @@ erDiagram
     donantes        ||--o{ donaciones            : "aporta"
     usuarios        ||--o{ solicitudes_referencia : "crea / asigna"
     usuarios        ||--o{ visitas_medicas        : "atiende"
+    usuarios        ||--o{ auditoria              : "realiza"
