@@ -55,6 +55,9 @@ async function inicializarEsquema() {
     )
     ALTER TABLE usuarios ADD activo BIT NOT NULL CONSTRAINT DF_usuarios_activo DEFAULT 1;
   `);
+  // Tabla compartida de auditoria (idempotente; ver AuditoriaRepository).
+  // require diferido: AuditoriaRepository depende de este modulo.
+  await require('./AuditoriaRepository').crearTablaAuditoria(pool);
 }
 
 module.exports = { sql, getPool, inicializarEsquema };

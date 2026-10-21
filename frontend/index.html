@@ -17,6 +17,7 @@
   <symbol id="i-financiero" viewBox="0 0 24 24"><path class="ico" d="M3 7h18v10H3zM3 10h18M7 14h2M12 14h5"/></symbol>
   <symbol id="i-reportes" viewBox="0 0 24 24"><path class="ico" d="M5 3h11l4 4v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM8 11v6M12 8v9M16 14v3"/></symbol>
   <symbol id="i-usuarios" viewBox="0 0 24 24"><circle class="ico" cx="9" cy="8" r="3.5"/><path class="ico" d="M2.5 20v-1a5 5 0 0 1 5-5h3a5 5 0 0 1 5 5v1M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14a5 5 0 0 1 3 4.6V20"/></symbol>
+  <symbol id="i-auditoria" viewBox="0 0 24 24"><path class="ico" d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-5"/></symbol>
   <symbol id="i-logout" viewBox="0 0 24 24"><path class="ico" d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H10"/></symbol>
 </svg>
 
@@ -84,6 +85,7 @@
         <li><button class="tab" data-tab="financiero"><svg class="ico" width="18" height="18"><use href="#i-financiero"/></svg>Financiero</button></li>
         <li><button class="tab" data-tab="reportes"><svg class="ico" width="18" height="18"><use href="#i-reportes"/></svg>Reportes</button></li>
         <li><button class="tab" data-tab="usuarios"><svg class="ico" width="18" height="18"><use href="#i-usuarios"/></svg>Usuarios</button></li>
+        <li><button class="tab" data-tab="auditoria"><svg class="ico" width="18" height="18"><use href="#i-auditoria"/></svg>Auditoría</button></li>
       </ul>
     </nav>
 
@@ -726,6 +728,61 @@
             <tfoot id="repTfoot"></tfoot>
           </table>
         </div>
+      </div>
+    </section>
+
+    <!-- ================ AUDITORIA (solo admin) ================ -->
+    <section id="tabAuditoria" class="hidden">
+      <header class="stage-head">
+        <div>
+          <div class="eyebrow">Bitácora</div>
+          <h1>Auditoría</h1>
+          <p class="lede">Quién creó, modificó, canceló, desactivó o reactivó cada registro, y cuándo.</p>
+        </div>
+      </header>
+
+      <div class="card">
+        <h3>Filtrar</h3>
+        <p class="hint">Por defecto, los últimos 7 días. Se muestran como máximo 200 registros, del más reciente al más antiguo.</p>
+        <form id="formAuditoria">
+          <div class="fila-3">
+            <div><label for="audDesde">Desde</label><input type="date" id="audDesde" required></div>
+            <div><label for="audHasta">Hasta</label><input type="date" id="audHasta" required></div>
+            <div>
+              <label for="audEntidad">Entidad</label>
+              <select id="audEntidad">
+                <option value="">Todas</option>
+                <option value="paciente">Paciente</option>
+                <option value="solicitud">Solicitud</option>
+                <option value="visita">Visita</option>
+                <option value="examen">Examen</option>
+                <option value="prescripcion">Prescripción</option>
+                <option value="medicamento">Medicamento</option>
+                <option value="dispensacion">Dispensación</option>
+                <option value="cargo">Cargo</option>
+                <option value="cuota">Cuota</option>
+                <option value="donante">Donante</option>
+                <option value="donacion">Donación</option>
+                <option value="gasto">Gasto</option>
+                <option value="pago_fundacion">Pago a fundación</option>
+                <option value="usuario">Usuario</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn">Consultar</button>
+          <div id="msgAuditoria" role="status" aria-live="polite"></div>
+        </form>
+      </div>
+
+      <div class="card" style="margin-top:18px">
+        <h3>Registros <span class="contador" id="contadorAuditoria"></span></h3>
+        <div class="tabla-wrap">
+          <table>
+            <thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Entidad</th><th>Detalle</th></tr></thead>
+            <tbody id="tbodyAuditoria"></tbody>
+          </table>
+        </div>
+        <div id="vacioAuditoria" class="vacio hidden">Sin registros en el rango elegido.</div>
       </div>
     </section>
 

@@ -3,9 +3,14 @@
  * Traduce peticiones HTTP en llamadas a la capa de logica de negocio.
  */
 class PacienteController {
-  constructor(pacienteService) {
+  constructor(pacienteService, auditoriaService) {
     this.service = pacienteService;
+    this.auditoria = auditoriaService;
   }
+
+  /** Registra en auditoria; nunca falla (ver AuditoriaService). */
+  _auditar = (req, accion, entidad, idEntidad, detalle) =>
+    this.auditoria ? this.auditoria.registrar(req.usuario, accion, entidad, idEntidad, detalle) : null;
 
   listar = async (req, res) => {
     try {
@@ -32,6 +37,7 @@ class PacienteController {
   crear = async (req, res) => {
     try {
       const nuevo = await this.service.registrar(req.body);
+      await this._auditar(req, 'crear', 'paciente', nuevo.id, `${nuevo.nombres} ${nuevo.apellidos}`);
       res.status(201).json(nuevo);
     } catch (error) {
       res.status(400).json({ error: error.message });
@@ -41,6 +47,7 @@ class PacienteController {
   actualizar = async (req, res) => {
     try {
       const actualizado = await this.service.actualizar(Number(req.params.id), req.body);
+      await this._auditar(req, 'modificar', 'paciente', actualizado.id, 'expediente');
       res.json(actualizado);
     } catch (error) {
       res.status(400).json({ error: error.message });
@@ -50,7 +57,9 @@ class PacienteController {
   /** DELETE /api/pacientes/:id: borrado logico (activo = 0). */
   desactivar = async (req, res) => {
     try {
-      res.json(await this.service.desactivar(Number(req.params.id)));
+      const p = await this.service.desactivar(Number(req.params.id));
+      await this._auditar(req, 'desactivar', 'paciente', p.id, `${p.nombres} ${p.apellidos}`);
+      res.json(p);
     } catch (error) {
       res.status(error.status || 404).json({ error: error.message });
     }
@@ -58,7 +67,9 @@ class PacienteController {
 
   reactivar = async (req, res) => {
     try {
-      res.json(await this.service.reactivar(Number(req.params.id)));
+      const p = await this.service.reactivar(Number(req.params.id));
+      await this._auditar(req, 'reactivar', 'paciente', p.id, `${p.nombres} ${p.apellidos}`);
+      res.json(p);
     } catch (error) {
       res.status(error.status || 404).json({ error: error.message });
     }

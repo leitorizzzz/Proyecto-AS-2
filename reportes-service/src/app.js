@@ -8,10 +8,17 @@ const ReportesRepository = require('./repositories/ReportesRepository');
 const ReportesService = require('./services/ReportesService');
 const ReportesController = require('./controllers/ReportesController');
 const crearRutasReportes = require('./routes/reportesRoutes');
+const AuditoriaRepository = require('./repositories/AuditoriaRepository');
+const AuditoriaService = require('./services/AuditoriaService');
+const AuditoriaController = require('./controllers/AuditoriaController');
+const crearRutasAuditoria = require('./routes/auditoriaRoutes');
 
 const repo = new ReportesRepository();
 const service = new ReportesService(repo);
 const controller = new ReportesController(service);
+
+// Bitacora de auditoria: la escriben otros servicios, reportes solo la lee.
+const auditoriaController = new AuditoriaController(new AuditoriaService(new AuditoriaRepository()));
 
 const app = express();
 app.use(cors());
@@ -22,6 +29,7 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api/reportes', crearRutasReportes(controller));
+app.use('/api/auditoria', crearRutasAuditoria(auditoriaController));
 
 const PORT = process.env.PORT || 3005;
 

@@ -232,7 +232,8 @@ const RBAC = {
     laboratorio: ['laboratorio', 'medico_especialista', 'especialista', 'enfermero'],
     financiero:  ['fundacion', 'coordinador_fundacion'],
     reportes:    ['*'],
-    usuarios:    []          // solo admin
+    usuarios:    [],         // solo admin
+    auditoria:   []          // solo admin
   },
   // Acciones de escritura por rol
   acciones: {
@@ -307,6 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#formPagoFund').addEventListener('submit', onRegistrarPagoFundacion);
   $('#formPrecio').addEventListener('submit', onCrearPrecio);
   $('#formUsuario').addEventListener('submit', onCrearUsuario);
+  $('#formAuditoria').addEventListener('submit', e => { e.preventDefault(); consultarAuditoria(); });
   // El formulario del dialogo nunca debe enviarse de forma nativa (recargaria
   // la pagina); abrirDialogo() pone su propio onsubmit mientras esta abierto.
   $('#dlgForm').addEventListener('submit', e => e.preventDefault());
@@ -546,7 +548,8 @@ const CARGADORES = {
   laboratorio:  cargarLaboratorio,
   financiero:   cargarFinancieroTab,
   reportes:     () => {},   // el usuario dispara la generacion
-  usuarios:     cargarUsuarios
+  usuarios:     cargarUsuarios,
+  auditoria:    cargarAuditoria
 };
 
 function cambiarTab(tab) {
@@ -1725,6 +1728,50 @@ async function onRegistrarDonacion(e) {
     ok(msg, 'Donación registrada.');
     e.target.reset();
     cargarDonaciones();
+  } catch (err) { error(msg, err.message); }
+}
+
+/* ============================================================
+ *   AUDITORIA (solo admin)
+ * ============================================================ */
+
+const ETIQUETA_ACCION = {
+  crear: 'creó', modificar: 'modificó', cancelar: 'canceló',
+  desactivar: 'desactivó', reactivar: 'reactivó'
+};
+
+function cargarAuditoria() {
+  // Rango por defecto: ultimos 7 dias (se recalcula al entrar si esta vacio).
+  if (!$('#audDesde').value || !$('#audHasta').value) {
+    const hoy = new Date();
+    const desde = new Date(hoy); desde.setDate(hoy.getDate() - 7);
+    $('#audDesde').value = fechaLocalISO(desde);
+    $('#audHasta').value = fechaLocalISO(hoy);
+  }
+  consultarAuditoria();
+}
+
+async function consultarAuditoria() {
+  const msg = $('#msgAuditoria'); limpiar(msg);
+  const desde = $('#audDesde').value, hasta = $('#audHasta').value;
+  if (!desde || !hasta) return error(msg, 'Elija el rango de fechas.');
+  // Limites del dia LOCAL como instantes: la tabla guarda UTC.
+  const inicio = new Date(`${desde}T00:00:00`);
+  const fin = new Date(`${hasta}T00:00:00`); fin.setDate(fin.getDate() + 1);
+  const qs = new URLSearchParams({ desde: inicio.toISOString(), hasta: fin.toISOString() });
+  if ($('#audEntidad').value) qs.set('entidad', $('#audEntidad').value);
+  try {
+    const filas = await api(API.reportes, `/api/auditoria?${qs}`);
+    $('#contadorAuditoria').textContent = `${filas.length} registros`;
+    $('#tbodyAuditoria').innerHTML = filas.map(r => `
+      <tr>
+        <td class="tiny">${fechaHora(r.fecha)}</td>
+        <td class="tiny">${esc(r.usuario)}</td>
+        <td><span class="chip accion-${esc(r.accion)}">${esc(ETIQUETA_ACCION[r.accion] || r.accion)}</span></td>
+        <td>${esc(r.entidad.replace('_', ' '))}${r.idEntidad != null ? ` <span class="num tiny">#${r.idEntidad}</span>` : ''}</td>
+        <td class="tiny">${esc(r.detalle || '')}</td>
+      </tr>`).join('');
+    $('#vacioAuditoria').classList.toggle('hidden', filas.length > 0);
   } catch (err) { error(msg, err.message); }
 }
 

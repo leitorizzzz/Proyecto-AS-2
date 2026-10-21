@@ -3,13 +3,19 @@
  * Traduce peticiones HTTP en llamadas a la capa de logica de negocio.
  */
 class AuthController {
-  constructor(authService) {
+  constructor(authService, auditoriaService) {
     this.service = authService;
+    this.auditoria = auditoriaService;
   }
+
+  /** Registra en auditoria; nunca falla (ver AuditoriaService). */
+  _auditar = (req, accion, entidad, idEntidad, detalle) =>
+    this.auditoria ? this.auditoria.registrar(req.usuario, accion, entidad, idEntidad, detalle) : null;
 
   register = async (req, res) => {
     try {
       const usuario = await this.service.registrar(req.body);
+      await this._auditar(req, 'crear', 'usuario', usuario.id, `${usuario.email} (${usuario.rol})`);
       res.status(201).json(usuario);
     } catch (error) {
       res.status(400).json({ error: error.message });
@@ -40,7 +46,9 @@ class AuthController {
 
   desactivarUsuario = async (req, res) => {
     try {
-      res.json(await this.service.desactivarUsuario(Number(req.params.id), req.usuario.sub));
+      const u = await this.service.desactivarUsuario(Number(req.params.id), req.usuario.sub);
+      await this._auditar(req, 'desactivar', 'usuario', u.id, u.email);
+      res.json(u);
     } catch (error) {
       res.status(error.status || 500).json({ error: error.message });
     }
@@ -48,7 +56,9 @@ class AuthController {
 
   reactivarUsuario = async (req, res) => {
     try {
-      res.json(await this.service.reactivarUsuario(Number(req.params.id)));
+      const u = await this.service.reactivarUsuario(Number(req.params.id));
+      await this._auditar(req, 'reactivar', 'usuario', u.id, u.email);
+      res.json(u);
     } catch (error) {
       res.status(error.status || 500).json({ error: error.message });
     }

@@ -10,6 +10,8 @@ const DispensacionRepository = require('./repositories/DispensacionRepository');
 const PrescripcionReadRepository = require('./repositories/PrescripcionReadRepository');
 const FarmaciaService = require('./services/FarmaciaService');
 const FarmaciaController = require('./controllers/FarmaciaController');
+const AuditoriaRepository = require('./repositories/AuditoriaRepository');
+const AuditoriaService = require('./services/AuditoriaService');
 const crearRutasFarmacia = require('./routes/farmaciaRoutes');
 
 // --- Ensamblado de capas (inyeccion de dependencias manual) ---
@@ -22,7 +24,7 @@ const farmaciaService = new FarmaciaService(
   dispensacionRepository,
   prescripcionRepository
 );
-const farmaciaController = new FarmaciaController(farmaciaService);
+const farmaciaController = new FarmaciaController(farmaciaService, new AuditoriaService(new AuditoriaRepository()));
 
 const app = express();
 app.use(cors());

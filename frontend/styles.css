@@ -511,6 +511,18 @@ td.num, th.num { font-family: var(--font-mono); font-variant-numeric: tabular-nu
 .chip.desactivado::before { content: "⊘"; }
 tr.fila-inactiva td { color: var(--text-mute); }
 
+/* Acciones de auditoria: simbolo + borde, como el resto de los chips. */
+.chip.accion-crear      { border: 1px solid var(--ok); color: var(--ok-ink); }
+.chip.accion-crear::before      { content: "+"; }
+.chip.accion-modificar  { border: 1px solid var(--info); color: var(--info-ink); }
+.chip.accion-modificar::before  { content: "✎"; }
+.chip.accion-cancelar   { border: 1px solid var(--err); color: var(--err-ink); }
+.chip.accion-cancelar::before   { content: "✕"; }
+.chip.accion-desactivar { border: 2px dotted var(--text-mute); color: var(--text-soft); }
+.chip.accion-desactivar::before { content: "⊘"; }
+.chip.accion-reactivar  { border: 1px dashed var(--ok); color: var(--ok-ink); }
+.chip.accion-reactivar::before  { content: "↺"; }
+
 .filtro-inactivos {
   display: inline-flex; align-items: center; gap: 8px;
   margin: 0 0 10px; font-size: var(--fs-meta); font-weight: 500;

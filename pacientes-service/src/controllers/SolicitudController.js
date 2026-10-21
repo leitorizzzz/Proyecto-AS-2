@@ -3,9 +3,14 @@
  * Traduce HTTP <-> SolicitudService. No contiene reglas de negocio.
  */
 class SolicitudController {
-  constructor(solicitudService) {
+  constructor(solicitudService, auditoriaService) {
     this.service = solicitudService;
+    this.auditoria = auditoriaService;
   }
+
+  /** Registra en auditoria; nunca falla (ver AuditoriaService). */
+  _auditar = (req, accion, entidad, idEntidad, detalle) =>
+    this.auditoria ? this.auditoria.registrar(req.usuario, accion, entidad, idEntidad, detalle) : null;
 
   _fallo = (res, error) => {
     const status = error.status || 500;
@@ -39,6 +44,7 @@ class SolicitudController {
       // Pasamos el Authorization al service para que el cliente HTTP hacia
       // notificaciones-service pueda reusar el JWT del solicitante.
       const nueva = await this.service.crear(req.body, idMedicoGeneral, req.headers.authorization);
+      await this._auditar(req, 'crear', 'solicitud', nueva.id, `paciente #${nueva.idPaciente} · ${nueva.especialidad}`);
       res.status(201).json(nueva);
     } catch (error) { this._fallo(res, error); }
   };
@@ -46,6 +52,8 @@ class SolicitudController {
   asignarCita = async (req, res) => {
     try {
       const actualizada = await this.service.asignarCita(Number(req.params.id), req.body);
+      await this._auditar(req, 'modificar', 'solicitud', actualizada.id,
+        `cita asignada ${req.body.fechaCita} ${req.body.horaCita} · especialista #${req.body.idMedicoEspecialista}`);
       res.json(actualizada);
     } catch (error) { this._fallo(res, error); }
   };
@@ -53,6 +61,7 @@ class SolicitudController {
   cancelar = async (req, res) => {
     try {
       const cancelada = await this.service.cancelar(Number(req.params.id));
+      await this._auditar(req, 'cancelar', 'solicitud', cancelada.id, `paciente #${cancelada.idPaciente}`);
       res.json(cancelada);
     } catch (error) { this._fallo(res, error); }
   };

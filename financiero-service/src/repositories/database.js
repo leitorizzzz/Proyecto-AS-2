@@ -113,6 +113,9 @@ async function inicializarEsquema() {
       fecha DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
     );
   `);
+  // Tabla compartida de auditoria (idempotente; ver AuditoriaRepository).
+  // require diferido: AuditoriaRepository depende de este modulo.
+  await require('./AuditoriaRepository').crearTablaAuditoria(pool);
 }
 
 module.exports = { sql, getPool, inicializarEsquema };

@@ -80,6 +80,9 @@ async function inicializarEsquema() {
         ('Amoxicilina', 'suspension 250mg/5ml', 40, 3.50);
     `);
   }
+  // Tabla compartida de auditoria (idempotente; ver AuditoriaRepository).
+  // require diferido: AuditoriaRepository depende de este modulo.
+  await require('./AuditoriaRepository').crearTablaAuditoria(pool);
 }
 
 module.exports = { sql, getPool, inicializarEsquema };

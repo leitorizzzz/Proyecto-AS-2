@@ -7,12 +7,15 @@ const { inicializarEsquema } = require('./repositories/database');
 const UsuarioRepository = require('./repositories/UsuarioRepository');
 const AuthService = require('./services/AuthService');
 const AuthController = require('./controllers/AuthController');
+const AuditoriaRepository = require('./repositories/AuditoriaRepository');
+const AuditoriaService = require('./services/AuditoriaService');
 const crearRutasAuth = require('./routes/authRoutes');
 
 // --- Ensamblado de capas ---
 const usuarioRepository = new UsuarioRepository();
 const authService = new AuthService(usuarioRepository);
-const authController = new AuthController(authService);
+const auditoriaService = new AuditoriaService(new AuditoriaRepository());
+const authController = new AuthController(authService, auditoriaService);
 
 const app = express();
 app.use(cors());

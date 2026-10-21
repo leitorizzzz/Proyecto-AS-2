@@ -187,6 +187,9 @@ async function inicializarEsquema() {
     )
     ALTER TABLE visita_prescripciones ADD fechaDispensacion DATETIME2 NULL;
   `);
+  // Tabla compartida de auditoria (idempotente; ver AuditoriaRepository).
+  // require diferido: AuditoriaRepository depende de este modulo.
+  await require('./AuditoriaRepository').crearTablaAuditoria(pool);
 }
 
 module.exports = { sql, getPool, inicializarEsquema };

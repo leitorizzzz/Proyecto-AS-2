@@ -17,6 +17,8 @@ const NotificacionesClient = require('./services/NotificacionesClient');
 const PacienteController = require('./controllers/PacienteController');
 const SolicitudController = require('./controllers/SolicitudController');
 const VisitaMedicaController = require('./controllers/VisitaMedicaController');
+const AuditoriaRepository = require('./repositories/AuditoriaRepository');
+const AuditoriaService = require('./services/AuditoriaService');
 
 const crearRutasPacientes = require('./routes/pacientesRoutes');
 const crearRutasSolicitudes = require('./routes/solicitudRoutes');
@@ -37,9 +39,10 @@ const pacienteService = new PacienteService(pacienteRepository);
 const solicitudService = new SolicitudService(solicitudRepository, pacienteRepository, notificacionesClient);
 const visitaService = new VisitaMedicaService(visitaRepository, solicitudService, pacienteRepository);
 
-const pacienteController = new PacienteController(pacienteService);
-const solicitudController = new SolicitudController(solicitudService);
-const visitaController = new VisitaMedicaController(visitaService);
+const auditoriaService = new AuditoriaService(new AuditoriaRepository());
+const pacienteController = new PacienteController(pacienteService, auditoriaService);
+const solicitudController = new SolicitudController(solicitudService, auditoriaService);
+const visitaController = new VisitaMedicaController(visitaService, auditoriaService);
 
 const app = express();
 app.use(cors());
