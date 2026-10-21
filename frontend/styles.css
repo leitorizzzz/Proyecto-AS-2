@@ -308,6 +308,18 @@ main.stage {
 /* La bandeja de solicitudes tiene 5 columnas: necesita mas ancho que el
    formulario para que el nombre del paciente no se parta en 3 lineas. */
 #tabSolicitudes .grid-split { grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr); }
+/* Listas con columnas de Estado/Acciones (borrado logico): la tabla ocupa
+   todo el ancho y el formulario va debajo, con ancho de lectura. */
+#tabPacientes .grid-split,
+#tabFarmacia .grid-split:first-of-type,
+#tabUsuarios .grid-split { grid-template-columns: minmax(0, 1fr); }
+#tabPacientes .grid-split > .card:last-child,
+#tabFarmacia .grid-split:first-of-type > .card:last-child,
+#tabUsuarios .grid-split > .card:last-child { max-width: 760px; }
+/* Tablas con columnas de Estado/Acciones: celdas mas compactas. */
+#tbodyPacientes td, #tbodyMedicamentos td, #tbodyDonantes td, #tbodyUsuarios td {
+  padding-left: 10px; padding-right: 10px;
+}
 #tbodySolicitudes td:first-child { min-width: 120px; }
 #tbodySolicitudes td { padding-left: 10px; padding-right: 10px; }
 #tbodySolicitudes .btn-link { white-space: nowrap; }
@@ -490,6 +502,21 @@ td.num, th.num { font-family: var(--font-mono); font-variant-numeric: tabular-nu
 .chip.cancelada::before { content: "✕"; }
 .chip.fallida::before { content: "!"; }
 .chip.fallida_definitiva::before { content: "✕!"; }
+
+/* Borrado logico: patron de borde propio (punteado) para no confundirse
+   con pendiente (dashed) ni cancelada (solido). */
+.chip.activo { background: var(--surface-card); border: 1px solid var(--ok); color: var(--ok-ink); }
+.chip.activo::before { content: "●"; }
+.chip.desactivado { background: var(--surface-raised); border: 2px dotted var(--text-mute); color: var(--text-soft); }
+.chip.desactivado::before { content: "⊘"; }
+tr.fila-inactiva td { color: var(--text-mute); }
+
+.filtro-inactivos {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin: 0 0 10px; font-size: var(--fs-meta); font-weight: 500;
+  color: var(--text-soft); cursor: pointer;
+}
+.filtro-inactivos input { width: 18px; height: 18px; min-height: 0; margin: 0; accent-color: var(--accent); }
 
 /* ============ MENSAJES ============ */
 .msg {

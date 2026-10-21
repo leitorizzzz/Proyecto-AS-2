@@ -74,6 +74,12 @@ function fechaHora(v) {
 function fechaLocalISO(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+/** Chip de borrado logico (activo / desactivado). */
+function chipActivo(activo) {
+  return activo === false
+    ? '<span class="chip desactivado">desactivado</span>'
+    : '<span class="chip activo">activo</span>';
+}
 function chip(estado) {
   const clase = String(estado || '').replace(/\s+/g, '_');
   return `<span class="chip ${clase}">${estado || '—'}</span>`;
@@ -225,7 +231,8 @@ const RBAC = {
     farmacia:    ['farmacia', 'enfermero', 'medico_especialista', 'especialista'],
     laboratorio: ['laboratorio', 'medico_especialista', 'especialista', 'enfermero'],
     financiero:  ['fundacion', 'coordinador_fundacion'],
-    reportes:    ['*']
+    reportes:    ['*'],
+    usuarios:    []          // solo admin
   },
   // Acciones de escritura por rol
   acciones: {
@@ -240,6 +247,13 @@ const RBAC = {
     registrarResultadoLab:['laboratorio', 'admin'],
     escribirCajaFin:      ['admin'],
     editarPreciosLab:     ['admin'],
+    // Borrado logico
+    verInactivos:         ['admin'],
+    desactivarPaciente:   ['admin'],
+    desactivarMedicamento:['farmacia', 'admin'],
+    reactivarMedicamento: ['admin'],
+    desactivarDonante:    ['admin'],
+    gestionarUsuarios:    ['admin'],
   }
 };
 function rolActual() { return state.usuario?.rol || null; }
@@ -289,6 +303,14 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#formGasto').addEventListener('submit', onRegistrarGasto);
   $('#formPagoFund').addEventListener('submit', onRegistrarPagoFundacion);
   $('#formPrecio').addEventListener('submit', onCrearPrecio);
+  $('#formUsuario').addEventListener('submit', onCrearUsuario);
+  // El formulario del dialogo nunca debe enviarse de forma nativa (recargaria
+  // la pagina); abrirDialogo() pone su propio onsubmit mientras esta abierto.
+  $('#dlgForm').addEventListener('submit', e => e.preventDefault());
+  $('#pacVerInactivos').addEventListener('change', cargarPacientes);
+  $('#medVerInactivos').addEventListener('change', cargarFarmacia);
+  $('#donVerInactivos').addEventListener('change', cargarDonantes);
+  $('#usrVerInactivos').addEventListener('change', cargarUsuarios);
 
   $('#dPaciente').addEventListener('change', async () => {
     await cargarPrescripcionesPendientes();
@@ -418,7 +440,8 @@ const CARGADORES = {
   farmacia:     cargarFarmacia,
   laboratorio:  cargarLaboratorio,
   financiero:   cargarFinancieroTab,
-  reportes:     () => {}    // el usuario dispara la generacion
+  reportes:     () => {},   // el usuario dispara la generacion
+  usuarios:     cargarUsuarios
 };
 
 function cambiarTab(tab) {
@@ -444,10 +467,10 @@ async function cargarDashboard() {
 
   try {
     const [pacientes, solicitudes] = await Promise.all([
-      api(API.pacientes, '/api/pacientes'),
+      pacientesParaNombres(),
       api(API.pacientes, '/api/solicitudes')
     ]);
-    $('#kpiPacientes').textContent = pacientes.length;
+    $('#kpiPacientes').textContent = pacientes.filter(p => p.activo !== false).length;
 
     const activas = solicitudes.filter(s =>
       ['pendiente_asignacion','cita_asignada','en_atencion'].includes(s.estado));
@@ -470,7 +493,7 @@ async function cargarDashboard() {
 
     // KPI alertas de saldo: consulta financiero para los primeros 10
     // pacientes (compromiso simple entre latencia y cobertura).
-    cargarKpiAlertasSaldo(pacientes.slice(0, 20));
+    cargarKpiAlertasSaldo(pacientes.filter(p => p.activo !== false).slice(0, 20));
   } catch (err) {
     $('#kpiPacientes').textContent = '—';
     $('#kpiSolicitudesActivas').textContent = '—';
@@ -517,13 +540,21 @@ async function cargarPacientes() {
     btn.textContent = puedeCrear ? 'Registrar paciente' : 'Registro no permitido para su rol';
     form.querySelectorAll('input, select, textarea').forEach(el => el.disabled = !puedeCrear);
   }
+  const verInactivos = puedeAccion('verInactivos');
+  $('#filtroPacientes').classList.toggle('hidden', !verInactivos);
+  const conInactivos = verInactivos && $('#pacVerInactivos').checked;
   try {
-    const pacientes = await api(API.pacientes, '/api/pacientes');
+    const pacientes = await api(API.pacientes,
+      conInactivos ? '/api/pacientes?incluirInactivos=true' : '/api/pacientes');
     state.pacientes = pacientes;
-    $('#contadorPacientes').textContent = `${pacientes.length} personas`;
+    const activos = pacientes.filter(p => p.activo !== false).length;
+    $('#contadorPacientes').textContent = conInactivos
+      ? `${activos} activos · ${pacientes.length - activos} desactivados`
+      : `${pacientes.length} personas`;
     const puedeEditar = puedeAccion('editarPaciente');
+    const puedeDesactivar = puedeAccion('desactivarPaciente');
     const rows = pacientes.map(p => `
-      <tr>
+      <tr class="${p.activo === false ? 'fila-inactiva' : ''}">
         <td>
           <strong>${esc(p.nombres)} ${esc(p.apellidos)}</strong>
           <div class="tiny">${esc(p.familiarEmail || 'sin correo de familiar')}</div>
@@ -531,13 +562,15 @@ async function cargarPacientes() {
         <td class="num">${esc(p.dpi)}</td>
         <td>${fechaCorta(p.fechaNacimiento)}</td>
         <td>${fechaCorta(p.fechaIngreso)}</td>
-        <td class="col-acciones">${puedeEditar
-          ? `<button class="btn-link" data-editar-paciente="${p.id}">Editar</button>`
-          : '<span class="tiny">—</span>'}</td>
+        <td>${chipActivo(p.activo)}</td>
+        <td class="col-acciones">${accionesPaciente(p, puedeEditar, puedeDesactivar)}</td>
       </tr>`).join('');
     $('#tbodyPacientes').innerHTML = rows;
     $$('#tbodyPacientes [data-editar-paciente]').forEach(b =>
       b.addEventListener('click', () => editarPaciente(Number(b.dataset.editarPaciente))));
+    $$('#tbodyPacientes [data-activo-paciente]').forEach(b =>
+      b.addEventListener('click', () =>
+        cambiarActivoPaciente(Number(b.dataset.activoPaciente), b.dataset.accion === 'reactivar')));
     $('#vacioPacientes').classList.toggle('hidden', pacientes.length > 0);
     // repoblar selects que dependen de pacientes
     llenarSelectPacientes($('#sPaciente'), pacientes);
@@ -548,6 +581,39 @@ async function cargarPacientes() {
   } catch (err) {
     console.error('Pacientes:', err);
   }
+}
+
+function accionesPaciente(p, puedeEditar, puedeDesactivar) {
+  const acciones = [];
+  if (puedeEditar && p.activo !== false)
+    acciones.push(`<button class="btn-link" data-editar-paciente="${p.id}">Editar</button>`);
+  if (puedeDesactivar) {
+    acciones.push(p.activo === false
+      ? `<button class="btn-link" data-activo-paciente="${p.id}" data-accion="reactivar">Reactivar</button>`
+      : `<button class="btn-link danger" data-activo-paciente="${p.id}" data-accion="desactivar">Desactivar</button>`);
+  }
+  return acciones.join(' &middot; ') || '<span class="tiny">—</span>';
+}
+
+async function cambiarActivoPaciente(id, reactivar) {
+  const p = (state.pacientes || []).find(x => x.id === id);
+  if (!p) return;
+  const nombre = `${p.nombres} ${p.apellidos}`;
+  const ok_ = await confirmar(nombre, reactivar
+    ? 'El paciente volverá a aparecer en los listados y podrá recibir solicitudes, visitas y dispensaciones.'
+    : 'El paciente dejará de aparecer en los listados y no podrá recibir solicitudes, visitas ni dispensaciones. Su historial se conserva y se puede reactivar.',
+    {
+      eyebrow: reactivar ? 'Reactivar paciente' : 'Desactivar paciente',
+      textoConfirmar: reactivar ? 'Reactivar' : 'Desactivar',
+      textoCancelar: 'Volver',
+      peligro: !reactivar,
+      alEnviar: () => api(API.pacientes, reactivar
+        ? `/api/pacientes/${id}/reactivar`
+        : `/api/pacientes/${id}`, { method: reactivar ? 'PATCH' : 'DELETE' })
+    });
+  if (!ok_) return;
+  ok($('#msgPaciente'), `${nombre} ${reactivar ? 'reactivado' : 'desactivado'}.`);
+  cargarPacientes();
 }
 
 async function editarPaciente(id) {
@@ -598,11 +664,23 @@ async function editarPaciente(id) {
   }
 }
 
+/**
+ * Lista de pacientes para resolver nombres en tablas (solicitudes, visitas,
+ * panel). El admin recibe tambien los desactivados para que su historial no
+ * aparezca como "Paciente #id"; los demas roles solo ven activos.
+ */
+function pacientesParaNombres() {
+  return api(API.pacientes, puedeAccion('verInactivos')
+    ? '/api/pacientes?incluirInactivos=true'
+    : '/api/pacientes');
+}
+
+/** Solo pacientes activos: a un desactivado no se le registra nada nuevo. */
 function llenarSelectPacientes(sel, pacientes) {
   if (!sel) return;
   const prev = sel.value;
   sel.innerHTML = `<option value="">Elegir…</option>` +
-    pacientes.map(p => `<option value="${p.id}">${esc(p.nombres)} ${esc(p.apellidos)} — ${esc(p.dpi)}</option>`).join('');
+    pacientes.filter(p => p.activo !== false).map(p => `<option value="${p.id}">${esc(p.nombres)} ${esc(p.apellidos)} — ${esc(p.dpi)}</option>`).join('');
   if (prev) sel.value = prev;
 }
 
@@ -654,7 +732,7 @@ async function cargarSolicitudes() {
   try {
     const [solicitudes, pacientes] = await Promise.all([
       api(API.pacientes, '/api/solicitudes'),
-      api(API.pacientes, '/api/pacientes')
+      pacientesParaNombres()
     ]);
     const mapa = Object.fromEntries(pacientes.map(p => [p.id, `${p.nombres} ${p.apellidos}`]));
     state.solicitudes = solicitudes;
@@ -810,7 +888,7 @@ async function cargarVisitasTab() {
   try {
     const [solicitudes, pacientes] = await Promise.all([
       api(API.pacientes, '/api/solicitudes'),
-      api(API.pacientes, '/api/pacientes')
+      pacientesParaNombres()
     ]);
     const mapa = Object.fromEntries(pacientes.map(p => [p.id, `${p.nombres} ${p.apellidos}`]));
 
@@ -991,18 +1069,38 @@ async function cargarFarmacia() {
   else if (msgD) limpiar(msgD);
 
   try {
+    const verInactivos = puedeAccion('verInactivos');
+    $('#filtroMedicamentos').classList.toggle('hidden', !verInactivos);
+    const conInactivos = verInactivos && $('#medVerInactivos').checked;
     const [meds, pacientes] = await Promise.all([
-      api(API.farmacia, '/api/farmacia/medicamentos'),
+      api(API.farmacia, conInactivos
+        ? '/api/farmacia/medicamentos?incluirInactivos=true'
+        : '/api/farmacia/medicamentos'),
       api(API.pacientes, '/api/pacientes')
     ]);
+    state.medicamentos = meds;
+    const puedeDesactivar = puedeAccion('desactivarMedicamento');
+    const puedeReactivar = puedeAccion('reactivarMedicamento');
     $('#contadorMedicamentos').textContent = `${meds.length} productos`;
-    $('#tbodyMedicamentos').innerHTML = meds.map(m => `
-      <tr>
+    $('#tbodyMedicamentos').innerHTML = meds.map(m => {
+      let accion = '<span class="tiny">—</span>';
+      if (m.activo === false && puedeReactivar)
+        accion = `<button class="btn-link" data-activo-med="${m.id}" data-accion="reactivar">Reactivar</button>`;
+      else if (m.activo !== false && puedeDesactivar)
+        accion = `<button class="btn-link danger" data-activo-med="${m.id}" data-accion="desactivar">Desactivar</button>`;
+      return `
+      <tr class="${m.activo === false ? 'fila-inactiva' : ''}">
         <td><strong>${esc(m.nombre)}</strong></td>
         <td class="tiny">${esc(m.presentacion || '')}</td>
         <td>${m.stock < 20 ? `<span class="chip cancelada">${m.stock} bajo</span>` : m.stock}</td>
         <td class="right num">${money(m.precioUnitario)}</td>
-      </tr>`).join('');
+        <td>${chipActivo(m.activo)}</td>
+        <td class="col-acciones">${accion}</td>
+      </tr>`;
+    }).join('');
+    $$('#tbodyMedicamentos [data-activo-med]').forEach(b =>
+      b.addEventListener('click', () =>
+        cambiarActivoMedicamento(Number(b.dataset.activoMed), b.dataset.accion === 'reactivar')));
     $('#vacioMedicamentos').classList.toggle('hidden', meds.length > 0);
     llenarSelectPacientes($('#dPaciente'), pacientes);
     if ($('#dPaciente').value) {
@@ -1013,6 +1111,24 @@ async function cargarFarmacia() {
       $('#hintPrescripcion').textContent = '';
     }
   } catch (err) { console.error('Farmacia:', err); }
+}
+
+async function cambiarActivoMedicamento(id, reactivar) {
+  const m = (state.medicamentos || []).find(x => x.id === id);
+  if (!m) return;
+  const ok_ = await confirmar(m.nombre, reactivar
+    ? 'El medicamento vuelve al inventario visible y se puede prescribir y dispensar.'
+    : 'El medicamento sale del inventario visible: no se podrá prescribir ni dispensar. Las dispensaciones anteriores se conservan.',
+    {
+      eyebrow: reactivar ? 'Reactivar medicamento' : 'Desactivar medicamento',
+      textoConfirmar: reactivar ? 'Reactivar' : 'Desactivar',
+      textoCancelar: 'Volver',
+      peligro: !reactivar,
+      alEnviar: () => api(API.farmacia, reactivar
+        ? `/api/farmacia/medicamentos/${id}/reactivar`
+        : `/api/farmacia/medicamentos/${id}`, { method: reactivar ? 'PATCH' : 'DELETE' })
+    });
+  if (ok_) cargarFarmacia();
 }
 
 async function cargarPrescripcionesPendientes() {
@@ -1268,6 +1384,7 @@ async function cargarFinancieroTab() {
     llenarSelectPacientes($('#qPaciente'), pacientes);
     cargarDonaciones();
     cargarDonantesSelect();
+    cargarDonantes();
     cargarGastos();
     cargarPagosFundacion();
   } catch (err) { console.error(err); }
@@ -1416,6 +1533,54 @@ async function cargarDonaciones() {
   } catch (err) { console.error(err); }
 }
 
+async function cargarDonantes() {
+  const verInactivos = puedeAccion('verInactivos');
+  $('#filtroDonantes').classList.toggle('hidden', !verInactivos);
+  const conInactivos = verInactivos && $('#donVerInactivos').checked;
+  try {
+    const list = await api(API.financiero, conInactivos
+      ? '/api/financiero/donantes?incluirInactivos=true'
+      : '/api/financiero/donantes');
+    state.donantes = list;
+    const puede = puedeAccion('desactivarDonante');
+    $('#contadorDonantes').textContent = `${list.length} registrados`;
+    $('#tbodyDonantes').innerHTML = list.map(d => `
+      <tr class="${d.activo === false ? 'fila-inactiva' : ''}">
+        <td>${esc(d.nombre)}</td>
+        <td>${esc(d.telefono || '')}</td>
+        <td class="tiny">${esc(d.email || '')}</td>
+        <td class="tiny">${fechaCorta(d.fechaRegistro)}</td>
+        <td>${chipActivo(d.activo)}</td>
+        <td class="col-acciones">${!puede ? '<span class="tiny">—</span>' : d.activo === false
+          ? `<button class="btn-link" data-activo-donante="${d.id}" data-accion="reactivar">Reactivar</button>`
+          : `<button class="btn-link danger" data-activo-donante="${d.id}" data-accion="desactivar">Desactivar</button>`}</td>
+      </tr>`).join('');
+    $('#vacioDonantes').classList.toggle('hidden', list.length > 0);
+    $$('#tbodyDonantes [data-activo-donante]').forEach(b =>
+      b.addEventListener('click', () =>
+        cambiarActivoDonante(Number(b.dataset.activoDonante), b.dataset.accion === 'reactivar')));
+  } catch (err) { console.error(err); }
+}
+
+async function cambiarActivoDonante(id, reactivar) {
+  const d = (state.donantes || []).find(x => x.id === id);
+  if (!d) return;
+  const ok_ = await confirmar(d.nombre, reactivar
+    ? 'El donante vuelve a la lista y puede recibir nuevas donaciones.'
+    : 'El donante sale de la lista y no se le pueden registrar nuevas donaciones. Las anteriores se conservan.',
+    {
+      eyebrow: reactivar ? 'Reactivar donante' : 'Desactivar donante',
+      textoConfirmar: reactivar ? 'Reactivar' : 'Desactivar',
+      textoCancelar: 'Volver',
+      peligro: !reactivar,
+      alEnviar: () => api(API.financiero,
+        `/api/financiero/donantes/${id}/${reactivar ? 'reactivar' : 'desactivar'}`, { method: 'PATCH' })
+    });
+  if (!ok_) return;
+  cargarDonantes();
+  cargarDonantesSelect();
+}
+
 async function cargarDonantesSelect() {
   try {
     const list = await api(API.financiero, '/api/financiero/donantes');
@@ -1437,6 +1602,7 @@ async function onRegistrarDonante(e) {
     ok(msg, 'Donante guardado.');
     e.target.reset();
     cargarDonantesSelect();
+    cargarDonantes();
   } catch (err) { error(msg, err.message); }
 }
 
@@ -1454,6 +1620,82 @@ async function onRegistrarDonacion(e) {
     ok(msg, 'Donación registrada.');
     e.target.reset();
     cargarDonaciones();
+  } catch (err) { error(msg, err.message); }
+}
+
+/* ============================================================
+ *   USUARIOS (solo admin)
+ * ============================================================ */
+
+async function cargarUsuarios() {
+  const conInactivos = $('#usrVerInactivos').checked;
+  try {
+    const usuarios = await api(API.auth,
+      conInactivos ? '/api/auth/usuarios?incluirInactivos=true' : '/api/auth/usuarios');
+    state.usuarios = usuarios;
+    const activos = usuarios.filter(u => u.activo !== false).length;
+    $('#contadorUsuarios').textContent = conInactivos
+      ? `${activos} activas · ${usuarios.length - activos} desactivadas`
+      : `${usuarios.length} cuentas`;
+    const yo = state.usuario?.sub;
+    $('#tbodyUsuarios').innerHTML = usuarios.map(u => {
+      let accion;
+      if (u.id === yo) accion = '<span class="tiny">su cuenta</span>';
+      else if (u.activo === false)
+        accion = `<button class="btn-link" data-activo-usuario="${u.id}" data-accion="reactivar">Reactivar</button>`;
+      else
+        accion = `<button class="btn-link danger" data-activo-usuario="${u.id}" data-accion="desactivar">Desactivar</button>`;
+      return `
+      <tr class="${u.activo === false ? 'fila-inactiva' : ''}">
+        <td><strong>${esc(u.nombre)}</strong><div class="tiny">${esc(u.email)}</div></td>
+        <td>${esc(u.rol)}</td>
+        <td class="tiny">${fechaCorta(u.fechaRegistro)}</td>
+        <td>${chipActivo(u.activo)}</td>
+        <td class="col-acciones">${accion}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="5" class="tiny">Sin cuentas.</td></tr>';
+    $$('#tbodyUsuarios [data-activo-usuario]').forEach(b =>
+      b.addEventListener('click', () =>
+        cambiarActivoUsuario(Number(b.dataset.activoUsuario), b.dataset.accion === 'reactivar')));
+  } catch (err) {
+    $('#tbodyUsuarios').innerHTML =
+      `<tr><td colspan="5"><div class="msg error">No se pudieron cargar las cuentas: ${esc(err.message)}</div></td></tr>`;
+  }
+}
+
+async function cambiarActivoUsuario(id, reactivar) {
+  const u = (state.usuarios || []).find(x => x.id === id);
+  if (!u) return;
+  const ok_ = await confirmar(`${u.nombre} · ${u.rol}`, reactivar
+    ? 'La cuenta podrá volver a iniciar sesión.'
+    : 'La cuenta no podrá iniciar sesión. Lo que registró (solicitudes, visitas, dispensaciones) se conserva con su nombre.',
+    {
+      eyebrow: reactivar ? 'Reactivar cuenta' : 'Desactivar cuenta',
+      textoConfirmar: reactivar ? 'Reactivar' : 'Desactivar',
+      textoCancelar: 'Volver',
+      peligro: !reactivar,
+      alEnviar: () => api(API.auth,
+        `/api/auth/usuarios/${id}/${reactivar ? 'reactivar' : 'desactivar'}`, { method: 'PATCH' })
+    });
+  if (!ok_) return;
+  ok($('#msgUsuario'), `Cuenta de ${u.email} ${reactivar ? 'reactivada' : 'desactivada'}.`);
+  cargarUsuarios();
+}
+
+async function onCrearUsuario(e) {
+  e.preventDefault();
+  const msg = $('#msgUsuario'); limpiar(msg);
+  const body = {
+    nombre: $('#uNombre').value.trim(),
+    email: $('#uEmail').value.trim(),
+    password: $('#uPassword').value,
+    rol: $('#uRol').value
+  };
+  try {
+    await api(API.auth, '/api/auth/register', { method: 'POST', body });
+    e.target.reset();
+    await cargarUsuarios();
+    ok(msg, `Cuenta de ${body.email} creada con rol ${body.rol}.`);
   } catch (err) { error(msg, err.message); }
 }
 
