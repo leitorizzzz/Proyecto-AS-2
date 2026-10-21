@@ -281,8 +281,8 @@ async function asegurarUsuario(adminToken, u) {
     ok(`telefono actualizado a 55559999`);
   } catch (e) { falla(e.message); }
 
-  // 16 - DELETE /api/pacientes/:id (crea uno descartable y lo borra)
-  paso('pacientes: DELETE /:id borra un paciente descartable');
+  // 16 - DELETE /api/pacientes/:id = borrado logico (crea uno propio)
+  paso('pacientes: DELETE /:id desactiva un paciente propio (borrado logico)');
   try {
     const dpi = String(Date.now() + 1).padStart(13, '0').slice(-13);
     const creado = await req('POST', `${API.pacientes}/api/pacientes`, {
@@ -292,10 +292,13 @@ async function asegurarUsuario(adminToken, u) {
       },
       token: adminToken, esperarStatus: 201
     });
-    await req('DELETE', `${API.pacientes}/api/pacientes/${creado.data.id}`, { token: adminToken, esperarStatus: 204 });
-    const check = await req('GET', `${API.pacientes}/api/pacientes/${creado.data.id}`, { token: adminToken });
-    if (check.status !== 404) throw new Error(`post-DELETE deberia ser 404, fue ${check.status}`);
-    ok(`id=${creado.data.id} borrado y 404 confirmado`);
+    const r = await req('DELETE', `${API.pacientes}/api/pacientes/${creado.data.id}`, { token: adminToken, esperarStatus: 200 });
+    if (r.data.activo !== false) throw new Error('DELETE no dejo activo=false');
+    const check = await req('GET', `${API.pacientes}/api/pacientes/${creado.data.id}`, { token: adminToken, esperarStatus: 200 });
+    if (check.data.activo !== false) throw new Error('el registro no se conserva desactivado');
+    const lista = (await req('GET', `${API.pacientes}/api/pacientes`, { token: adminToken, esperarStatus: 200 })).data;
+    if (lista.some(p => p.id === creado.data.id)) throw new Error('el listado por defecto muestra al desactivado');
+    ok(`id=${creado.data.id} desactivado, conservado y fuera del listado`);
   } catch (e) { falla(e.message); }
 
   // 17..19 - los 7 reportes en JSON, PDF y Excel
@@ -391,9 +394,14 @@ async function asegurarUsuario(adminToken, u) {
     ok('3 rechazos 403');
   } catch (e) { falla(e.message); }
 
-  paso('pacientes: DELETE de un paciente con solicitudes -> 409');
+  paso('paciente activo: desactivado no recibe solicitudes (409); reactivado si');
   try {
-    const r = await req('DELETE', `${API.pacientes}/api/pacientes/${pacienteId}`, { token: adminToken, esperarStatus: 409 });
+    await req('DELETE', `${API.pacientes}/api/pacientes/${pacienteId}`, { token: adminToken, esperarStatus: 200 });
+    const r = await req('POST', `${API.pacientes}/api/solicitudes`, {
+      body: { idPaciente: pacienteId, especialidad: 'inactivo-e2e', motivo: 'paciente desactivado' },
+      token: mgToken, esperarStatus: 409
+    });
+    await req('PATCH', `${API.pacientes}/api/pacientes/${pacienteId}/reactivar`, { token: adminToken, esperarStatus: 200 });
     ok(String(r.data?.error || '').slice(0, 60));
   } catch (e) { falla(e.message); }
 

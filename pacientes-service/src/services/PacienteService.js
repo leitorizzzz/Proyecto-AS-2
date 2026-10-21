@@ -12,8 +12,9 @@ class PacienteService {
     this.repo = pacienteRepository;
   }
 
-  listar() {
-    return this.repo.obtenerTodos();
+  /** Por defecto solo activos. El controlador decide quien puede ver inactivos. */
+  listar({ incluirInactivos = false } = {}) {
+    return this.repo.obtenerTodos({ incluirInactivos });
   }
 
   async obtener(id) {
@@ -43,7 +44,11 @@ class PacienteService {
   async registrar(datos) {
     this._validar(datos);
     const existente = await this.repo.obtenerPorDpi(datos.dpi);
-    if (existente) throw new Error('Ya existe un paciente con ese DPI');
+    if (existente) {
+      throw new Error(existente.activo === false
+        ? 'Ya existe un paciente desactivado con ese DPI; un administrador puede reactivarlo'
+        : 'Ya existe un paciente con ese DPI');
+    }
 
     const paciente = new Paciente(datos);
     return this.repo.guardar(paciente);
@@ -62,20 +67,25 @@ class PacienteService {
     return this.repo.actualizar(id, paciente);
   }
 
-  async eliminar(id) {
-    await this.obtener(id);
-    try {
-      return await this.repo.eliminar(id);
-    } catch (err) {
-      // 547 = violacion de FK: el paciente ya tiene solicitudes o visitas.
-      if (err.number === 547) {
-        throw Object.assign(
-          new Error('No se puede eliminar: el paciente tiene solicitudes o visitas registradas'),
-          { status: 409 }
-        );
-      }
-      throw err;
+  /**
+   * Borrado logico (DELETE /api/pacientes/:id). Conserva solicitudes,
+   * visitas, dispensaciones y cuenta; el paciente deja de aparecer en los
+   * listados y no puede recibir nuevas atenciones.
+   */
+  async desactivar(id) {
+    const paciente = await this.obtener(id);
+    if (paciente.activo === false) {
+      throw Object.assign(new Error('El paciente ya esta desactivado'), { status: 409 });
     }
+    return this.repo.cambiarActivo(id, false);
+  }
+
+  async reactivar(id) {
+    const paciente = await this.obtener(id);
+    if (paciente.activo !== false) {
+      throw Object.assign(new Error('El paciente ya esta activo'), { status: 409 });
+    }
+    return this.repo.cambiarActivo(id, true);
   }
 }
 

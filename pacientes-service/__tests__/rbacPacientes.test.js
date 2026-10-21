@@ -20,7 +20,8 @@ function app() {
     obtener: (_r, res) => res.json({}),
     crear: (_r, res) => res.status(201).json({ id: 1 }),
     actualizar: (_r, res) => res.json({ id: 1 }),
-    eliminar: (_r, res) => res.status(204).send()
+    desactivar: (_r, res) => res.json({ id: 1, activo: false }),
+    reactivar: (_r, res) => res.json({ id: 1, activo: true })
   };
   const a = express();
   a.use(express.json());
@@ -52,8 +53,8 @@ describe('RBAC /api/pacientes', () => {
     expect((await request(srv).delete('/api/pacientes/1').set(con('enfermero'))).status).toBe(403);
   });
 
-  test('borrar paciente con rol admin -> 204', async () => {
-    expect((await request(srv).delete('/api/pacientes/1').set(con('admin'))).status).toBe(204);
+  test('borrar paciente con rol admin -> 200 (borrado logico)', async () => {
+    expect((await request(srv).delete('/api/pacientes/1').set(con('admin'))).status).toBe(200);
   });
 
   test('listar pacientes con rol laboratorio -> 200', async () => {

@@ -99,7 +99,27 @@ class FinancieroService {
     }));
   }
 
-  async listarDonantes() { return this.donanteRepo.listarDonantes(); }
+  listarDonantes({ incluirInactivos = false } = {}) {
+    return this.donanteRepo.listarDonantes({ incluirInactivos });
+  }
+
+  async desactivarDonante(id) {
+    const donante = await this.donanteRepo.obtenerDonante(Number(id));
+    if (!donante) throw Object.assign(new Error('Donante no encontrado'), { status: 404 });
+    if (donante.activo === false) {
+      throw Object.assign(new Error('El donante ya esta desactivado'), { status: 409 });
+    }
+    return this.donanteRepo.cambiarActivoDonante(donante.id, false);
+  }
+
+  async reactivarDonante(id) {
+    const donante = await this.donanteRepo.obtenerDonante(Number(id));
+    if (!donante) throw Object.assign(new Error('Donante no encontrado'), { status: 404 });
+    if (donante.activo !== false) {
+      throw Object.assign(new Error('El donante ya esta activo'), { status: 409 });
+    }
+    return this.donanteRepo.cambiarActivoDonante(donante.id, true);
+  }
 
   async registrarDonacion({ idDonante, monto, tipo, concepto }) {
     if (!idDonante) throw Object.assign(new Error('idDonante es requerido'), { status: 400 });
@@ -110,6 +130,12 @@ class FinancieroService {
 
     const donante = await this.donanteRepo.obtenerDonante(Number(idDonante));
     if (!donante) throw Object.assign(new Error('Donante no encontrado'), { status: 404 });
+    if (donante.activo === false) {
+      throw Object.assign(
+        new Error(`El donante ${donante.nombre} esta desactivado: no se le pueden registrar donaciones`),
+        { status: 409 }
+      );
+    }
 
     return this.donanteRepo.guardarDonacion(new Donacion({
       idDonante: Number(idDonante),

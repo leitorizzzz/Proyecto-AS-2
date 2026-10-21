@@ -9,7 +9,11 @@ class PacienteController {
 
   listar = async (req, res) => {
     try {
-      const pacientes = await this.service.listar();
+      const incluirInactivos = req.query.incluirInactivos === 'true';
+      if (incluirInactivos && req.usuario?.rol !== 'admin') {
+        return res.status(403).json({ error: 'Solo administracion puede ver pacientes desactivados' });
+      }
+      const pacientes = await this.service.listar({ incluirInactivos });
       res.json(pacientes);
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -43,10 +47,18 @@ class PacienteController {
     }
   };
 
-  eliminar = async (req, res) => {
+  /** DELETE /api/pacientes/:id: borrado logico (activo = 0). */
+  desactivar = async (req, res) => {
     try {
-      await this.service.eliminar(Number(req.params.id));
-      res.status(204).send();
+      res.json(await this.service.desactivar(Number(req.params.id)));
+    } catch (error) {
+      res.status(error.status || 404).json({ error: error.message });
+    }
+  };
+
+  reactivar = async (req, res) => {
+    try {
+      res.json(await this.service.reactivar(Number(req.params.id)));
     } catch (error) {
       res.status(error.status || 404).json({ error: error.message });
     }

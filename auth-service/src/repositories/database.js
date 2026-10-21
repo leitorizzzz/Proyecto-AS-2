@@ -46,6 +46,15 @@ async function inicializarEsquema() {
       fechaRegistro DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
     );
   `);
+
+  // Desactivacion de cuentas (borrado logico): las existentes quedan activas.
+  await pool.request().query(`
+    IF NOT EXISTS (
+      SELECT 1 FROM sys.columns
+      WHERE object_id = OBJECT_ID('usuarios') AND name = 'activo'
+    )
+    ALTER TABLE usuarios ADD activo BIT NOT NULL CONSTRAINT DF_usuarios_activo DEFAULT 1;
+  `);
 }
 
 module.exports = { sql, getPool, inicializarEsquema };

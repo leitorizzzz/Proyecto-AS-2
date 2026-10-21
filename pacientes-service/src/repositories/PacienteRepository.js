@@ -21,10 +21,12 @@ class PacienteRepository {
       .input('padecimientos', sql.NVarChar(sql.MAX), p.padecimientos);
   }
 
-  async obtenerTodos() {
+  /** Por defecto solo activos; incluirInactivos los trae todos. */
+  async obtenerTodos({ incluirInactivos = false } = {}) {
     const pool = await getPool();
+    const where = incluirInactivos ? '' : 'WHERE activo = 1';
     const result = await pool.request()
-      .query('SELECT * FROM pacientes ORDER BY apellidos, nombres');
+      .query(`SELECT * FROM pacientes ${where} ORDER BY apellidos, nombres`);
     return result.recordset.map(f => new Paciente(f));
   }
 
@@ -80,12 +82,14 @@ class PacienteRepository {
     return this.obtenerPorId(id);
   }
 
-  async eliminar(id) {
+  /** Borrado logico: no hay DELETE fisico de pacientes. */
+  async cambiarActivo(id, activo) {
     const pool = await getPool();
-    const result = await pool.request()
+    await pool.request()
       .input('id', sql.Int, id)
-      .query('DELETE FROM pacientes WHERE id = @id');
-    return result.rowsAffected[0] > 0;
+      .input('activo', sql.Bit, activo ? 1 : 0)
+      .query('UPDATE pacientes SET activo = @activo WHERE id = @id');
+    return this.obtenerPorId(id);
   }
 }
 

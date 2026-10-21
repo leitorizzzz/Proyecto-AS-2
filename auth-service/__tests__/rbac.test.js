@@ -18,7 +18,9 @@ function app() {
     register: (_r, res) => res.status(201).json({ id: 1 }),
     login: (_r, res) => res.json({ token: 't' }),
     me: (_r, res) => res.json({ id: 1 }),
-    listarUsuarios: (_r, res) => res.json([])
+    listarUsuarios: (_r, res) => res.json([]),
+    desactivarUsuario: (_r, res) => res.json({}),
+    reactivarUsuario: (_r, res) => res.json({})
   };
   const a = express();
   a.use(express.json());

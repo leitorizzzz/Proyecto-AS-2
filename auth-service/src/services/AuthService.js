@@ -56,6 +56,13 @@ class AuthService {
 
     const ok = await bcrypt.compare(password, usuario.passwordHash);
     if (!ok) throw new Error('Credenciales invalidas');
+    // Se valida despues de la password para no revelar que la cuenta existe.
+    if (usuario.activo === false) {
+      throw Object.assign(
+        new Error('Cuenta desactivada. Pida a administracion que la reactive.'),
+        { status: 403 }
+      );
+    }
 
     const token = jwt.sign(
       { sub: usuario.id, email: usuario.email, rol: usuario.rol },
@@ -70,14 +77,36 @@ class AuthService {
    * Lista usuarios sin passwordHash. `rol` acepta uno o varios separados
    * por coma (p. ej. "medico_especialista,especialista").
    */
-  async listarUsuarios({ rol } = {}) {
+  async listarUsuarios({ rol, incluirInactivos = false } = {}) {
     const roles = rol ? String(rol).split(',').map(r => r.trim()).filter(Boolean) : [];
     const invalidos = roles.filter(r => !ROLES_VALIDOS.includes(r));
     if (invalidos.length) {
       throw Object.assign(new Error(`Rol invalido: ${invalidos.join(', ')}`), { status: 400 });
     }
-    const usuarios = await this.usuarioRepo.listar({ roles });
+    const usuarios = await this.usuarioRepo.listar({ roles, incluirInactivos });
     return usuarios.map(u => u.toPublic());
+  }
+
+  /** Desactiva una cuenta. Un admin no puede desactivarse a si mismo. */
+  async desactivarUsuario(id, idSolicitante) {
+    const usuario = await this.usuarioRepo.obtenerPorId(Number(id));
+    if (!usuario) throw Object.assign(new Error('Usuario no encontrado'), { status: 404 });
+    if (Number(id) === Number(idSolicitante)) {
+      throw Object.assign(new Error('No puede desactivar su propia cuenta'), { status: 409 });
+    }
+    if (usuario.activo === false) {
+      throw Object.assign(new Error('La cuenta ya esta desactivada'), { status: 409 });
+    }
+    return (await this.usuarioRepo.cambiarActivo(usuario.id, false)).toPublic();
+  }
+
+  async reactivarUsuario(id) {
+    const usuario = await this.usuarioRepo.obtenerPorId(Number(id));
+    if (!usuario) throw Object.assign(new Error('Usuario no encontrado'), { status: 404 });
+    if (usuario.activo !== false) {
+      throw Object.assign(new Error('La cuenta ya esta activa'), { status: 409 });
+    }
+    return (await this.usuarioRepo.cambiarActivo(usuario.id, true)).toPublic();
   }
 
   async obtenerPerfil(idUsuario) {

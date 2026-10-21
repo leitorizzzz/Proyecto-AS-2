@@ -1,6 +1,6 @@
 /**
  * Pruebas unitarias de PacienteService: validaciones de alta/edicion y
- * borrado bloqueado cuando el paciente ya tiene historial (FK).
+ * borrado logico (desactivar / reactivar).
  */
 const PacienteService = require('../src/services/PacienteService');
 
@@ -9,16 +9,13 @@ const VALIDO = {
   genero: 'F', dpi: '1234567890123'
 };
 
-function nuevoServicio({ porId = { id: 1, ...VALIDO }, porDpi = null, errorAlEliminar = null } = {}) {
+function nuevoServicio({ porId = { id: 1, ...VALIDO, activo: true }, porDpi = null } = {}) {
   const repo = {
     obtenerPorId: jest.fn(async () => porId),
     obtenerPorDpi: jest.fn(async () => porDpi),
     guardar: jest.fn(async p => ({ ...p, id: 2 })),
     actualizar: jest.fn(async (id, p) => ({ ...p, id })),
-    eliminar: jest.fn(async () => {
-      if (errorAlEliminar) throw errorAlEliminar;
-      return true;
-    })
+    cambiarActivo: jest.fn(async (id, activo) => ({ ...porId, id, activo }))
   };
   return { svc: new PacienteService(repo), repo };
 }
@@ -47,14 +44,14 @@ describe('PacienteService', () => {
     expect(repo.actualizar).toHaveBeenCalledWith(1, expect.objectContaining({ telefono: '55550000' }));
   });
 
-  test('eliminar paciente con solicitudes (FK 547) -> 409', async () => {
-    const fk = Object.assign(new Error('The DELETE statement conflicted with the REFERENCE constraint'), { number: 547 });
-    const { svc } = nuevoServicio({ errorAlEliminar: fk });
-    await expect(svc.eliminar(1)).rejects.toMatchObject({ status: 409 });
+  test('desactivar un paciente ya desactivado -> 409', async () => {
+    const { svc, repo } = nuevoServicio({ porId: { id: 1, ...VALIDO, activo: false } });
+    await expect(svc.desactivar(1)).rejects.toMatchObject({ status: 409 });
+    expect(repo.cambiarActivo).not.toHaveBeenCalled();
   });
 
-  test('eliminar paciente inexistente -> no encontrado', async () => {
+  test('desactivar paciente inexistente -> no encontrado', async () => {
     const { svc } = nuevoServicio({ porId: null });
-    await expect(svc.eliminar(99)).rejects.toThrow('Paciente no encontrado');
+    await expect(svc.desactivar(99)).rejects.toThrow('Paciente no encontrado');
   });
 });

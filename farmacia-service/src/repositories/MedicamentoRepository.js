@@ -8,9 +8,11 @@ const Medicamento = require('../models/Medicamento');
  */
 class MedicamentoRepository {
 
-  async obtenerTodos() {
+  /** Por defecto solo activos; incluirInactivos los trae todos. */
+  async obtenerTodos({ incluirInactivos = false } = {}) {
     const pool = await getPool();
-    const result = await pool.request().query('SELECT * FROM medicamentos ORDER BY id');
+    const where = incluirInactivos ? '' : 'WHERE activo = 1';
+    const result = await pool.request().query(`SELECT * FROM medicamentos ${where} ORDER BY id`);
     return result.recordset.map(f => new Medicamento(f));
   }
 
@@ -62,12 +64,14 @@ class MedicamentoRepository {
       .query('UPDATE medicamentos SET stock = @stock WHERE id = @id');
   }
 
-  async eliminar(id) {
+  /** Borrado logico: no hay DELETE fisico de medicamentos. */
+  async cambiarActivo(id, activo) {
     const pool = await getPool();
-    const result = await pool.request()
+    await pool.request()
       .input('id', sql.Int, id)
-      .query('DELETE FROM medicamentos WHERE id = @id');
-    return result.rowsAffected[0] > 0;
+      .input('activo', sql.Bit, activo ? 1 : 0)
+      .query('UPDATE medicamentos SET activo = @activo WHERE id = @id');
+    return this.obtenerPorId(id);
   }
 }
 

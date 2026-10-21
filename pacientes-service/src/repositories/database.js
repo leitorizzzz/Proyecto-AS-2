@@ -68,6 +68,15 @@ async function inicializarEsquema() {
     ALTER TABLE pacientes ADD familiarEmail NVARCHAR(200) NULL;
   `);
 
+  // Borrado logico: las filas existentes quedan activas (DEFAULT 1).
+  await pool.request().query(`
+    IF NOT EXISTS (
+      SELECT 1 FROM sys.columns
+      WHERE object_id = OBJECT_ID('pacientes') AND name = 'activo'
+    )
+    ALTER TABLE pacientes ADD activo BIT NOT NULL CONSTRAINT DF_pacientes_activo DEFAULT 1;
+  `);
+
   await pool.request().query(`
     IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'solicitudes_referencia')
     CREATE TABLE solicitudes_referencia (

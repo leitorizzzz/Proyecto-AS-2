@@ -57,9 +57,11 @@ class PrescripcionReadRepository {
           vp.estado,
           vp.idDispensacion,
           vp.fechaPrescripcion,
-          vp.fechaDispensacion
+          vp.fechaDispensacion,
+          p.activo AS pacienteActivo
         FROM visita_prescripciones vp
         INNER JOIN visitas_medicas vm ON vm.id = vp.idVisita
+        INNER JOIN pacientes p ON p.id = vm.idPaciente
         WHERE vp.id = @id
       `);
     return r.recordset[0] ? new Prescripcion(r.recordset[0]) : null;

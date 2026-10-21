@@ -27,7 +27,23 @@ class FinancieroController {
   };
 
   listarDonantes = async (req, res) => {
-    try { res.json(await this.service.listarDonantes()); }
+    try {
+      const incluirInactivos = req.query.incluirInactivos === 'true';
+      if (incluirInactivos && req.usuario?.rol !== 'admin') {
+        return res.status(403).json({ error: 'Solo administracion puede ver donantes desactivados' });
+      }
+      res.json(await this.service.listarDonantes({ incluirInactivos }));
+    }
+    catch (error) { this._fallo(res, error); }
+  };
+
+  desactivarDonante = async (req, res) => {
+    try { res.json(await this.service.desactivarDonante(Number(req.params.id))); }
+    catch (error) { this._fallo(res, error); }
+  };
+
+  reactivarDonante = async (req, res) => {
+    try { res.json(await this.service.reactivarDonante(Number(req.params.id))); }
     catch (error) { this._fallo(res, error); }
   };
 

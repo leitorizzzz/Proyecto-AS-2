@@ -17,6 +17,12 @@ function crearRutasAuth(authController) {
   router.get('/usuarios', autenticar, autorizarRoles('admin', 'coordinador_fundacion'),
     authController.listarUsuarios);
 
+  // Desactivar / reactivar cuentas (borrado logico): solo admin.
+  router.patch('/usuarios/:id/desactivar', autenticar, autorizarRoles('admin'),
+    authController.desactivarUsuario);
+  router.patch('/usuarios/:id/reactivar', autenticar, autorizarRoles('admin'),
+    authController.reactivarUsuario);
+
   return router;
 }
 

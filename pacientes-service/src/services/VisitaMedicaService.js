@@ -1,5 +1,6 @@
 const VisitaMedica = require('../models/VisitaMedica');
 const SolicitudReferencia = require('../models/SolicitudReferencia');
+const { asegurarPacienteActivo } = require('./reglasPaciente');
 
 /**
  * CAPA DE LOGICA DE NEGOCIO
@@ -8,9 +9,10 @@ const SolicitudReferencia = require('../models/SolicitudReferencia');
  * solicitud a 'en_atencion'; al completar la visita la mueve a 'completada'.
  */
 class VisitaMedicaService {
-  constructor(visitaRepository, solicitudService) {
+  constructor(visitaRepository, solicitudService, pacienteRepository) {
     this.repo = visitaRepository;
     this.solicitudService = solicitudService;
+    this.pacienteRepo = pacienteRepository;
   }
 
   obtener(id) { return this._obtener(id); }
@@ -38,6 +40,8 @@ class VisitaMedicaService {
         { status: 409 }
       );
     }
+
+    await asegurarPacienteActivo(this.pacienteRepo, solicitud.idPaciente, 'iniciarle visitas');
 
     const yaExiste = await this.repo.obtenerPorSolicitud(idSolicitud);
     if (yaExiste) {
@@ -80,6 +84,7 @@ class VisitaMedicaService {
     if (!datos || !datos.tipo || String(datos.tipo).trim() === '') {
       throw Object.assign(new Error('tipo del examen es requerido'), { status: 400 });
     }
+    await asegurarPacienteActivo(this.pacienteRepo, visita.idPaciente, 'pedirle examenes');
     return this.repo.agregarExamen(id, { tipo: String(datos.tipo).trim() });
   }
 
@@ -91,6 +96,7 @@ class VisitaMedicaService {
     if (!datos || !datos.medicamento || String(datos.medicamento).trim() === '') {
       throw Object.assign(new Error('medicamento es requerido'), { status: 400 });
     }
+    await asegurarPacienteActivo(this.pacienteRepo, visita.idPaciente, 'prescribirle medicamentos');
     return this.repo.agregarPrescripcion(id, {
       medicamento: String(datos.medicamento).trim(),
       dosis: datos.dosis ? String(datos.dosis) : null,

@@ -19,10 +19,21 @@ class DonanteRepository {
     return new Donante(result.recordset[0]);
   }
 
-  async listarDonantes() {
+  /** Por defecto solo activos; incluirInactivos los trae todos. */
+  async listarDonantes({ incluirInactivos = false } = {}) {
     const pool = await getPool();
-    const result = await pool.request().query('SELECT * FROM donantes ORDER BY nombre');
+    const where = incluirInactivos ? '' : 'WHERE activo = 1';
+    const result = await pool.request().query(`SELECT * FROM donantes ${where} ORDER BY nombre`);
     return result.recordset.map(r => new Donante(r));
+  }
+
+  async cambiarActivoDonante(id, activo) {
+    const pool = await getPool();
+    await pool.request()
+      .input('id', sql.Int, id)
+      .input('activo', sql.Bit, activo ? 1 : 0)
+      .query('UPDATE donantes SET activo = @activo WHERE id = @id');
+    return this.obtenerDonante(id);
   }
 
   async obtenerDonante(id) {

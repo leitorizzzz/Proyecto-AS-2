@@ -20,7 +20,8 @@ function app() {
     obtenerMedicamento: ok,
     crearMedicamento: (_r, res) => res.status(201).json({ id: 1 }),
     actualizarMedicamento: ok,
-    eliminarMedicamento: (_r, res) => res.status(204).send(),
+    desactivarMedicamento: ok,
+    reactivarMedicamento: ok,
     prescripcionesPendientesPaciente: (_r, res) => res.json([]),
     dispensar: (_r, res) => res.status(201).json({ id: 1 }),
     historialPaciente: ok

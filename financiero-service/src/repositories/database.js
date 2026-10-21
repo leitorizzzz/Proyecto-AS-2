@@ -71,6 +71,15 @@ async function inicializarEsquema() {
     );
   `);
 
+  // Borrado logico de donantes: las donaciones registradas se conservan.
+  await pool.request().query(`
+    IF NOT EXISTS (
+      SELECT 1 FROM sys.columns
+      WHERE object_id = OBJECT_ID('donantes') AND name = 'activo'
+    )
+    ALTER TABLE donantes ADD activo BIT NOT NULL CONSTRAINT DF_donantes_activo DEFAULT 1;
+  `);
+
   await pool.request().query(`
     IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'donaciones')
     CREATE TABLE donaciones (

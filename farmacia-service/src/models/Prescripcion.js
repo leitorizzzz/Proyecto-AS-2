@@ -22,7 +22,8 @@ class Prescripcion {
     estado,
     idDispensacion,
     fechaPrescripcion,
-    fechaDispensacion
+    fechaDispensacion,
+    pacienteActivo
   }) {
     this.id = id;
     this.idVisita = idVisita;
@@ -35,6 +36,9 @@ class Prescripcion {
     this.idDispensacion = idDispensacion || null;
     this.fechaPrescripcion = fechaPrescripcion || null;
     this.fechaDispensacion = fechaDispensacion || null;
+    // Leido de pacientes.activo (BD compartida): un paciente desactivado
+    // no puede recibir dispensaciones.
+    this.pacienteActivo = pacienteActivo === undefined || pacienteActivo === null ? true : Boolean(pacienteActivo);
   }
 
   estaPendiente() { return this.estado === 'pendiente'; }

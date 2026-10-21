@@ -46,6 +46,16 @@ async function inicializarEsquema() {
     );
   `);
 
+  // Borrado logico: un medicamento desactivado sale del inventario visible
+  // pero sus dispensaciones siguen apuntando a el. Existentes = activos.
+  await pool.request().query(`
+    IF NOT EXISTS (
+      SELECT 1 FROM sys.columns
+      WHERE object_id = OBJECT_ID('medicamentos') AND name = 'activo'
+    )
+    ALTER TABLE medicamentos ADD activo BIT NOT NULL CONSTRAINT DF_medicamentos_activo DEFAULT 1;
+  `);
+
   await pool.request().query(`
     IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'dispensaciones')
     CREATE TABLE dispensaciones (

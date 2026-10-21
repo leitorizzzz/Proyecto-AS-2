@@ -14,6 +14,12 @@ function crearSolicitudServiceMock(estado) {
   };
 }
 
+// Paciente activo por defecto; las pruebas de la regla "paciente activo"
+// pasan activo: false.
+function crearPacienteRepoMock(activo = true) {
+  return { obtenerPorId: jest.fn(async id => ({ id, nombres: 'Rosa', apellidos: 'Gomez', activo })) };
+}
+
 function crearRepoMock(visita) {
   return {
     obtenerPorId: jest.fn(async () => visita),
@@ -32,7 +38,7 @@ describe('VisitaMedicaService', () => {
     const visita = new VisitaMedica({ id: 1, idSolicitudReferencia: 1, idPaciente: 1,
       idMedicoEspecialista: 2, estado: 'en_atencion',
       diagnostico: '', observaciones: 'ok' });
-    const svc = new VisitaMedicaService(crearRepoMock(visita), crearSolicitudServiceMock('en_atencion'));
+    const svc = new VisitaMedicaService(crearRepoMock(visita), crearSolicitudServiceMock('en_atencion'), crearPacienteRepoMock());
     await expect(svc.completar(1)).rejects.toMatchObject({ status: 400 });
   });
 
@@ -40,7 +46,7 @@ describe('VisitaMedicaService', () => {
     const visita = new VisitaMedica({ id: 1, idSolicitudReferencia: 1, idPaciente: 1,
       idMedicoEspecialista: 2, estado: 'en_atencion',
       diagnostico: 'HTA', observaciones: '' });
-    const svc = new VisitaMedicaService(crearRepoMock(visita), crearSolicitudServiceMock('en_atencion'));
+    const svc = new VisitaMedicaService(crearRepoMock(visita), crearSolicitudServiceMock('en_atencion'), crearPacienteRepoMock());
     await expect(svc.completar(1)).rejects.toMatchObject({ status: 400 });
   });
 
@@ -58,7 +64,7 @@ describe('VisitaMedicaService', () => {
   test('inmutabilidad: editar visita completada -> 409', async () => {
     const visita = new VisitaMedica({ id: 1, idSolicitudReferencia: 1, idPaciente: 1,
       idMedicoEspecialista: 2, estado: 'completada' });
-    const svc = new VisitaMedicaService(crearRepoMock(visita), crearSolicitudServiceMock('completada'));
+    const svc = new VisitaMedicaService(crearRepoMock(visita), crearSolicitudServiceMock('completada'), crearPacienteRepoMock());
     await expect(svc.actualizarClinico(1, { diagnostico: 'x', observaciones: 'y' }))
       .rejects.toMatchObject({ status: 409 });
   });
@@ -67,7 +73,7 @@ describe('VisitaMedicaService', () => {
     const visita = new VisitaMedica({ id: 1, idSolicitudReferencia: 1, idPaciente: 1,
       idMedicoEspecialista: 2, estado: 'en_atencion' });
     const repo = crearRepoMock(visita);
-    const svc = new VisitaMedicaService(repo, crearSolicitudServiceMock('en_atencion'));
+    const svc = new VisitaMedicaService(repo, crearSolicitudServiceMock('en_atencion'), crearPacienteRepoMock());
     await svc.agregarPrescripcion(1, { medicamento: 'Losartan', idMedicamento: 2, dosis: '1/24h' });
     expect(repo.agregarPrescripcion).toHaveBeenCalledWith(1, expect.objectContaining({
       medicamento: 'Losartan', idMedicamento: 2

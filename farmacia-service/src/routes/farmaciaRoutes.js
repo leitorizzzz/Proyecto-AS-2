@@ -18,7 +18,9 @@ function crearRutasFarmacia(farmaciaController) {
   router.get('/medicamentos/:id', farmaciaController.obtenerMedicamento);
   router.post('/medicamentos', soloFarmacia, farmaciaController.crearMedicamento);
   router.put('/medicamentos/:id', soloFarmacia, farmaciaController.actualizarMedicamento);
-  router.delete('/medicamentos/:id', soloFarmacia, farmaciaController.eliminarMedicamento);
+  // DELETE = desactivar (borrado logico). Reactivar y ?incluirInactivos: solo admin.
+  router.delete('/medicamentos/:id', soloFarmacia, farmaciaController.desactivarMedicamento);
+  router.patch('/medicamentos/:id/reactivar', autorizarRoles('admin'), farmaciaController.reactivarMedicamento);
 
   // Prescripciones pendientes (lectura desde visita_prescripciones)
   router.get(

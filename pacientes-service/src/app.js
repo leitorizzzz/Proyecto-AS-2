@@ -35,7 +35,7 @@ const notificacionesClient = new NotificacionesClient({
 
 const pacienteService = new PacienteService(pacienteRepository);
 const solicitudService = new SolicitudService(solicitudRepository, pacienteRepository, notificacionesClient);
-const visitaService = new VisitaMedicaService(visitaRepository, solicitudService);
+const visitaService = new VisitaMedicaService(visitaRepository, solicitudService, pacienteRepository);
 
 const pacienteController = new PacienteController(pacienteService);
 const solicitudController = new SolicitudController(solicitudService);

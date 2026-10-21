@@ -4,12 +4,13 @@
  * No contiene logica de negocio ni acceso a base de datos.
  */
 class Medicamento {
-  constructor({ id, nombre, presentacion, stock, precioUnitario }) {
+  constructor({ id, nombre, presentacion, stock, precioUnitario, activo }) {
     this.id = id || null;
     this.nombre = nombre;
     this.presentacion = presentacion;   // ej: "tableta 500mg", "jarabe 120ml"
     this.stock = stock;
     this.precioUnitario = precioUnitario;
+    this.activo = activo === undefined || activo === null ? true : Boolean(activo);
   }
 
   getNombre() { return this.nombre; }

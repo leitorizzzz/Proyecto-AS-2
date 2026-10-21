@@ -1,4 +1,5 @@
 const SolicitudReferencia = require('../models/SolicitudReferencia');
+const { asegurarPacienteActivo } = require('./reglasPaciente');
 
 const ESPECIALIDAD_MAX = 100;
 const MOTIVO_MAX = 1000;
@@ -53,10 +54,7 @@ class SolicitudService {
       throw Object.assign(new Error(`motivo excede ${MOTIVO_MAX} caracteres`), { status: 400 });
     }
 
-    const paciente = await this.pacienteRepo.obtenerPorId(Number(idPaciente));
-    if (!paciente) {
-      throw Object.assign(new Error('Paciente no encontrado'), { status: 404 });
-    }
+    const paciente = await asegurarPacienteActivo(this.pacienteRepo, idPaciente, 'crear solicitudes');
 
     // RN-02
     const duplicada = await this.repo.existeSolicitudActiva(Number(idPaciente), especialidad);
@@ -103,6 +101,7 @@ class SolicitudService {
     if (!idMedicoEspecialista || Number.isNaN(Number(idMedicoEspecialista))) {
       throw Object.assign(new Error('idMedicoEspecialista es requerido'), { status: 400 });
     }
+    await asegurarPacienteActivo(this.pacienteRepo, solicitud.idPaciente, 'asignarle citas');
 
     return this.repo.asignarCita(id, {
       fechaCita,

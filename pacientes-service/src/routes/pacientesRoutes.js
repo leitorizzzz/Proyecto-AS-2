@@ -8,15 +8,17 @@ function crearRutasPacientes(pacienteController) {
   // Todas las rutas de pacientes requieren token valido
   router.use(autenticar);
 
-  // Lectura: cualquier autenticado. Alta y edicion del expediente:
-  // enfermeria y administracion. Borrado fisico: solo administracion.
+  // Lectura: cualquier autenticado (?incluirInactivos=true solo admin).
+  // Alta y edicion del expediente: enfermeria y administracion.
+  // Desactivar (DELETE = borrado logico) y reactivar: solo administracion.
   const registraPacientes = autorizarRoles('enfermero', 'admin');
 
   router.get('/', pacienteController.listar);
   router.get('/:id', pacienteController.obtener);
   router.post('/', registraPacientes, pacienteController.crear);
   router.put('/:id', registraPacientes, pacienteController.actualizar);
-  router.delete('/:id', autorizarRoles('admin'), pacienteController.eliminar);
+  router.delete('/:id', autorizarRoles('admin'), pacienteController.desactivar);
+  router.patch('/:id/reactivar', autorizarRoles('admin'), pacienteController.reactivar);
 
   return router;
 }

@@ -14,6 +14,8 @@ function crearRutasFinanciero(ctrl) {
 
   router.get('/donantes', ctrl.listarDonantes);
   router.post('/donantes', soloAdmin, ctrl.crearDonante);
+  router.patch('/donantes/:id/desactivar', soloAdmin, ctrl.desactivarDonante);
+  router.patch('/donantes/:id/reactivar', soloAdmin, ctrl.reactivarDonante);
 
   router.get('/donaciones', ctrl.listarDonaciones);
   router.post('/donaciones', soloAdmin, ctrl.registrarDonacion);

@@ -21,13 +21,34 @@ class AuthController {
       const resultado = await this.service.login(req.body);
       res.json(resultado);
     } catch (error) {
-      res.status(401).json({ error: error.message });
+      // 401 credenciales invalidas; 403 cuenta desactivada
+      res.status(error.status || 401).json({ error: error.message });
     }
   };
 
   listarUsuarios = async (req, res) => {
     try {
-      res.json(await this.service.listarUsuarios({ rol: req.query.rol }));
+      const incluirInactivos = req.query.incluirInactivos === 'true';
+      if (incluirInactivos && req.usuario.rol !== 'admin') {
+        return res.status(403).json({ error: 'Solo administracion puede ver cuentas desactivadas' });
+      }
+      res.json(await this.service.listarUsuarios({ rol: req.query.rol, incluirInactivos }));
+    } catch (error) {
+      res.status(error.status || 500).json({ error: error.message });
+    }
+  };
+
+  desactivarUsuario = async (req, res) => {
+    try {
+      res.json(await this.service.desactivarUsuario(Number(req.params.id), req.usuario.sub));
+    } catch (error) {
+      res.status(error.status || 500).json({ error: error.message });
+    }
+  };
+
+  reactivarUsuario = async (req, res) => {
+    try {
+      res.json(await this.service.reactivarUsuario(Number(req.params.id)));
     } catch (error) {
       res.status(error.status || 500).json({ error: error.message });
     }

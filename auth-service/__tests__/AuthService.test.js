@@ -69,7 +69,7 @@ describe('AuthService', () => {
       usuarios: [new Usuario({ id: 3, nombre: 'Dr. R', email: 'r@asilo.gt', passwordHash: 'h', rol: 'medico_especialista' })]
     });
     const lista = await svc.listarUsuarios({ rol: 'medico_especialista, especialista' });
-    expect(repo.listar).toHaveBeenCalledWith({ roles: ['medico_especialista', 'especialista'] });
+    expect(repo.listar).toHaveBeenCalledWith({ roles: ['medico_especialista', 'especialista'], incluirInactivos: false });
     expect(lista).toHaveLength(1);
     expect(lista[0]).not.toHaveProperty('passwordHash');
   });

@@ -22,8 +22,8 @@ class FarmaciaService {
     this.prescripcionRepo = prescripcionRepository;
   }
 
-  listarMedicamentos() {
-    return this.medicamentoRepo.obtenerTodos();
+  listarMedicamentos({ incluirInactivos = false } = {}) {
+    return this.medicamentoRepo.obtenerTodos({ incluirInactivos });
   }
 
   async obtenerMedicamento(id) {
@@ -53,9 +53,21 @@ class FarmaciaService {
     return this.medicamentoRepo.actualizar(id, datos);
   }
 
-  async eliminarMedicamento(id) {
-    await this.obtenerMedicamento(id);
-    return this.medicamentoRepo.eliminar(id);
+  /** DELETE /medicamentos/:id = borrado logico; las dispensaciones se conservan. */
+  async desactivarMedicamento(id) {
+    const medicamento = await this.obtenerMedicamento(id);
+    if (medicamento.activo === false) {
+      throw Object.assign(new Error('El medicamento ya esta desactivado'), { status: 409 });
+    }
+    return this.medicamentoRepo.cambiarActivo(id, false);
+  }
+
+  async reactivarMedicamento(id) {
+    const medicamento = await this.obtenerMedicamento(id);
+    if (medicamento.activo !== false) {
+      throw Object.assign(new Error('El medicamento ya esta activo'), { status: 409 });
+    }
+    return this.medicamentoRepo.cambiarActivo(id, true);
   }
 
   /**
@@ -123,7 +135,20 @@ class FarmaciaService {
       );
     }
 
+    if (prescripcion.pacienteActivo === false) {
+      throw Object.assign(
+        new Error(`El paciente ${prescripcion.idPaciente} esta desactivado: no se le pueden dispensar medicamentos. Un administrador puede reactivarlo.`),
+        { status: 409 }
+      );
+    }
+
     const medicamento = await this.obtenerMedicamento(prescripcion.idMedicamento);
+    if (medicamento.activo === false) {
+      throw Object.assign(
+        new Error(`El medicamento ${medicamento.getNombre()} esta desactivado en el inventario`),
+        { status: 409 }
+      );
+    }
 
     if (!medicamento.tieneStockSuficiente(Number(cantidad))) {
       throw Object.assign(

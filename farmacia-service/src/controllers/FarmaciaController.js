@@ -15,7 +15,11 @@ class FarmaciaController {
 
   listarMedicamentos = async (req, res) => {
     try {
-      const medicamentos = await this.service.listarMedicamentos();
+      const incluirInactivos = req.query.incluirInactivos === 'true';
+      if (incluirInactivos && req.usuario?.rol !== 'admin') {
+        return res.status(403).json({ error: 'Solo administracion puede ver medicamentos desactivados' });
+      }
+      const medicamentos = await this.service.listarMedicamentos({ incluirInactivos });
       res.json(medicamentos);
     } catch (error) { this._fallo(res, error); }
   };
@@ -41,10 +45,16 @@ class FarmaciaController {
     } catch (error) { this._fallo(res, error); }
   };
 
-  eliminarMedicamento = async (req, res) => {
+  /** DELETE /medicamentos/:id: borrado logico (activo = 0). */
+  desactivarMedicamento = async (req, res) => {
     try {
-      await this.service.eliminarMedicamento(Number(req.params.id));
-      res.status(204).send();
+      res.json(await this.service.desactivarMedicamento(Number(req.params.id)));
+    } catch (error) { this._fallo(res, error); }
+  };
+
+  reactivarMedicamento = async (req, res) => {
+    try {
+      res.json(await this.service.reactivarMedicamento(Number(req.params.id)));
     } catch (error) { this._fallo(res, error); }
   };
 
