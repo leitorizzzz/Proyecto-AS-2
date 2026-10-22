@@ -49,6 +49,11 @@ directorio sin `passwordHash` (solo cuentas activas); lo usa el diálogo
 emitido sigue válido hasta su `exp` en los demás servicios.
 **`JWT_EXPIRES_IN` solo aplica aquí** (es quien firma); los demás servicios
 solo verifican con `JWT_SECRET` y respetan el `exp` embebido en el token.
+`GET /api/auth/usuarios` también lo usa `medico_general` (elige al
+enfermero de la solicitud). **bcrypt corre en hilos de trabajo**
+(`services/hashPool.js` + `hashWorker.js`, `HASH_HILOS`): mismo algoritmo
+y costo 10, pero los logins simultáneos ya no se atienden en fila (caso 25:
+login máx. 7,1 s → < 1 s con 50 usuarios).
 
 ### `pacientes-service/` — ✅ funcional, agrupa 3 dominios
 **Importante:** Solicitudes y Visita Médica NO son microservicios aparte —
@@ -63,15 +68,41 @@ mantiene sus propias 4 capas dentro del mismo servicio:
   Regla **paciente activo** en `services/reglasPaciente.js`: a un
   desactivado no se le crean solicitudes, citas, visitas, exámenes ni
   prescripciones → 409.
+  **Familiar responsable y ficha (caso 5)**: el alta exige `familiar`
+  completo (nombres, apellidos, dpi 13 dígitos, parentesco, telefono,
+  email, direccion; `services/reglasFamiliar.js`) → 400 con
+  `camposFaltantes`; en la misma transacción crea `familiares` (uno
+  `principal` activo por paciente) y `fichas_medicas` (1:1).
+  `PUT /:id/familiar` lo corrige. `pacientes.familiarEmail` queda como
+  copia del correo del principal.
 - **SolicitudReferencia**: `SolicitudController/Service/Repository`, modelo
   `SolicitudReferencia`. Flujo: `medico_general` crea solicitud →
   `coordinador_fundacion`/`admin` asigna cita → `medico_especialista`
   convierte a visita. RN-02: no permitir 2 solicitudes activas
   (`pendiente_asignacion`, `cita_asignada`, `en_atencion`) para la misma
-  especialidad del mismo paciente → 409.
+  especialidad del mismo paciente → 409 con `solicitudActiva {id, estado}`.
+  `idEnfermero` obligatorio (usuario activo con rol `enfermero`, caso 7).
+  Asignar cita deja **avisos internos** (tabla `avisos`, tipo
+  `cita_asignada`) al médico general y al enfermero en la misma
+  transacción; `GET /api/avisos[?noLeidos=true]`, `PATCH /api/avisos/:id/leido`
+  (`AvisoController/Service/Repository`, modelo `Aviso`).
 - **VisitaMedica**: `VisitaMedicaController/Service/Repository`, modelo
   `VisitaMedica`. Completar visita exige `diagnostico` y `observaciones`
-  no vacíos → 400 si faltan. Estado inmutable tras `completada`/`cancelada`.
+  no vacíos → 400 con `camposFaltantes` y la visita pasa a **`incompleta`**
+  (sigue editable). Estado inmutable tras `completada`/`cancelada`.
+  Queda vinculada a la ficha (`idFichaMedica`). **Cierre = cargo atómico
+  (caso 19)**: `VisitaMedicaRepository.completarConCargo` en una
+  transacción bloquea la visita, calcula consulta (`tarifas_servicio`
+  `consulta_especialista`) + laboratorio + farmacia con RN-09, inserta
+  `cargos_servicio` (`origen='visita'`, `idFamiliar`) + `cargos_detalle`
+  y cierra visita y solicitud; un segundo cierre → 409 (índice único
+  `UX_cargos_visita`). Sin tarifa, examen sin precio o familiar
+  incompleto → 409 y no se cierra.
+  **Exámenes (caso 15)**: al ordenar se congelan `precioBase`,
+  `descuento` y `costo` en `visita_examenes`; tipo sin precio en
+  `examenes_precios` → 409. **Prescripciones (caso 18)**:
+  `cantidadPrescrita` obligatoria; estados `pendiente → parcial →
+  dispensada` según `cantidadEntregada`.
 - **Exámenes y prescripciones de la visita**: viven en
   `visita_examenes` y `visita_prescripciones`, propiedad de este
   servicio. `laboratorio-service` y `farmacia-service` **sí** las leen
@@ -91,6 +122,14 @@ mantiene sus propias 4 capas dentro del mismo servicio:
 `DELETE /medicamentos/:id` = borrado lógico; reactivar solo admin. No se
 dispensa a pacientes desactivados (lee `pacientes.activo` en la BD
 compartida) ni medicamentos desactivados → 409.
+**Despacho parcial (caso 18)**: `DispensacionRepository.registrarDespacho`
+en una transacción (bloquea primero la visita, como el cierre, para no
+interbloquearse) descuenta stock y `cantidadEntregada` con UPDATE
+condicional, guarda `idPrescripcion`/`montoBase` y suma
+`visitas_medicas.costoFarmacia`. Entregar más de lo que falta → 409 sin
+tocar stock. Si la visita ya está cerrada, genera un cargo complementario
+(`origen='dispensacion'`). El esquema crea `dispensaciones` antes de sus
+ALTER (desde cero fallaba hasta el 21 oct).
 
 ### `laboratorio-service/` — ✅ funcional, puerto 3003
 `LaboratorioController` → `ordenesPendientes`, `identificarPaciente(dpi)`,
@@ -102,22 +141,48 @@ administrables con `GET/POST/PUT /api/laboratorio/precios` (lectura
 cualquier autenticado, escritura solo admin; `PrecioExamen`,
 `PrecioExamenRepository`). Descuento fundación RN-09 configurable via
 `DESCUENTO_FUNDACION`; el listado de precios ya trae `precioConDescuento`.
-El costo de un examen se busca por coincidencia exacta del `tipo`.
+El costo de un examen se busca por coincidencia exacta del `tipo`; si la
+orden trae el costo registrado al pedirla, ese manda
+(`registradoAlOrdenar: true`). Las órdenes anteriores al 21 oct (NULL)
+usan el catálogo actual.
 
 ### `financiero-service/` — ✅ funcional, puerto 3004
 `FinancieroController` → `estadoCuenta`, `registrarCargo`,
 `registrarPago-cuota`, `registrarDonante/Donacion`, `registrarGasto`,
-`registrarPagoFundacion`. `FinancieroService` implementa
-`generarAlertaSaldo` con umbral `UMBRAL_ALERTA_SALDO`. Repositorios:
-`CuentaRepository`, `DonanteRepository`, `MovimientosRepository`.
+`registrarPagoFundacion`. Repositorios: `CuentaRepository`,
+`DonanteRepository`, `MovimientosRepository`, `FamiliarReadRepository`.
 Donantes con borrado lógico (`PATCH /donantes/:id/{desactivar,reactivar}`,
 admin); donación a donante desactivado → 409.
+- **Titular (caso 20)**: la cuenta es del familiar responsable; cargo o
+  cuota sin familiar completo → 409 (`services/reglasCuenta.js`).
+  `estadoCuenta` trae `familiar`.
+- **Cargos**: `cargos_servicio` con `idVisita`, `idDispensacion`,
+  `idFamiliar`, `origen` (`manual|visita|dispensacion`), `montoPagado`;
+  desglose en `cargos_detalle`; tarifa de consulta en `tarifas_servicio`
+  (semilla Q150). **Abonos** `POST /cargos/:id/abonos` (admin, tabla
+  `abonos_cargo`): mayor que el saldo → 409; CHECK
+  `CK_cargos_saldo_no_negativo` en la BD. Estados `pendiente|parcial|pagado`.
+- **Alertas de cobro (caso 21)**, `services/alertasCobro.js`: **roja** si
+  saldo ≥ `UMBRAL_ALERTA_SALDO` o cuota con más de `DIAS_MORA_ROJA` (30)
+  días de mora; **naranja** si saldo ≥ `UMBRAL_ALERTA_NARANJA` (por defecto
+  la mitad) o alguna cuota vencida. Reemplaza los niveles `bajo|alto`.
+  `GET /alertas` (admin, coordinador_fundacion, fundacion) lista las
+  cuentas con alerta, rojas primero. `POST /cuotas` (admin) emite la cuota
+  pendiente con `fechaVencimiento` (por defecto fin de mes); "hoy" se
+  calcula en hora de Guatemala.
 
 ### `reportes-service/` — ✅ funcional, puerto 3005
 Los 7 reportes del enunciado exportables a JSON, PDF (pdfkit) o Excel
 (exceljs). No crea tablas propias; consulta todas las demás en la BD
 compartida vía `ReportesRepository`. `GET /api/reportes/tipos` lista los
 identificadores; `GET /api/reportes/:tipo?desde=&hasta=&formato=` genera.
+`desde`/`hasta` son días de Guatemala y **`hasta` es inclusivo**
+(`fecha >= 00:00 GT desde AND fecha < 00:00 GT del día siguiente`);
+fecha, `idPaciente` o `formato` inválidos → 400 (caso 23). El Excel lleva
+**fórmulas reales** (`SUM` en totales, suma de rubros por fila), banda
+institucional, cabecera fija y autofiltro (caso 22). Costos por paciente
+sale solo de los cargos, por rubro (consulta, laboratorio, farmacia,
+otros): antes sumaba también dispensaciones y contaba farmacia dos veces.
 También sirve **`GET /api/auditoria`** (solo admin, solo lectura):
 `AuditoriaController/Service/Repository`, filtros `desde`, `hasta`
 (YYYY-MM-DD inclusivo o instante ISO), `entidad`, `idEntidad`, `limite`.
@@ -126,7 +191,10 @@ También sirve **`GET /api/auditoria`** (solo admin, solo lectura):
 - `activo BIT NOT NULL DEFAULT 1` (ALTER idempotente) en `pacientes`,
   `usuarios`, `medicamentos`, `donantes`. No hay DELETE físico en ellas.
 - Tabla compartida `auditoria` (id, usuario = email del JWT, idUsuario,
-  accion, entidad, idEntidad, detalle, fecha UTC). La crean auth,
+  accion, entidad, idEntidad, detalle, fecha UTC, y desde el caso 24
+  `ip`, `modulo`, `datosAnteriores`/`datosNuevos` en JSON sin
+  password/hash/token). Con Docker Desktop la IP que se ve es la del
+  gateway de Docker (172.18.0.1). La crean auth,
   pacientes, farmacia y financiero al arrancar (DDL que tolera la carrera,
   errores 2714/1913) y la escriben desde sus **controladores** con
   `AuditoriaService` — copia idéntica de `RegistroAuditoria` +
@@ -147,7 +215,8 @@ reintenta las fallidas con backoff exponencial
 fire-and-forget al crear una solicitud (`NotificacionesClient`); si Brevo
 o el servicio caen, la solicitud se crea igual y el reintento lo hace el
 job interno. `POST /api/notificaciones/:id/reintentar` fuerza un reintento
-manual (solo admin).
+manual (solo admin). Cada enviada guarda `idMensajeProveedor` (caso 10):
+el `messageId` de Brevo, o `sim-<uuid>` en simulación.
 
 ### `frontend/` — ✅ funcional, puerto 8090
 HTML/CSS/JS plano servido por nginx. Un solo `index.html` + `styles.css`
@@ -173,8 +242,15 @@ Plex Sans — no reintroducir esos colores.
   (`✓ Ok —`, `⚠ Aviso —`, `✕ Error —`) y cada chip combina símbolo +
   patrón de borde: pendiente ◔ dashed, cita_asignada ● sólido 1px,
   en_atencion ◉ sólido 2px, completada/pagada/disponible/dispensada
-  ✓ double 3px, cancelada ✕ sólido 1px. Verificado en escala de
-  grises.
+  ✓ double 3px, cancelada ✕ sólido 1px, incompleta ! sólido 2px,
+  parcial ◑ dashed 2px, alerta naranja ◆ dashed 2px (token
+  `--naranja #C2410C`), alerta roja ▲ sólido 3px. Verificado en escala
+  de grises.
+- **Pantallas del plan SQA**: alta de paciente con bloque de familiar
+  responsable y acción "Familiar"; selector de enfermero en la
+  solicitud; tarjeta **Mis avisos** y **Alertas de cobro** en el panel;
+  campos faltantes resaltados al cerrar la visita; costo registrado y
+  **Ver resultado** en los exámenes; "Emitir pendiente" en cuotas.
 - **Layout**: login a dos paneles (lateral oscuro + formulario);
   shell con sidebar de 248px (regleta magenta, grupos I. Cuidado /
   II. Servicios / III. Administración) y `main.stage` con ancho
@@ -228,21 +304,29 @@ operativos (exámenes, medicamentos) → últimos 30 días; análisis
 
 ### Pruebas automatizadas — ✅
 Suite jest+supertest a nivel raíz. Comando: `npm run test:todo` o
-`scripts/run-all-tests.sh|.ps1`. Última ejecución (20 oct 2026):
-**156/156** en 22 archivos. `express`,
-`jsonwebtoken` y `bcryptjs` son devDependencies de la raíz para que las
-pruebas RBAC no dependan de los `node_modules` de cada servicio.
-E2E (`npm run test:e2e`, stack arriba): **39/39**. **Regla: el e2e solo
+`scripts/run-all-tests.sh|.ps1`. Última ejecución (21 oct 2026, stack
+recién creado con `down -v` + `bootstrap.ps1`): **242/242** en 33
+archivos. `express`, `jsonwebtoken`, `bcryptjs`, `exceljs` y `pdfkit` son
+devDependencies de la raíz para que las pruebas no dependan de los
+`node_modules` de cada servicio.
+E2E (`npm run test:e2e`, stack arriba): **58/58**. **Regla: el e2e solo
 toca registros que crea** (pacientes "E2E …", medicamento "E2E
 medicamento <ts>", precio "E2E examen (no usar)", donantes y cuentas
-"e2e.*"); los datos existentes solo se leen. Mapa de casos SQA ↔
-pruebas, 1 a 1, en [`docs/PLAN_PRUEBAS.md`](docs/PLAN_PRUEBAS.md).
-Sin pruebas unitarias: los 7 reportes (solo e2e) y el frontend.
+"e2e.*"); los datos existentes solo se leen.
+Carga (`npm run test:carga`, `USUARIOS=20..50`): login, listar pacientes,
+crear y listar solicitudes; falla si una petición supera 3 s. Última: 50
+usuarios, 600 peticiones, máx. 942 ms, p95 687 ms.
+Resultado del plan oficial del SQA (25 casos):
+[`docs/RESULTADOS_PLAN_SQA.csv`](docs/RESULTADOS_PLAN_SQA.csv); nombres
+del plan ↔ código en [`docs/EQUIVALENCIAS.md`](docs/EQUIVALENCIAS.md).
+Mapa de casos ↔ pruebas en [`docs/PLAN_PRUEBAS.md`](docs/PLAN_PRUEBAS.md).
+Sin pruebas unitarias: el frontend.
 
 ### Datos de demo — ✅
 `scripts/seed-demo.js` (`npm run seed:demo`). Idempotente, pobla
-usuarios por rol, pacientes, solicitudes en cada estado, visita
-completada con prescripción y examen, donaciones y gastos. Documentado
+usuarios por rol, pacientes con familiar responsable y ficha,
+solicitudes en cada estado (con enfermera asignada), visita completada
+con prescripción, examen y su cargo, donaciones y gastos. Documentado
 en [`scripts/README.md`](scripts/README.md).
 
 ### Documentación adicional
@@ -253,7 +337,7 @@ en [`scripts/README.md`](scripts/README.md).
 
 ## Pendiente de implementar
 
-1. Insertar las capturas reales en `docs/MANUAL_USUARIO.md` (28
+1. Insertar las capturas reales en `docs/MANUAL_USUARIO.md` (29
    marcadores `[CAPTURA: ...]`).
 2. Renderizar los `.mmd` a PNG con mermaid-cli para la entrega impresa
    (hoy sólo quedan como fuente .mmd).
@@ -272,7 +356,11 @@ en [`scripts/README.md`](scripts/README.md).
    `EBADENGINE`, dependencias de mssql piden Node 22 y la imagen es
    Node 20).
 8. Brevo real nunca probado (procedimiento en
-   `notificaciones-service/README.md`).
+   `notificaciones-service/README.md`); casos 10 y 11 solo verificados en
+   simulación / con la URL inalcanzable.
+9. Caso 6: el egreso es `activo = 0`; no guarda fecha ni motivo de egreso.
+10. Caso 24: detrás de Docker Desktop la IP auditada es la del gateway;
+    en el Debian conviene confirmar que llega la IP real del cliente.
 
 ## Reglas de negocio críticas (no romper al tocar código existente)
 
@@ -282,9 +370,15 @@ en [`scripts/README.md`](scripts/README.md).
   solicitudes, citas, visitas, exámenes, prescripciones ni
   dispensaciones (409). Implementada el 20 oct 2026.
 - No hay borrado físico de pacientes, usuarios, medicamentos ni donantes.
-- RN-06: prescripción válida antes de permitir despacho en farmacia.
+- RN-06: prescripción válida antes de permitir despacho en farmacia; no
+  se entrega más de lo prescrito.
 - RN-09: descuento 20% fundación siempre aplicado en cálculos de costo.
 - Estados de solicitud/visita son inmutables una vez `completada`/`cancelada`.
+- Cerrar una visita genera su cargo en la misma transacción; nunca dos
+  cargos por visita.
+- Ningún saldo queda negativo; no se registran cargos ni cuotas a un
+  familiar incompleto; todo interno nuevo lleva familiar completo y ficha.
+- No se ordena un examen sin precio en el catálogo.
 
 ## Preferencias de Leo al trabajar
 

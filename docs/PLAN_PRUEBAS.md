@@ -16,14 +16,15 @@ Las pruebas se dividen en dos capas separadas:
 
 **(1) Unitarias + RBAC**: NO requieren el stack Docker. Mocks de repositorios
 y app Express sintetica. `npm install` en la raiz basta: `express`,
-`jsonwebtoken` y `bcryptjs` estan como devDependencies de la raiz para que
+`jsonwebtoken`, `bcryptjs`, `exceljs` y `pdfkit` estan como devDependencies de la raiz para que
 las pruebas corran en un clon limpio sin instalar cada servicio.
 ```bash
 ./scripts/run-all-tests.sh         # Linux / Git Bash
 ./scripts/run-all-tests.ps1        # PowerShell
 npm run test:todo
 ```
-Ultima ejecucion (20 oct 2026): **156 casos en 22 archivos, 156 OK, 0 fallas**.
+Ultima ejecucion (21 oct 2026, sobre un stack recien creado con `docker compose down -v` +
+`scripts/bootstrap.ps1`): **242 casos en 33 archivos, 242 OK, 0 fallas**.
 
 **(2) Integracion end-to-end**: requieren el stack docker-compose
 arriba. Recorren el flujo completo de un paciente, con usuarios reales
@@ -32,7 +33,14 @@ y JWT, contra las APIs HTTP. Un paso por linea con [ OK ] / [FALLA].
 npm run test:e2e                         # localhost
 BASE_HOST=100.96.172.77 npm run test:e2e  # servidor Debian
 ```
-Ultima ejecucion (20 oct 2026, stack local): **39 pasos, 39 OK**.
+Ultima ejecucion (21 oct 2026, stack local recien creado): **58 pasos, 58 OK**.
+
+**(3) Carga** (caso 25): `npm run test:carga` (`USUARIOS=20..50`, `VUELTAS`,
+`LIMITE_MS`). Cada usuario virtual hace login, lista pacientes, crea y
+lista solicitudes; reporta p50/p95/max por operacion y falla si una
+peticion supera 3 s. Ultima ejecucion: 50 usuarios x 3 vueltas, 600
+peticiones, max 942 ms, p95 687 ms, 0 errores. Antes del arreglo (bcrypt en
+el hilo principal) el login llegaba a 7,1 s con 30 usuarios.
 
 **Regla de las pruebas de integracion:** el e2e solo crea, modifica,
 desactiva o reactiva registros que creo el mismo (pacientes "E2E ...",
@@ -41,6 +49,46 @@ donantes "E2E donante <ts>", cuentas "e2e.*"). Los datos existentes,
 de demo o reales, solo se leen. Hasta el 20 oct el paso E2E-09/E2E-11
 dispensaba el Losartan del inventario (bajaba su stock real) y E2E-29
 hacia PUT sobre el primer precio del catalogo; ambos se corrigieron.
+
+## Plan oficial del SQA (25 casos)
+
+Resultado por caso (OK / OK con diferencia / FALLA) con su evidencia en
+[RESULTADOS_PLAN_SQA.csv](RESULTADOS_PLAN_SQA.csv); los nombres del plan
+(internos, log_notificaciones, estados en mayusculas) se traducen a las
+tablas reales en [EQUIVALENCIAS.md](EQUIVALENCIAS.md). Pruebas que cubren
+cada caso:
+
+| Caso | Prueba unitaria | Paso e2e (texto del smoke) |
+|---|---|---|
+| 1 Login + JWT | AuthService.test.js | login admin |
+| 2 RBAC 403 | rbac.test.js de cada servicio | RBAC backend: farmacia crea paciente... -> 403 |
+| 3 401 sin BD | rbac.test.js (repositorios simulados) | — |
+| 4 JWT en varios servicios | — | todo el smoke usa el mismo token en los 7 servicios |
+| 5 Interno + familiar + ficha 1:1 | FamiliarFicha.test.js | caso 5 (2 pasos) |
+| 6 Egreso logico | PacienteActivo.test.js | pacientes: DELETE /:id desactiva un paciente propio |
+| 7 Solicitud con enfermero | SolicitudService.test.js | caso 7 |
+| 8 No-MG no crea | rbacPacientes.test.js | caso 7 (enfermero y especialista 403) |
+| 9 RN-02 con la activa | SolicitudService.test.js | RN-02: segunda solicitud activa... -> 409 |
+| 10 Brevo: enviada + ID | NotificacionesService.test.js | notificaciones: existe una para este paciente |
+| 11 Caida de Brevo | NotificacionesService.test.js | — (verificado a mano en el bloque 1) |
+| 12 Aviso interno al medico | SolicitudService.test.js | caso 12 |
+| 13 Visita vinculada a la ficha | VisitaMedicaService.test.js | caso 13 |
+| 14 Visita INCOMPLETA | VisitaIncompleta.test.js | caso 14 |
+| 15 Costo registrado al ordenar | CostoExamen.test.js, LaboratorioService.test.js | caso 15 |
+| 16 Resultado visible | — | caso 16 |
+| 17 RN-06 | FarmaciaService.test.js | farmacia: segundo intento de dispensar -> 409 |
+| 18 Despacho parcial | DespachoParcial.test.js | caso 18 (3 pasos) |
+| 19 Cargo atomico | CargoVisita.test.js | caso 19 (2 pasos), caso 18/19 |
+| 20 Saldos y familiar completo | AbonosCargo.test.js, TitularCuenta.test.js | caso 20 |
+| 21 Alertas naranja/roja | AlertasCobro.test.js | caso 21 |
+| 22 PDF/Excel con formulas | ReportesExport.test.js | caso 22, reportes en PDF y Excel |
+| 23 SQL injection | ReportesExport.test.js | caso 23 |
+| 24 Auditoria completa | Auditoria.test.js | auditoria (2 pasos) |
+| 25 Rendimiento < 3 s | HashPool.test.js | `npm run test:carga` |
+
+Rango de reportes (bloque 3): ReportesRango.test.js y el paso "reportes:
+rango hoy-a-hoy...". Los casos nuevos de esta ronda no tienen ID propio
+en la tabla siguiente: se identifican por archivo (ver "Mapa a archivos").
 
 ## Tabla de casos unitarios
 
@@ -212,36 +260,47 @@ verificar el mapeo abriendo cada archivo (ver "Mapa a archivos").
 
 | Prefijo ID | Archivo | Casos |
 |---|---|---|
-| PS-xx | [pacientes-service/__tests__/SolicitudService.test.js](../pacientes-service/__tests__/SolicitudService.test.js) | 8 |
+| PS-xx | [pacientes-service/__tests__/SolicitudService.test.js](../pacientes-service/__tests__/SolicitudService.test.js) | 11 |
 | PA-xx | [pacientes-service/__tests__/PacienteService.test.js](../pacientes-service/__tests__/PacienteService.test.js) | 6 |
 | PV-xx | [pacientes-service/__tests__/PacienteActivo.test.js](../pacientes-service/__tests__/PacienteActivo.test.js) | 13 |
-| AW-xx | [pacientes-service/__tests__/Auditoria.test.js](../pacientes-service/__tests__/Auditoria.test.js) | 7 |
-| VM-xx | [pacientes-service/__tests__/VisitaMedicaService.test.js](../pacientes-service/__tests__/VisitaMedicaService.test.js) | 5 |
+| AW-xx | [pacientes-service/__tests__/Auditoria.test.js](../pacientes-service/__tests__/Auditoria.test.js) | 10 |
+| VM-xx | [pacientes-service/__tests__/VisitaMedicaService.test.js](../pacientes-service/__tests__/VisitaMedicaService.test.js) | 6 |
+| SQA 14 | [pacientes-service/__tests__/VisitaIncompleta.test.js](../pacientes-service/__tests__/VisitaIncompleta.test.js) | 4 |
+| SQA 19 | [pacientes-service/__tests__/CargoVisita.test.js](../pacientes-service/__tests__/CargoVisita.test.js) | 10 |
+| SQA 15 | [pacientes-service/__tests__/CostoExamen.test.js](../pacientes-service/__tests__/CostoExamen.test.js) | 3 |
+| SQA 5 | [pacientes-service/__tests__/FamiliarFicha.test.js](../pacientes-service/__tests__/FamiliarFicha.test.js) | 8 |
 | RB-xx | [pacientes-service/__tests__/rbac.test.js](../pacientes-service/__tests__/rbac.test.js) | 9 |
 | RBP-xx | [pacientes-service/__tests__/rbacPacientes.test.js](../pacientes-service/__tests__/rbacPacientes.test.js) | 9 |
 | FS-xx | [farmacia-service/__tests__/FarmaciaService.test.js](../farmacia-service/__tests__/FarmaciaService.test.js) | 8 |
 | FA-xx | [farmacia-service/__tests__/ActivoFarmacia.test.js](../farmacia-service/__tests__/ActivoFarmacia.test.js) | 5 |
+| SQA 18 | [farmacia-service/__tests__/DespachoParcial.test.js](../farmacia-service/__tests__/DespachoParcial.test.js) | 6 |
 | RBF-xx | [farmacia-service/__tests__/rbac.test.js](../farmacia-service/__tests__/rbac.test.js) | 6 |
-| LS-xx | [laboratorio-service/__tests__/LaboratorioService.test.js](../laboratorio-service/__tests__/LaboratorioService.test.js) | 7 |
+| LS-xx | [laboratorio-service/__tests__/LaboratorioService.test.js](../laboratorio-service/__tests__/LaboratorioService.test.js) | 8 |
 | LP-xx | [laboratorio-service/__tests__/PreciosExamen.test.js](../laboratorio-service/__tests__/PreciosExamen.test.js) | 8 |
 | RBL-xx | [laboratorio-service/__tests__/rbac.test.js](../laboratorio-service/__tests__/rbac.test.js) | 5 |
-| FI-01..08 | [financiero-service/__tests__/FinancieroService.test.js](../financiero-service/__tests__/FinancieroService.test.js) | 8 |
+| FI-xx | [financiero-service/__tests__/FinancieroService.test.js](../financiero-service/__tests__/FinancieroService.test.js) | 9 |
 | FI-09..13 | [financiero-service/__tests__/MovimientosCaja.test.js](../financiero-service/__tests__/MovimientosCaja.test.js) | 5 |
 | DA-xx | [financiero-service/__tests__/DonantesActivos.test.js](../financiero-service/__tests__/DonantesActivos.test.js) | 4 |
-| RBI-xx | [financiero-service/__tests__/rbac.test.js](../financiero-service/__tests__/rbac.test.js) | 6 |
+| SQA 20 | [financiero-service/__tests__/AbonosCargo.test.js](../financiero-service/__tests__/AbonosCargo.test.js) | 7 |
+| SQA 20 | [financiero-service/__tests__/TitularCuenta.test.js](../financiero-service/__tests__/TitularCuenta.test.js) | 3 |
+| SQA 21 | [financiero-service/__tests__/AlertasCobro.test.js](../financiero-service/__tests__/AlertasCobro.test.js) | 9 |
+| RBI-xx | [financiero-service/__tests__/rbac.test.js](../financiero-service/__tests__/rbac.test.js) | 9 |
 | AU-xx | [auth-service/__tests__/AuthService.test.js](../auth-service/__tests__/AuthService.test.js) | 7 |
 | CU-xx | [auth-service/__tests__/CuentasActivas.test.js](../auth-service/__tests__/CuentasActivas.test.js) | 7 |
+| SQA 25 | [auth-service/__tests__/HashPool.test.js](../auth-service/__tests__/HashPool.test.js) | 4 |
 | RBA-xx | [auth-service/__tests__/rbac.test.js](../auth-service/__tests__/rbac.test.js) | 6 |
-| NO-xx | [notificaciones-service/__tests__/NotificacionesService.test.js](../notificaciones-service/__tests__/NotificacionesService.test.js) | 7 |
+| NO-xx | [notificaciones-service/__tests__/NotificacionesService.test.js](../notificaciones-service/__tests__/NotificacionesService.test.js) | 8 |
 | AR-xx | [reportes-service/__tests__/AuditoriaConsulta.test.js](../reportes-service/__tests__/AuditoriaConsulta.test.js) | 10 |
-| | **Total** | **156** |
+| SQA 22/23 | [reportes-service/__tests__/ReportesExport.test.js](../reportes-service/__tests__/ReportesExport.test.js) | 11 |
+| Bloque 3 | [reportes-service/__tests__/ReportesRango.test.js](../reportes-service/__tests__/ReportesRango.test.js) | 8 |
+| | **Total** | **242** |
 
 ## Lo que todavia NO esta automatizado
 
-- **Los 7 reportes** no tienen pruebas unitarias (en reportes-service solo
-  se prueba la consulta de auditoria, AR-xx); los cubre el e2e (E2E-19 a
-  E2E-21: responden y los archivos tienen firma valida, sin verificar el
-  contenido de cada fila).
+- **Los 7 reportes**: ReportesExport.test.js y ReportesRango.test.js
+  prueban el armado, las formulas del Excel, la validacion de filtros y el
+  rango de fechas con un repositorio simulado; las consultas SQL de cada
+  reporte solo las ejercita el e2e.
 - **Cierre de sesion por inactividad** (frontend): probado a mano en el
   navegador con limites cortos (iniciarControlInactividad({ limiteMs,
   avisoMs })), sin prueba automatizada.
@@ -251,55 +310,78 @@ verificar el mapeo abriendo cada archivo (ver "Mapa a archivos").
 - **RBAC de visitas** (`PATCH /api/visitas/:id`, examenes, prescripciones,
   completar: solo `medico_especialista`) no tiene prueba de rechazo; el
   e2e solo recorre el camino permitido.
-- **Envio real por Brevo**: NO-03/NO-04 simulan `fetch`. Nunca se envio
-  un correo real; el procedimiento manual esta en
+- **Envio real por Brevo** (casos 10 y 11): las pruebas simulan `fetch`
+  (incluido el `messageId` de Brevo) y el e2e corre en simulacion
+  (`idMensajeProveedor = sim-...`). Nunca se envio un correo real; el procedimiento manual esta en
   [notificaciones-service/README.md](../notificaciones-service/README.md).
 - **Frontend**: sin pruebas automatizadas. Se verifica a mano en el
   navegador por rol (ver el manual de usuario).
 
 ## Suite de integracion E2E (scripts/e2e-smoke.js)
 
-| ID | Paso | Valida |
-|---|---|---|
-| E2E-01 | login admin | Credenciales admin del seed |
-| E2E-02 | asegurar 5 usuarios de rol | register con admin (RBAC) |
-| E2E-03 | crear paciente con DPI unico | pacientes-service POST |
-| E2E-04 | medico_general crea solicitud | **dispara notificacion fire-and-forget** |
-| E2E-05 | coordinador asigna cita | transicion a `cita_asignada` |
-| E2E-06 | especialista convierte en visita | transicion a `en_atencion` |
-| E2E-07 | PATCH diagnostico + observaciones | precondicion para completar |
-| E2E-08 | agregar examen | genera orden pendiente para laboratorio |
-| E2E-09 | crea un medicamento propio y lo prescribe | precondicion para RN-06 (ya no usa el Losartan del inventario) |
-| E2E-10 | laboratorio registra resultado | lectura cross-service de `visita_examenes` |
-| E2E-11 | farmacia dispensa | RN-06 + RN-09 end-to-end |
-| E2E-12 | segundo intento de dispensar | debe fallar con 409 (idempotencia RN-06) |
-| E2E-13 | completar visita | transicion a `completada`, inmutabilidad |
-| E2E-14 | verificar notificacion | HTTP cross-service pacientes->notificaciones |
-| E2E-15 | estado de cuenta financiero | lectura cross-service |
-| E2E-16 | GET /api/auth/me | token devuelve el usuario correcto |
-| E2E-17 | PUT /api/pacientes/:id | actualizacion de paciente persiste |
-| E2E-18 | DELETE /api/pacientes/:id sobre un paciente propio | borrado logico: activo=false, se conserva y sale del listado |
-| E2E-19 | 7 reportes en JSON (columnas presentes) | reportes-service formato json |
-| E2E-20 | 7 reportes en PDF (firma %PDF, >500 B, content-type) | pdfkit genera PDF valido |
-| E2E-21 | 7 reportes en Excel (firma PK, >500 B, content-type) | exceljs genera XLSX valido |
-| E2E-22 | segunda solicitud activa en la misma especialidad | **RN-02** -> 409 |
-| E2E-23 | medico_general cancela una solicitud | transicion a `cancelada` |
-| E2E-24 | cancelar otra vez la misma solicitud | inmutabilidad -> 409 |
-| E2E-25 | farmacia crea paciente, laboratorio crea medicamento, especialista dispensa | RBAC del backend -> 3 x 403 |
-| E2E-26 | desactiva el paciente del smoke, intenta una solicitud y lo reactiva | **paciente activo** -> 409 |
-| E2E-27 | GET /api/auth/usuarios?rol=medico_especialista | coordinador 200 sin passwordHash; farmacia 403 |
-| E2E-28 | costo del examen vs catalogo de precios | **RN-09** end-to-end en laboratorio |
-| E2E-29 | PUT /precios/:id sobre el precio propio "E2E examen (no usar)" | admin 200, laboratorio 403 |
-| E2E-30 | POST /gastos | admin 201 y aparece en el listado; farmacia 403 |
-| E2E-31 | POST /pagos-fundacion | admin 201 y aparece en el listado |
-| E2E-32 | paciente B propio con visita y prescripcion pendiente | preparacion |
-| E2E-33 | desactiva B: examen y dispensacion -> 409; listados lo ocultan; incluirInactivos medico 403 / admin 200 | **paciente activo** end-to-end |
-| E2E-34 | desactiva el medicamento propio: sale del inventario, dispensar 409; farmacia no reactiva (403), admin si | borrado logico de medicamentos |
-| E2E-35 | cuenta propia: desactivar, login 403, autodesactivacion del admin 409, farmacia 403, reactivar, login 200 | desactivacion de cuentas |
-| E2E-36 | donante propio: desactivado no recibe donaciones (409), reactivado si | borrado logico de donantes |
-| E2E-37 | auditoria del paciente B | crear, desactivar y reactivar con el usuario admin |
-| E2E-38 | auditoria de dispensacion, visita y solicitud; farmacia 403; entidad invalida 400 | registro desde farmacia y pacientes |
-| E2E-39 | limpieza | desactiva el medicamento propio del smoke |
+Un renglon por paso, con el texto exacto que imprime el smoke (el numero
+es el que aparece entre corchetes en la salida).
+
+| ID | Paso |
+|---|---|
+| E2E-01 | login admin |
+| E2E-02 | asegurar usuarios de prueba (medico_general, coord, especialista, laboratorio, farmacia, enfermero) |
+| E2E-03 | crear paciente E2E (DPI unico por timestamp) |
+| E2E-04 | medico_general: POST /api/solicitudes (dispara notificacion) |
+| E2E-05 | coordinador: PATCH /api/solicitudes/:id/asignar-cita |
+| E2E-06 | especialista: POST /api/solicitudes/:id/convertir-a-visita |
+| E2E-07 | especialista: PATCH /api/visitas/:id (diagnostico+observaciones) |
+| E2E-08 | especialista: POST /api/visitas/:id/examenes |
+| E2E-09 | especialista: POST /api/visitas/:id/prescripciones con idMedicamento |
+| E2E-10 | laboratorio: POST /api/laboratorio/resultados/examen/:idExamen |
+| E2E-11 | caso 16: el especialista ve el examen disponible y lee el resultado |
+| E2E-12 | farmacia: POST /api/farmacia/dispensaciones (RN-06 + RN-09) |
+| E2E-13 | farmacia: segundo intento de dispensar -> 409 esperado |
+| E2E-14 | especialista: POST /api/visitas/:id/completar |
+| E2E-15 | notificaciones: existe una para este paciente |
+| E2E-16 | financiero: GET /api/financiero/estado-cuenta/:idPaciente |
+| E2E-17 | auth: GET /api/auth/me devuelve el usuario del token |
+| E2E-18 | pacientes: PUT /:id actualiza telefono |
+| E2E-19 | pacientes: DELETE /:id desactiva un paciente propio (borrado logico) |
+| E2E-20 | reportes: los 7 tipos en JSON (status 200, columnas presentes) |
+| E2E-21 | reportes: los 7 tipos en PDF (content-type application/pdf, no vacio) |
+| E2E-22 | reportes: los 7 tipos en Excel (content-type xlsx, no vacio) |
+| E2E-23 | RN-02: segunda solicitud activa misma especialidad -> 409 |
+| E2E-24 | medico_general: PATCH /api/solicitudes/:id/cancelar -> cancelada |
+| E2E-25 | inmutabilidad: cancelar una solicitud ya cancelada -> 409 |
+| E2E-26 | RBAC backend: farmacia crea paciente, laboratorio crea medicamento, especialista dispensa -> 403 |
+| E2E-27 | paciente activo: desactivado no recibe solicitudes (409); reactivado si |
+| E2E-28 | auth: GET /api/auth/usuarios?rol=medico_especialista (coordinador ok, farmacia 403) |
+| E2E-29 | laboratorio: costo del examen = precio del catalogo con RN-09 |
+| E2E-30 | laboratorio: PUT /precios/:id sobre un precio propio (admin 200, laboratorio 403) |
+| E2E-31 | caso 15: el examen queda con su costo con descuento al ordenarlo; cambiar el catalogo no lo altera |
+| E2E-32 | financiero: POST /gastos (admin 201 y aparece en el listado, farmacia 403) |
+| E2E-33 | financiero: POST /pagos-fundacion (admin 201 y aparece en el listado) |
+| E2E-34 | paciente B propio con visita y prescripcion pendiente (preparacion) |
+| E2E-35 | paciente desactivado: no recibe examenes ni dispensaciones (409); listados lo ocultan |
+| E2E-36 | medicamento propio desactivado: no se dispensa (409) y sale del inventario |
+| E2E-37 | cuenta desactivada: login 403, admin no se desactiva a si mismo (409), reactivada vuelve a entrar |
+| E2E-38 | donante propio desactivado: donacion 409; reactivado: 201 |
+| E2E-39 | auditoria: el paciente B tiene crear, desactivar y reactivar con usuario, IP, modulo y JSON |
+| E2E-40 | auditoria: dispensacion, visita y solicitud registradas; RBAC y validacion |
+| E2E-41 | caso 19: el cierre genero un cargo desglosado con descuento en la cuenta |
+| E2E-42 | caso 19: reintentar el cierre -> 409 y sigue habiendo un solo cargo de la visita |
+| E2E-43 | caso 18: tras entregar 1 de 5 la prescripcion queda parcial y la visita acumula el costo |
+| E2E-44 | caso 18: entregar mas de lo que falta (5 de 4) -> 409 sin tocar el stock |
+| E2E-45 | caso 14: cerrar la visita B sin diagnostico ni observaciones -> 400, campos faltantes e incompleta |
+| E2E-46 | caso 18/19: cerrar la visita B cobra lo entregado hasta ese momento |
+| E2E-47 | caso 20: abonos al cargo de la visita B nunca dejan saldo negativo |
+| E2E-48 | caso 18: completar la entrega despues del cierre -> dispensada y cargo complementario |
+| E2E-49 | caso 5: alta sin familiar o con familiar incompleto -> 400 con los campos que faltan |
+| E2E-50 | caso 5: el paciente E2E tiene familiar responsable completo y ficha medica 1:1 |
+| E2E-51 | caso 13: la visita quedo en_atencion vinculada a la ficha del paciente |
+| E2E-52 | caso 7: la solicitud lleva al enfermero; sin el o con un no-enfermero -> 400; enfermero y especialista no crean (403) |
+| E2E-53 | caso 12: asignar cita dejo aviso interno al medico general y al enfermero; marcar leido |
+| E2E-54 | caso 21: cuota con 5 dias de mora -> naranja, con 40 dias -> roja; pagada sale del panel |
+| E2E-55 | caso 23: inyeccion SQL en login, pacientes, laboratorio y reportes -> texto literal o 400/401 |
+| E2E-56 | caso 22: el Excel de costos por paciente tiene formulas SUM en los totales |
+| E2E-57 | reportes: rango hoy-a-hoy incluye lo registrado hoy en los 7 reportes; ayer-a-ayer no |
+| E2E-58 | limpieza: desactivar el medicamento propio del smoke |
 
 Registros que el smoke deja en la base, todos marcados como de prueba:
 pacientes "E2E Smoke" / "E2E Inactivable" / "E2E Descartable"
@@ -307,4 +389,9 @@ pacientes "E2E Smoke" / "E2E Inactivable" / "E2E Descartable"
 final), el precio "E2E examen (no usar)" (reutilizado entre corridas),
 donantes "E2E donante <ts>" y cuentas "e2e.desactivable.<ts>" (ambos
 desactivados), gastos, pagos y donaciones de Q1 con concepto "E2E ...",
-y sus registros de auditoria.
+pacientes "E2E Caso 15" / "E2E Alerta naranja" / "E2E Alerta roja" y el
+del caso 23 (nombre con texto SQL), con sus familiares "Familiar E2E
+Responsable", solicitudes, visitas, cargos, cuotas y avisos, y sus
+registros de auditoria. La prueba de carga deja pacientes "Carga <ts> #n"
+desactivados y sus solicitudes canceladas. Para una base de demo limpia:
+`docker compose down -v` + `scripts/bootstrap.ps1` (sin correr el e2e).

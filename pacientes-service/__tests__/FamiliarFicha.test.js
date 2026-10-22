@@ -71,6 +71,14 @@ describe('Avisos internos (caso 12)', () => {
     expect(repo.listarPorUsuario).toHaveBeenCalledWith(42, { soloNoLeidos: true });
   });
 
+  test('editar el expediente no cambia el correo de avisos (sale del familiar)', async () => {
+    const { svc, repo } = nuevo();
+    repo.obtenerPorId.mockResolvedValueOnce({ id: 50, ...PACIENTE, familiarEmail: 'ana@example.com' });
+    repo.actualizar = jest.fn(async (_id, p) => p);
+    const r = await svc.actualizar(50, { ...PACIENTE, familiarEmail: 'otro@example.com' });
+    expect(r.familiarEmail).toBe('ana@example.com');
+  });
+
   test('marcar como leido un aviso ajeno -> 404', async () => {
     const repo = { marcarLeido: jest.fn(async () => null) };
     await expect(new AvisoService(repo).marcarLeido(5, 42)).rejects.toMatchObject({ status: 404 });

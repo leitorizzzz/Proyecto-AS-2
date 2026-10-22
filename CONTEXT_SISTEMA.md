@@ -108,19 +108,37 @@ pendiente_asignacion       cita_asignada                        en_atencion
                                                                    ├─ POST  /api/visitas/:id/examenes
                                                                    ├─ POST  /api/visitas/:id/prescripciones
                                                                    └─ POST  /api/visitas/:id/completar
-                                                                                                        │
-                                                                                                        ▼
-                                                                                                    completada
+                                                                          │  faltan campos → 400, visita `incompleta` (editable)
+                                                                          ▼
+                                                                      completada + cargo (misma transacción)
 Cancelación (medico_general | admin) desde cualquier estado previo a completada → cancelada.
 ```
 
 **Reglas de negocio implementadas:**
 
-- **RN-02**: Un paciente no puede tener dos solicitudes activas
-  (`pendiente_asignacion`, `cita_asignada`, `en_atencion`) para la misma
-  especialidad simultáneamente. Duplicado → `409`.
-- Completar visita exige `diagnostico` y `observaciones` no vacíos → `400` si faltan.
-- Al completar la visita, la solicitud enlazada se marca `completada`.
+- **Alta de interno (caso 5)**: exige familiar responsable completo
+  (nombres, apellidos, DPI de 13 dígitos, parentesco, teléfono, email,
+  dirección) → `400` con `camposFaltantes`. En la misma transacción se
+  crean `familiares` (uno principal activo) y `fichas_medicas` (1:1).
+- **Solicitud (casos 7 y 9)**: exige `idEnfermero` (usuario activo con rol
+  `enfermero`). **RN-02**: un paciente no puede tener dos solicitudes
+  activas (`pendiente_asignacion`, `cita_asignada`, `en_atencion`) para la
+  misma especialidad. Duplicado → `409` con `solicitudActiva {id, estado}`.
+- **Asignar cita (caso 12)**: deja avisos internos (`avisos`) al médico
+  general y al enfermero de la solicitud en la misma transacción.
+- **Visita (casos 13 y 14)**: queda vinculada a la ficha
+  (`idFichaMedica`). Completar exige `diagnostico` y `observaciones`; si
+  faltan → `400` con `camposFaltantes` y la visita pasa a `incompleta`.
+- **Examen (caso 15)**: al ordenarlo se congela su costo con RN-09
+  (`precioBase`, `descuento`, `costo`); sin precio en el catálogo → `409`.
+- **Prescripción (caso 18)**: `cantidadPrescrita` obligatoria; farmacia
+  entrega por partes (`pendiente → parcial → dispensada`) y suma el costo
+  a `visitas_medicas.costoFarmacia`.
+- **Cierre (caso 19)**: en una transacción se cierra la visita y la
+  solicitud y se genera el cargo al familiar (consulta según
+  `tarifas_servicio` + laboratorio + farmacia, cada línea con RN-09) en
+  `cargos_servicio` + `cargos_detalle`. Un solo cargo por visita (índice
+  único); lo despachado después del cierre genera un cargo complementario.
 - Estado inmutable una vez `completada` o `cancelada`.
 
 **Tablas SQL Server añadidas a `AsiloCabezaAlgodon`** (bootstrap
@@ -130,15 +148,18 @@ idempotente al arrancar `pacientes-service`):
   motivo, estado, fechaCita, horaCita, idMedicoEspecialista, fechaCreacion,
   fechaActualizacion) + índice `IX_solicitudes_paciente_especialidad_activa`
   usado por RN-02.
+  Columna `idEnfermero` (caso 7).
 - `visitas_medicas` (id, idSolicitudReferencia UNIQUE, idPaciente,
   idMedicoEspecialista, fecha, diagnostico, observaciones, estado,
-  fechaCompletada).
+  fechaCompletada, idFichaMedica, costoLaboratorio, costoFarmacia).
 - `visita_examenes` (id, idVisita, tipo, estado `pendiente` → `disponible`
-  cuando laboratorio registra el resultado, fechaSolicitud).
+  cuando laboratorio registra el resultado, fechaSolicitud, precioBase,
+  descuento, costo).
 - `visita_prescripciones` (id, idVisita, medicamento, dosis, indicaciones,
-  fechaPrescripcion, idMedicamento, estado `pendiente` → `dispensada`,
-  idDispensacion, fechaDispensacion). Las cuatro ultimas columnas se
-  agregan con `ALTER` idempotente y las marca `farmacia-service` (RN-06).
+  fechaPrescripcion, idMedicamento, estado `pendiente` → `parcial` →
+  `dispensada`, cantidadPrescrita, cantidadEntregada, idDispensacion,
+  fechaDispensacion). Las marca `farmacia-service` (RN-06).
+- `familiares`, `fichas_medicas`, `avisos` (casos 5 y 12).
 
 ### 3.3 Roles
 
@@ -154,7 +175,11 @@ indica.
 | Acción | Roles permitidos |
 |---|---|
 | `POST /api/auth/register` | `admin` |
-| `GET /api/auth/usuarios[?rol=]` (directorio, sin passwordHash; solo activos) | `admin`, `coordinador_fundacion` |
+| `GET /api/auth/usuarios[?rol=]` (directorio, sin passwordHash; solo activos) | `admin`, `coordinador_fundacion`, `medico_general` |
+| `PUT /api/pacientes/:id/familiar` | `enfermero`, `admin` |
+| `GET /api/avisos`, `PATCH /api/avisos/:id/leido` | cualquier autenticado, solo sus propios avisos |
+| `POST /api/financiero/cargos/:id/abonos`, `POST /api/financiero/cuotas` | `admin` |
+| `GET /api/financiero/alertas` | `admin`, `coordinador_fundacion`, `fundacion` |
 | `PATCH /api/auth/usuarios/:id/{desactivar,reactivar}` | `admin` (no puede desactivarse a si mismo) |
 | `POST`, `PUT /api/pacientes[/:id]` | `enfermero`, `admin` |
 | `DELETE /api/pacientes/:id` (borrado logico: desactiva), `PATCH /api/pacientes/:id/reactivar` | `admin` |
@@ -204,7 +229,10 @@ reactivar.
 ### 3.5 Auditoría
 
 Tabla compartida `auditoria` (id, usuario = email del JWT, idUsuario,
-accion, entidad, idEntidad, detalle, fecha UTC). La crean al arrancar
+accion, entidad, idEntidad, detalle, fecha UTC, `ip`, `modulo`,
+`datosAnteriores` y `datosNuevos` en JSON — caso 24; nunca guarda
+password, hash ni token). La IP sale de `x-forwarded-for` o del socket;
+detrás de Docker Desktop es la del gateway (172.18.0.1). La crean al arrancar
 auth, pacientes, farmacia y financiero (DDL idempotente que tolera la
 carrera entre servicios) y la escriben desde sus controladores con
 `AuditoriaService` (copia idéntica en los cuatro, como
@@ -217,7 +245,8 @@ carrera entre servicios) y la escriben desde sus controladores con
 | pacientes | solicitud | crear, modificar (asignar cita), cancelar |
 | pacientes | visita / examen / prescripcion | crear (iniciar visita, pedir examen, prescribir), modificar (notas, completar) |
 | farmacia | medicamento / dispensacion | crear, modificar, desactivar, reactivar / crear |
-| financiero | cargo, cuota, donante, donacion, gasto, pago_fundacion | crear; donante además desactivar y reactivar |
+| pacientes | familiar | crear, modificar |
+| financiero | cargo, abono, cuota, donante, donacion, gasto, pago_fundacion | crear; donante además desactivar y reactivar |
 
 La lee `reportes-service` en `GET /api/auditoria?desde&hasta&entidad&idEntidad&limite`
 (solo admin; `hasta` en YYYY-MM-DD incluye el día; también acepta
@@ -265,7 +294,7 @@ microservicios:
 | Canal | Cuándo se usa | Ejemplos reales |
 |---|---|---|
 | **HTTP + JWT** | Para efectos secundarios sin estado compartido: avisos, integraciones externas, operaciones idempotentes que puede ser retry-friendly. | `pacientes-service` → `POST /api/notificaciones/solicitud` (fire-and-forget al crear solicitud). `notificaciones-service` → Brevo. |
-| **Lectura / escritura directa de la BD compartida** | Cuando el servicio B necesita leer y marcar un recurso que es parte del **agregado transaccional** de A, y una llamada HTTP solo introduciría coupling, latencia y modos de falla sin aportar nada. | `farmacia-service` lee y marca `visita_prescripciones` (RN-06). `laboratorio-service` lee y marca `visita_examenes`. `reportes-service` lee todas las tablas de dominio. |
+| **Lectura / escritura directa de la BD compartida** | Cuando el servicio B necesita leer y marcar un recurso que es parte del **agregado transaccional** de A, y una llamada HTTP solo introduciría coupling, latencia y modos de falla sin aportar nada. | `farmacia-service` lee y marca `visita_prescripciones` (RN-06, despacho parcial) y suma `visitas_medicas.costoFarmacia`. `laboratorio-service` lee y marca `visita_examenes`. `pacientes-service` escribe `cargos_servicio`/`cargos_detalle` al cerrar la visita (misma transacción) y lee `tarifas_servicio` y `examenes_precios`. `financiero-service` lee `familiares` (titular) y `pacientes` (alertas). `reportes-service` lee todas las tablas de dominio. |
 
 Justificación de usar la BD como canal de integración en lugar de más
 HTTP: (a) el agregado transaccional (prescripción, examen) **pertenece
@@ -362,6 +391,13 @@ Cada servicio tiene la **misma estructura interna de 4 capas**:
       donantes, y regla "paciente activo" (§3.4).
 - [x] Auditoría mínima con consulta para el admin (§3.5).
 - [x] Cierre de sesión por inactividad en el frontend (30 min, aviso 60 s antes).
+- [x] Verificación contra el plan oficial del SQA (21 oct 2026): 25 casos,
+      resultado en [docs/RESULTADOS_PLAN_SQA.csv](docs/RESULTADOS_PLAN_SQA.csv)
+      y equivalencias de nombres en [docs/EQUIVALENCIAS.md](docs/EQUIVALENCIAS.md).
+- [x] Alertas de cobro naranja / roja (saldo y cuotas vencidas) en el panel.
+- [x] Prueba de carga versionada (`npm run test:carga`, < 3 s con 50 usuarios).
+- [ ] Probar Brevo real (casos 10 y 11 solo en simulación).
+- [ ] Egreso con fecha y motivo (hoy solo `activo = 0`).
 
 ### Endpoints internos (para referencia rápida)
 
@@ -369,7 +405,7 @@ Cada servicio tiene la **misma estructura interna de 4 capas**:
 |---|---|---|
 | auth-service | 3000 | `/api/auth/*` |
 | farmacia-service | 3001 | `/api/farmacia/*` |
-| pacientes-service | 3002 | `/api/pacientes`, `/api/solicitudes`, `/api/visitas` |
+| pacientes-service | 3002 | `/api/pacientes`, `/api/solicitudes`, `/api/visitas`, `/api/avisos` |
 | laboratorio-service | 3003 | `/api/laboratorio/*` |
 | financiero-service | 3004 | `/api/financiero/*` |
 | reportes-service | 3005 | `/api/reportes/*`, `/api/auditoria` |
@@ -386,6 +422,13 @@ Cada servicio tiene la **misma estructura interna de 4 capas**:
   idempotente para no romper datos existentes).
 - Columna `activo` en `pacientes`, `usuarios`, `medicamentos` y
   `donantes`; tabla compartida `auditoria` (20 oct 2026).
+- Ronda SQA (21 oct 2026): `familiares`, `fichas_medicas`, `avisos`
+  (pacientes); `cargos_detalle`, `abonos_cargo`, `tarifas_servicio`
+  (financiero); columnas nuevas en `cargos_servicio`, `cuotas_mensuales`,
+  `visitas_medicas`, `visita_examenes`, `visita_prescripciones`,
+  `dispensaciones`, `solicitudes_referencia`, `notificaciones` y
+  `auditoria` (detalle en [docs/ERD.mmd](docs/ERD.mmd)). Todas con DDL
+  idempotente; verificado arrancando desde una BD vacía.
 
 ### Infraestructura
 - [x] Docker Desktop funcionando en la máquina de desarrollo (WSL2).

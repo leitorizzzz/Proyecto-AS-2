@@ -91,10 +91,9 @@ class PacienteService {
       throw new Error('Ya existe otro paciente con ese DPI');
     }
 
-    // El correo de avisos sale del familiar responsable (PUT /:id/familiar);
-    // si la edicion no lo trae, se conserva.
-    const paciente = new Paciente({ ...datos, id,
-      familiarEmail: datos.familiarEmail !== undefined ? datos.familiarEmail : actual.familiarEmail });
+    // El correo de avisos es siempre el del familiar responsable (se cambia
+    // con PUT /:id/familiar); editar el expediente no lo puede desalinear.
+    const paciente = new Paciente({ ...datos, id, familiarEmail: actual.familiarEmail });
     return this.repo.actualizar(id, paciente);
   }
 

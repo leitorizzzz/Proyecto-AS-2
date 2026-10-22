@@ -148,12 +148,34 @@ Cuatro indicadores:
   los activos.
 - **Solicitudes activas** — pendientes, con cita o en atención.
 - **Visitas abiertas** — solicitudes en atención.
-- **Alertas de saldo** — pacientes cuyo saldo supera el umbral.
+- **Alertas de cobro** — cuántas cuentas están en rojo, y debajo cuántas
+  en rojo (▲) y en naranja (◆). Solo lo ven administración y
+  coordinación de fundación; para los demás muestra *—*.
+
+Para administración y coordinación aparece la tarjeta **Alertas de
+cobro**: una fila por cuenta con alerta, primero las rojas, con
+**Nivel**, **Paciente**, **Motivo**, **Cuotas vencidas**, **Mora máx.**
+(días) y **Saldo**.
+
+- ▲ **Roja**: el saldo llega al umbral (Q1000 por defecto) o una cuota
+  lleva más de 30 días vencida.
+- ◆ **Naranja**: el saldo pasa de la mitad del umbral o hay alguna
+  cuota vencida.
+
+Una cuota vence el último día de su mes (o la fecha indicada al
+emitirla); desde el día siguiente cuenta la mora. Al pagarla, la alerta
+desaparece.
+
+La tarjeta **Mis avisos** muestra las notificaciones internas para la
+persona que inició sesión, por ejemplo *Cita asignada* cuando la
+coordinación agenda una solicitud suya (médico general) o de un
+paciente que acompaña (enfermería). Los no leídos se marcan; **Marcar
+leído** los quita del contador.
 
 Debajo, la tarjeta **Solicitudes recientes** lista las últimas ocho
 con paciente, especialidad, estado y fecha de creación.
 
-[CAPTURA: Panel con los cuatro indicadores y la tabla "Solicitudes recientes"]
+[CAPTURA: Panel con los cuatro indicadores, "Alertas de cobro" y "Mis avisos"]
 
 ### 4.2 Pacientes
 
@@ -162,7 +184,8 @@ con paciente, especialidad, estado y fecha de creación.
 
 Arriba, la tarjeta **Residentes** lista a cada paciente activo con el
 correo de su familiar, DPI, fecha de nacimiento, fecha de ingreso,
-**Estado** y, para enfermería y administración, la acción **Editar**.
+**Estado** y, para enfermería y administración, las acciones **Editar**
+y **Familiar**.
 
 Debajo, la tarjeta **Registrar paciente**:
 
@@ -173,18 +196,31 @@ Debajo, la tarjeta **Registrar paciente**:
 | **Género** | Femenino, Masculino u Otro. |
 | **DPI (13 dígitos)** | Obligatorio y único. |
 | **Teléfono**, **Contacto de emergencia** | Opcionales. |
-| **Correo del familiar** | Opcional. A esta dirección llegan los avisos automáticos cuando se crea una solicitud. |
 | **Dirección**, **Padecimientos conocidos** | Opcionales. |
 
-Presionar **Registrar paciente**. Si ya existe otro paciente con el
-mismo DPI, el sistema muestra el motivo y no guarda.
+Bloque **Familiar responsable (titular de la cuenta)** — todos los
+campos son obligatorios: **Nombres**, **Apellidos**, **DPI (13
+dígitos)**, **Parentesco**, **Teléfono**, **Correo (recibe los
+avisos)** y **Dirección**. Esta persona es a quien se le cargan los
+servicios y a cuyo correo llegan los avisos automáticos.
+
+Presionar **Registrar paciente**. Junto con el paciente se registran
+su familiar responsable y su **ficha médica**. Si falta un dato del
+familiar, el sistema dice cuáles y no guarda; si ya existe otro
+paciente con el mismo DPI, muestra el motivo y no guarda.
+
+**Corregir el familiar.** Presionar **Familiar** en la fila del
+paciente: se abre una ventana con los datos del familiar responsable;
+corregir y guardar. Mientras al familiar le falte un dato no se le
+pueden registrar cargos ni cuotas, ni cerrar visitas de ese paciente.
 
 Para los demás perfiles el botón dice *Registro no permitido para su
 rol* y los campos están bloqueados.
 
 **Editar un expediente.** Presionar **Editar** en la fila del paciente.
-Se abre la ventana *Editar expediente* con los mismos campos del alta ya
-llenos; corregir lo necesario y presionar **Guardar cambios**. Las mismas
+Se abre la ventana *Editar expediente* con los datos del paciente ya
+llenos (el familiar se corrige con **Familiar**); corregir lo necesario
+y presionar **Guardar cambios**. Las mismas
 reglas aplican: DPI de 13 dígitos y no repetido con otro paciente.
 
 **Desactivar y reactivar** (solo `admin`). Los pacientes no se borran:
@@ -227,12 +263,12 @@ pendiente_asignacion → cita_asignada → en_atencion → completada
 **Crear una solicitud** (solo `medico_general`):
 
 1. En **Nueva solicitud**, elegir **Paciente**.
-2. Escribir **Especialidad** (el campo sugiere cardiologia,
+2. Elegir **Enfermero(a) que acompaña** (obligatorio).
+3. Escribir **Especialidad** (el campo sugiere cardiologia,
    neurologia, geriatria, etc.) y **Motivo**.
-3. Presionar **Crear solicitud**.
+4. Presionar **Crear solicitud**. Queda en `pendiente_asignacion`.
 
-El sistema envía automáticamente un correo al familiar si el paciente
-tiene correo registrado. Si el envío falla, la solicitud se crea igual
+El sistema envía automáticamente un correo al familiar responsable. Si el envío falla, la solicitud se crea igual
 y el sistema reintenta solo.
 
 **Acciones de la bandeja** (columna *Acciones*; solo aparecen las que
@@ -243,7 +279,8 @@ su perfil puede usar):
   paciente y la especialidad como título: elegir **Fecha de la cita**
   (por defecto, mañana), **Hora** (por defecto 10:00) y **Médico
   especialista** de la lista del personal registrado, y presionar
-  **Asignar cita**.
+  **Asignar cita**. El médico general que la creó y el enfermero(a)
+  asignado reciben el aviso en **Mis avisos**.
 - **Iniciar visita** (`medico_especialista`), en solicitudes
   `cita_asignada`. La ventana *Iniciar visita* pide confirmar; al
   presionar **Iniciar visita** el sistema abre la pantalla **Visitas**
@@ -258,8 +295,8 @@ su perfil puede usar):
 [CAPTURA: ventana "Cancelar solicitud" con el botón rojo]
 
 **RN-02.** Si se intenta crear una segunda solicitud activa para el
-mismo paciente y la misma especialidad, el sistema responde: *"Ya
-existe una solicitud activa para el paciente X en la especialidad Y"*.
+mismo paciente y la misma especialidad, el sistema la rechaza e indica
+el número y el estado de la solicitud activa que lo impide.
 
 ### 4.4 Visitas médicas
 
@@ -276,25 +313,36 @@ existe una solicitud activa para el paciente X en la especialidad Y"*.
      botón **Guardar cambios**.
    - **Exámenes solicitados**: escribir el tipo en **Nuevo examen** y
      presionar **Agregar examen**. Laboratorio lo recibe de inmediato.
-     El campo sugiere los exámenes del catálogo de precios; usar uno de
-     ellos permite que laboratorio calcule el costo.
+     El campo sugiere los exámenes del catálogo de precios: solo se
+     pueden pedir exámenes con precio, y el costo con el descuento de la
+     fundación queda registrado en ese momento (se ve bajo el examen).
+     Cuando laboratorio registra el resultado, el examen pasa a
+     `disponible` y aparece **Ver resultado**.
    - **Prescripciones**: elegir **Medicamento del inventario** (el
      campo **Nombre y presentación** se completa solo), escribir
-     **Dosis** e **Indicaciones**, y presionar **Agregar
-     prescripción**. Si no se elige un medicamento del inventario,
-     farmacia no podrá dispensarla (RN-06).
+     **Cantidad prescrita (unidades)**, **Dosis** e **Indicaciones**, y
+     presionar **Agregar prescripción**. Si no se elige un medicamento
+     del inventario, farmacia no podrá dispensarla (RN-06). Cada
+     prescripción indica cuánto se ha entregado (*entregado x de y*).
    - **Cerrar visita**: botón **Marcar visita como completa**.
 3. Para cerrar, presionar **Marcar visita como completa** y confirmar
    en la ventana *Cerrar visita* con **Marcar como completa**. El
    sistema usa el diagnóstico y las observaciones **guardados**: si se
    cambiaron, presionar antes **Guardar cambios**. Si alguno está vacío,
-   la ventana muestra el error y no cierra. Al cerrar, la solicitud
-   enlazada pasa a `completada` y todos los campos de la visita quedan
-   bloqueados.
+   la visita queda `incompleta`, el campo que falta se marca con borde,
+   fondo y el texto *✕ Obligatorio para cerrar*; completarlo, guardar y
+   volver a cerrar. Al cerrar, la solicitud enlazada pasa a
+   `completada`, todos los campos de la visita quedan bloqueados y el
+   sistema genera **en el mismo paso** el cargo al familiar: consulta
+   del especialista, exámenes y medicamentos entregados, cada uno con el
+   20 % de descuento. El mensaje muestra el total por rubro. Una visita
+   no se puede cobrar dos veces.
 
 [CAPTURA: detalle de una visita en atención con Notas clínicas, Exámenes solicitados y Prescripciones]
 
-[CAPTURA: la misma visita ya completada, con los campos bloqueados]
+[CAPTURA: visita incompleta con los campos faltantes resaltados]
+
+[CAPTURA: la misma visita ya completada, con los campos bloqueados y el cargo generado]
 
 ### 4.5 Farmacia
 
@@ -317,11 +365,15 @@ Debajo, **Dispensar contra prescripción**:
    queda bloqueado. Una prescripción marcada *(sin medicamento de
    inventario)* no se puede dispensar: el especialista debe emitir
    otra eligiendo el medicamento del inventario.
-3. Escribir **Cantidad a entregar** y presionar **Dispensar**.
+3. Escribir **Cantidad a entregar** (la lista indica *faltan N de M*)
+   y presionar **Dispensar**. Se puede entregar por partes.
 4. El sistema descuenta el inventario y muestra el costo con el 20 %
-   de descuento de la fundación (RN-09). Si el paciente o el
-   medicamento están desactivados, rechaza la dispensación.
-5. La prescripción queda `dispensada` y no se puede repetir.
+   de descuento de la fundación (RN-09), que se suma a la visita. Si el
+   paciente o el medicamento están desactivados, o se pide más de lo
+   que falta, rechaza la dispensación sin tocar el inventario.
+5. Mientras falte entregar, la prescripción queda `parcial`; al
+   completar la cantidad pasa a `dispensada` y no admite más. Lo que se
+   entrega después de cerrada la visita genera un cargo aparte.
 
 Abajo, **Historial del paciente seleccionado** muestra sus
 dispensaciones anteriores y el total.
@@ -340,8 +392,8 @@ perfiles ven un aviso en su lugar. Cada fila tiene dos acciones:
 
 - **Seleccionar** — copia el número al formulario de la derecha.
 - **Ver costo** — abre la ventana *Costo del examen* con precio base,
-  descuento de la fundación y total a facturar. Si el examen no está en
-  el catálogo de precios, la ventana lo indica.
+  descuento de la fundación y total a facturar: el costo registrado al
+  pedir el examen, aunque después cambie el catálogo.
 
 A la derecha, **Registrar resultado**:
 
@@ -380,17 +432,24 @@ del catálogo.
 **Quién la ve:** `coordinador_fundacion`, `fundacion`, `admin`.
 **Quién registra:** solo `admin`.
 
-- **Estado de cuenta.** Elegir **Paciente**. Aparecen cuatro
-  indicadores — **Saldo total**, **Cargos por servicios**, **Cuotas
-  pendientes** y **Último movimiento** — y las tablas **Cargos** y
-  **Cuotas**. Si el saldo supera el umbral configurado (Q1000 por
-  defecto), la tarjeta de saldo muestra el aviso; si no, dice *Sin
-  alertas*.
+- **Estado de cuenta.** Elegir **Paciente**. Arriba se ve el **titular
+  de la cuenta** (familiar responsable con DPI, teléfono y correo).
+  Aparecen cuatro indicadores — **Saldo total**, **Cargos por
+  servicios**, **Cuotas pendientes** y **Último movimiento** — y las
+  tablas **Cargos** (con el desglose de consulta, laboratorio y
+  farmacia de cada visita) y **Cuotas** (con su vencimiento y, si
+  corresponde, *vencida N d*). La tarjeta de saldo muestra la alerta
+  ▲ roja o ◆ naranja con su motivo, o *Sin alertas*.
+- **Abonar.** En la tabla **Cargos**, **Abonar** abre una ventana con
+  el saldo del cargo; el sistema no acepta abonos mayores al saldo.
 - **Registrar cargo.** Paciente, **Concepto** y **Monto (Q)**; botón
-  **Registrar cargo**.
-- **Registrar / pagar cuota.** Paciente, **Mes**, **Año** y **Monto
-  (Q)**; botón **Registrar pago**. Si la cuota de ese mes no existía,
-  se crea y se marca pagada en un solo paso.
+  **Registrar cargo**. Si el familiar responsable está incompleto, el
+  sistema lo rechaza.
+- **Emitir / pagar cuota.** Paciente, **Mes**, **Año**, **Monto (Q)** y,
+  opcional, **Vence**. **Emitir pendiente** crea la cuota sin pagarla
+  (vence el último día del mes si no se indica otra fecha); si vence sin
+  pago entra a las alertas. **Registrar pago** la paga, y si no existía
+  la crea y la marca pagada en un solo paso.
 - **Donaciones.** Tabla con las donaciones registradas. En **Nueva
   donación**, guardar primero al donante con **Guardar donante** y
   luego elegirlo, escribir monto, tipo (Dinero, Bienes, Otro) y
@@ -410,7 +469,7 @@ ninguno de los siete reportes los incluye.
 
 [CAPTURA: "Estado de cuenta" de un paciente con saldo pendiente y las tablas Cargos y Cuotas]
 
-[CAPTURA: formularios "Registrar cargo", "Registrar / pagar cuota" y "Nueva donación"]
+[CAPTURA: formularios "Registrar cargo", "Emitir / pagar cuota" y "Nueva donación"]
 
 [CAPTURA: tarjetas "Gastos operativos" y "Pagos a la fundación" con sus formularios]
 
@@ -431,16 +490,20 @@ se conservan. Con **Ver también desactivados** se ve y se puede
    Cobros por rango de fecha, Pagos a la fundación, Costos por
    paciente, Análisis médico, Exámenes solicitados o Medicamentos
    aplicados.
-2. Revisar **Desde** y **Hasta**. Al cambiar de reporte el rango se
-   ajusta solo: mes en curso para los financieros, últimos 30 días
-   para exámenes y medicamentos, últimos 90 días para costos por
+2. Revisar **Desde** y **Hasta**. Ambos días se incluyen completos (un
+   rango de hoy a hoy trae todo lo de hoy). Al cambiar de reporte el
+   rango se ajusta solo: mes en curso para los financieros, últimos 30
+   días para exámenes y medicamentos, últimos 90 días para costos por
    paciente y análisis médico.
 3. Presionar **Ver en pantalla**, **Descargar PDF** o **Descargar
    Excel**.
 
 El resultado en pantalla aparece en una tarjeta con el título del
 reporte, el período, la cantidad de filas y, cuando aplica, una fila
-de totales.
+de totales. **Costos por paciente** muestra lo cobrado por rubro
+(consulta, laboratorio, farmacia y otros cargos). El Excel lleva la
+cabecera del asilo y los totales como fórmulas, de modo que se
+recalculan si se edita una celda.
 
 [CAPTURA: pantalla Reportes con "Entradas de dinero" en pantalla y su fila de total]
 
@@ -472,17 +535,19 @@ la cierre; a partir de ahí ya no puede volver a entrar.
 **Quién la ve:** solo `admin`.
 
 Bitácora de quién **creó**, **modificó**, **canceló**, **desactivó** o
-**reactivó** cada registro y cuándo: pacientes, solicitudes (incluida
-la asignación de cita), visitas, exámenes, prescripciones,
-medicamentos, dispensaciones, cargos, cuotas, donantes, donaciones,
-gastos, pagos a la fundación y cuentas de usuario.
+**reactivó** cada registro, cuándo, desde qué dirección IP y en qué
+módulo: pacientes, familiares, solicitudes (incluida la asignación de
+cita), visitas, exámenes, prescripciones, medicamentos, dispensaciones,
+cargos, abonos, cuotas, donantes, donaciones, gastos, pagos a la
+fundación y cuentas de usuario. Cada registro guarda los datos antes y
+después del cambio.
 
 1. Elegir **Desde** y **Hasta** (por defecto, los últimos 7 días) y,
    si se quiere, una **Entidad**.
 2. Presionar **Consultar**.
 
-La tabla **Registros** muestra fecha y hora, usuario, acción (con su
-símbolo), entidad con su número y un detalle (por ejemplo, la fecha y
+La tabla **Registros** muestra fecha y hora, usuario e IP, módulo,
+acción (con su símbolo), entidad con su número, los cambios y un detalle (por ejemplo, la fecha y
 hora de la cita asignada). Se muestran como máximo 200 registros, del
 más reciente al más antiguo. Laboratorio (resultados y precios) y
 notificaciones no se registran en la auditoría.
@@ -499,7 +564,16 @@ notificaciones no se registran en la auditoría.
   válida y pendiente, asociada a un medicamento del inventario.
 - **RN-09**: todas las ventas (farmacia y laboratorio) a residentes
   del asilo llevan 20 % de descuento de la fundación.
-- Completar una visita exige diagnóstico y observaciones no vacíos.
+- Todo interno se registra con su familiar responsable completo y su
+  ficha médica.
+- Una solicitud lleva siempre al enfermero(a) que acompaña.
+- Completar una visita exige diagnóstico y observaciones no vacíos; si
+  faltan, la visita queda incompleta.
+- Al cerrar una visita se genera su cargo una sola vez, con consulta,
+  exámenes y medicamentos entregados.
+- Ningún saldo puede quedar negativo; no se cargan servicios a un
+  familiar con datos incompletos.
+- No se pide un examen que no tenga precio en el catálogo.
 - Estados `completada` y `cancelada` son definitivos.
 - **Paciente activo**: a un paciente desactivado no se le crean
   solicitudes, citas, visitas, exámenes, prescripciones ni

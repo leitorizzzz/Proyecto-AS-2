@@ -31,6 +31,40 @@ erDiagram
         BIT activo "borrado logico, default 1"
     }
 
+    familiares {
+        INT id PK
+        INT idPaciente FK
+        NVARCHAR nombres
+        NVARCHAR apellidos
+        NVARCHAR dpi "13 digitos"
+        NVARCHAR parentesco
+        NVARCHAR telefono
+        NVARCHAR email
+        NVARCHAR direccion
+        BIT principal "uno principal activo por paciente"
+        BIT activo
+        DATETIME2 fechaRegistro
+    }
+
+    fichas_medicas {
+        INT id PK
+        INT idPaciente FK "UNIQUE, 1:1"
+        NVARCHAR grupoSanguineo
+        NVARCHAR alergias
+        NVARCHAR antecedentes
+        DATETIME2 fechaApertura
+    }
+
+    avisos {
+        INT id PK
+        INT idUsuario FK
+        NVARCHAR tipo "cita_asignada"
+        NVARCHAR mensaje
+        INT idSolicitud FK
+        BIT leido
+        DATETIME2 fecha
+    }
+
     solicitudes_referencia {
         INT id PK
         INT idPaciente FK
@@ -41,6 +75,7 @@ erDiagram
         DATE fechaCita
         TIME horaCita
         INT idMedicoEspecialista
+        INT idEnfermero "enfermero que acompana"
         DATETIME2 fechaCreacion
         DATETIME2 fechaActualizacion
     }
@@ -53,8 +88,11 @@ erDiagram
         DATETIME2 fecha
         NVARCHAR diagnostico
         NVARCHAR observaciones
-        NVARCHAR estado
+        NVARCHAR estado "en_atencion|incompleta|completada|cancelada"
         DATETIME2 fechaCompletada
+        INT idFichaMedica FK
+        DECIMAL costoLaboratorio
+        DECIMAL costoFarmacia
     }
 
     visita_examenes {
@@ -63,6 +101,9 @@ erDiagram
         NVARCHAR tipo
         NVARCHAR estado
         DATETIME2 fechaSolicitud
+        DECIMAL precioBase "congelado al ordenar"
+        DECIMAL descuento "RN-09"
+        DECIMAL costo
     }
 
     visita_prescripciones {
@@ -72,7 +113,9 @@ erDiagram
         NVARCHAR dosis
         NVARCHAR indicaciones
         INT idMedicamento FK
-        NVARCHAR estado
+        NVARCHAR estado "pendiente|parcial|dispensada"
+        INT cantidadPrescrita
+        INT cantidadEntregada
         INT idDispensacion FK
         DATETIME2 fechaDispensacion
         DATETIME2 fechaPrescripcion
@@ -95,6 +138,8 @@ erDiagram
         INT cantidad
         DECIMAL costoTotal
         DATETIME2 fecha
+        INT idPrescripcion FK
+        DECIMAL montoBase "antes del descuento"
     }
 
     examenes_precios {
@@ -121,7 +166,39 @@ erDiagram
         NVARCHAR concepto
         DECIMAL monto
         DATETIME2 fecha
-        NVARCHAR estado
+        NVARCHAR estado "pendiente|parcial|pagado"
+        INT idVisita FK "UNIQUE si no es complementario"
+        INT idDispensacion FK
+        INT idFamiliar FK "titular"
+        NVARCHAR origen "manual|visita|dispensacion"
+        DECIMAL montoPagado "CHECK 0..monto"
+    }
+
+    cargos_detalle {
+        INT id PK
+        INT idCargo FK
+        NVARCHAR rubro "consulta|laboratorio|farmacia"
+        NVARCHAR descripcion
+        INT idReferencia
+        DECIMAL montoBase
+        DECIMAL descuento
+        DECIMAL monto
+    }
+
+    abonos_cargo {
+        INT id PK
+        INT idCargo FK
+        DECIMAL monto
+        NVARCHAR concepto
+        INT idUsuario
+        DATETIME2 fecha
+    }
+
+    tarifas_servicio {
+        INT id PK
+        NVARCHAR codigo UK "consulta_especialista"
+        NVARCHAR descripcion
+        DECIMAL precioBase
     }
 
     cuotas_mensuales {
@@ -132,6 +209,7 @@ erDiagram
         DECIMAL monto
         NVARCHAR estado
         DATETIME2 fechaPago
+        DATE fechaVencimiento "alertas naranja/roja"
     }
 
     donantes {
@@ -183,6 +261,7 @@ erDiagram
         DATETIME2 fechaEnvio
         DATETIME2 fechaUltimoIntento
         NVARCHAR mensajeError
+        NVARCHAR idMensajeProveedor "messageId de Brevo o sim-uuid"
     }
 
     auditoria {
@@ -194,12 +273,25 @@ erDiagram
         INT idEntidad "id del registro auditado"
         NVARCHAR detalle
         DATETIME2 fecha "UTC"
+        NVARCHAR ip
+        NVARCHAR modulo
+        NVARCHAR datosAnteriores "JSON"
+        NVARCHAR datosNuevos "JSON"
     }
 
     pacientes ||--o{ solicitudes_referencia : "tiene"
     pacientes ||--o{ visitas_medicas       : "recibe"
     pacientes ||--o{ cargos_servicio       : "le aplican"
     pacientes ||--o{ cuotas_mensuales      : "paga"
+    pacientes ||--o{ familiares            : "responsable"
+    pacientes ||--|| fichas_medicas        : "ficha 1:1"
+    fichas_medicas ||--o{ visitas_medicas  : "registra"
+    familiares ||--o{ cargos_servicio      : "titular"
+    visitas_medicas ||--o| cargos_servicio : "genera al cerrar"
+    cargos_servicio ||--o{ cargos_detalle  : "desglosa"
+    cargos_servicio ||--o{ abonos_cargo    : "recibe"
+    usuarios ||--o{ avisos                 : "recibe"
+    solicitudes_referencia ||--o{ avisos   : "origina"
     solicitudes_referencia ||--o| visitas_medicas : "deriva en"
     visitas_medicas ||--o{ visita_examenes       : "solicita"
     visitas_medicas ||--o{ visita_prescripciones : "prescribe"

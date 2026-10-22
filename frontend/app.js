@@ -845,8 +845,6 @@ async function editarPaciente(id) {
         <div><label for="epTelefono">Teléfono</label><input id="epTelefono" name="telefono" value="${v(p.telefono)}"></div>
         <div><label for="epContacto">Contacto de emergencia</label><input id="epContacto" name="contactoEmergencia" value="${v(p.contactoEmergencia)}"></div>
       </div>
-      <label for="epFamiliarEmail">Correo del familiar</label>
-      <input id="epFamiliarEmail" name="familiarEmail" type="email" value="${v(p.familiarEmail)}">
       <label for="epDireccion">Dirección</label>
       <input id="epDireccion" name="direccion" value="${v(p.direccion)}">
       <label for="epPadecimientos">Padecimientos conocidos</label>
