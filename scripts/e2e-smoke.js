@@ -110,6 +110,7 @@ function familiarE2E(dpi) {
   let pacienteId, solicitudId, visitaId, prescripcionId, examenId, idEsp, idEnf, idMg;
   let medE2E;   // medicamento propio: no se toca el stock del inventario real
   let cargoVisita; // cargo generado al cerrar la visita (caso 19)
+  let conceptoPagoE2E; // pago a fundacion propio (rango de reportes)
   const TS = Date.now();
 
   // 00 - preparar usuarios (el smoke no depende de seed-demo)
@@ -552,6 +553,7 @@ function familiarE2E(dpi) {
   paso('financiero: POST /pagos-fundacion (admin 201 y aparece en el listado)');
   try {
     const concepto = `E2E pago fundacion ${Date.now()}`;
+    conceptoPagoE2E = concepto;
     await req('POST', `${API.financiero}/api/financiero/pagos-fundacion`, {
       body: { concepto, monto: 1 }, token: adminToken, esperarStatus: 201
     });
@@ -965,6 +967,30 @@ function familiarE2E(dpi) {
     const fila = ws.getCell('H6').value;
     if (!fila?.formula) throw new Error(`total por fila sin formula: ${JSON.stringify(fila)}`);
     ok(`${f.formula} = ${f.result}; fila 6: ${fila.formula}`);
+  } catch (e) { falla(e.message); }
+
+  // Bloque 3: "hasta" inclusivo. Un rango hoy-a-hoy (dia de Guatemala)
+  // trae lo que este smoke registro hoy; ayer-a-ayer no lo trae.
+  paso('reportes: rango hoy-a-hoy incluye lo registrado hoy en los 7 reportes; ayer-a-ayer no');
+  try {
+    const dia = offset => new Date(Date.now() - 6 * 3600e3 + offset * 864e5).toISOString().slice(0, 10);
+    const hoy = dia(0), ayer = dia(-1);
+    const rep = async (tipo, d, h) => (await req('GET', `${API.reportes}/api/reportes/${tipo}?desde=${d}&hasta=${h}`,
+      { token: adminToken, esperarStatus: 200 })).data.filas;
+    const esperado = {
+      'costos-por-paciente': f => f.idPaciente === pacienteId,
+      'analisis-medico': f => f.especialidad === 'cardiologia-e2e',
+      'cobros-por-rango': f => f.concepto === 'Cuota 1/2025' && /E2E Alerta naranja/.test(f.paciente),
+      'pagos-fundacion': f => f.concepto === conceptoPagoE2E,
+      'entradas': f => f.concepto.startsWith('Cuota 1/2025 - E2E Alerta naranja'),
+      'examenes': f => f.idExamen === examenId,
+      'medicamentos-aplicados': f => f.medicamento === medE2E.nombre
+    };
+    for (const [tipo, criterio] of Object.entries(esperado)) {
+      if (!(await rep(tipo, hoy, hoy)).some(criterio)) throw new Error(`${tipo} ${hoy}..${hoy} no incluye el registro de hoy`);
+    }
+    if ((await rep('examenes', ayer, ayer)).some(esperado.examenes)) throw new Error('ayer-a-ayer incluye un examen de hoy');
+    ok(`7 reportes ${hoy}..${hoy} con registros propios; ${ayer}..${ayer} sin ellos`);
   } catch (e) { falla(e.message); }
 
   paso('limpieza: desactivar el medicamento propio del smoke');

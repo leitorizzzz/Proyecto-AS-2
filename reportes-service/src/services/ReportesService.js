@@ -46,6 +46,17 @@ class ReportesService {
     return { desde, hasta };
   }
 
+  /**
+   * Bloque 3: limites que recibe el repositorio. Las fechas se guardan en
+   * UTC y el usuario elige dias de Guatemala (UTC-6): "hasta" es inclusivo,
+   * asi que el limite superior es el inicio del dia siguiente, exclusivo
+   * (fecha >= desde AND fecha < hasta). Un rango hoy-a-hoy trae todo hoy.
+   */
+  _limites({ desde, hasta }) {
+    const inicioGt = dia => new Date(Date.parse(`${dia}T00:00:00Z`) + ReportesService.DESFASE_GT_MS);
+    return { desde: inicioGt(desde), hasta: new Date(inicioGt(hasta).getTime() + 24 * 60 * 60 * 1000) };
+  }
+
   static esFechaValida(v) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(v))) return false;
     const d = new Date(`${v}T00:00:00Z`);
@@ -57,7 +68,7 @@ class ReportesService {
     if (filtros.idPaciente != null && !(Number.isInteger(filtros.idPaciente) && filtros.idPaciente > 0)) {
       throw Object.assign(new Error('idPaciente debe ser un entero positivo'), { status: 400 });
     }
-    const filas = await this.repo.costosPorPaciente({ ...rango, idPaciente: filtros.idPaciente });
+    const filas = await this.repo.costosPorPaciente({ ...this._limites(rango), idPaciente: filtros.idPaciente });
     return new Reporte({
       tipo: Reporte.TIPOS.COSTOS_POR_PACIENTE,
       titulo: 'Costos por paciente',
@@ -81,7 +92,7 @@ class ReportesService {
 
   async _analisisMedico(filtros) {
     const rango = this._rango(filtros);
-    const filas = await this.repo.analisisMedico(rango);
+    const filas = await this.repo.analisisMedico(this._limites(rango));
     return new Reporte({
       tipo: Reporte.TIPOS.ANALISIS_MEDICO,
       titulo: 'Analisis medico por especialidad',
@@ -99,7 +110,7 @@ class ReportesService {
 
   async _cobrosPorRango(filtros) {
     const rango = this._rango(filtros);
-    const filas = await this.repo.cobrosPorRango(rango);
+    const filas = await this.repo.cobrosPorRango(this._limites(rango));
     return new Reporte({
       tipo: Reporte.TIPOS.COBROS_POR_RANGO,
       titulo: 'Cobros por rango de fecha',
@@ -117,7 +128,7 @@ class ReportesService {
 
   async _pagosFundacion(filtros) {
     const rango = this._rango(filtros);
-    const filas = await this.repo.pagosFundacion(rango);
+    const filas = await this.repo.pagosFundacion(this._limites(rango));
     return new Reporte({
       tipo: Reporte.TIPOS.PAGOS_FUNDACION,
       titulo: 'Pagos realizados a la fundacion',
@@ -134,7 +145,7 @@ class ReportesService {
 
   async _entradas(filtros) {
     const rango = this._rango(filtros);
-    const filas = await this.repo.entradas(rango);
+    const filas = await this.repo.entradas(this._limites(rango));
     return new Reporte({
       tipo: Reporte.TIPOS.ENTRADAS,
       titulo: 'Entradas de dinero (donaciones y cuotas)',
@@ -152,7 +163,7 @@ class ReportesService {
 
   async _examenes(filtros) {
     const rango = this._rango(filtros);
-    const filas = await this.repo.examenes(rango);
+    const filas = await this.repo.examenes(this._limites(rango));
     return new Reporte({
       tipo: Reporte.TIPOS.EXAMENES,
       titulo: 'Examenes solicitados',
@@ -170,7 +181,7 @@ class ReportesService {
 
   async _medicamentosAplicados(filtros) {
     const rango = this._rango(filtros);
-    const filas = await this.repo.medicamentosAplicados(rango);
+    const filas = await this.repo.medicamentosAplicados(this._limites(rango));
     return new Reporte({
       tipo: Reporte.TIPOS.MEDICAMENTOS_APLICADOS,
       titulo: 'Medicamentos aplicados (dispensaciones)',
@@ -366,6 +377,9 @@ class ReportesService {
     return isNaN(d) ? String(v) : d.toISOString().slice(0, 10);
   }
 }
+
+// Guatemala no usa horario de verano: medianoche local = 06:00 UTC.
+ReportesService.DESFASE_GT_MS = 6 * 60 * 60 * 1000;
 
 ReportesService.MARCA = Object.freeze({
   institucion: 'Asilo de Ancianos "Cabeza de Algodon" - Mazatenango',

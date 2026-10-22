@@ -35,7 +35,7 @@ class ReportesRepository {
                SUM(CASE WHEN d.id IS NULL THEN cs.monto ELSE 0 END) AS otros
         FROM cargos_servicio cs
         LEFT JOIN cargos_detalle d ON d.idCargo = cs.id
-        WHERE cs.fecha BETWEEN @desde AND @hasta
+        WHERE cs.fecha >= @desde AND cs.fecha < @hasta
         GROUP BY cs.idPaciente
       ) c ON c.idPaciente = p.id
       WHERE 1 = 1 ${filtro}
@@ -58,7 +58,7 @@ class ReportesRepository {
         FROM solicitudes_referencia s
         LEFT JOIN visitas_medicas v
           ON v.idSolicitudReferencia = s.id AND v.estado = 'completada'
-        WHERE s.fechaCreacion BETWEEN @desde AND @hasta
+        WHERE s.fechaCreacion >= @desde AND s.fechaCreacion < @hasta
         GROUP BY s.especialidad
         ORDER BY solicitudes DESC
       `);
@@ -78,7 +78,7 @@ class ReportesRepository {
           cm.monto AS monto
         FROM cuotas_mensuales cm
         INNER JOIN pacientes p ON p.id = cm.idPaciente
-        WHERE cm.estado = 'pagada' AND cm.fechaPago BETWEEN @desde AND @hasta
+        WHERE cm.estado = 'pagada' AND cm.fechaPago >= @desde AND cm.fechaPago < @hasta
         ORDER BY cm.fechaPago DESC
       `);
     return r.recordset;
@@ -92,7 +92,7 @@ class ReportesRepository {
       .query(`
         SELECT id, fecha, concepto, monto
         FROM pagos_fundacion
-        WHERE fecha BETWEEN @desde AND @hasta
+        WHERE fecha >= @desde AND fecha < @hasta
         ORDER BY fecha DESC
       `);
     return r.recordset;
@@ -112,7 +112,7 @@ class ReportesRepository {
             d.tipo AS tipo,
             d.monto AS monto
           FROM donaciones d INNER JOIN donantes dn ON dn.id = d.idDonante
-          WHERE d.fecha BETWEEN @desde AND @hasta
+          WHERE d.fecha >= @desde AND d.fecha < @hasta
           UNION ALL
           SELECT
             cm.fechaPago AS fecha,
@@ -121,7 +121,7 @@ class ReportesRepository {
             'cuota' AS tipo,
             cm.monto AS monto
           FROM cuotas_mensuales cm INNER JOIN pacientes p ON p.id = cm.idPaciente
-          WHERE cm.estado = 'pagada' AND cm.fechaPago BETWEEN @desde AND @hasta
+          WHERE cm.estado = 'pagada' AND cm.fechaPago >= @desde AND cm.fechaPago < @hasta
         ) t
         ORDER BY fecha DESC
       `);
@@ -145,7 +145,7 @@ class ReportesRepository {
         INNER JOIN visitas_medicas vm ON vm.id = ex.idVisita
         INNER JOIN pacientes p ON p.id = vm.idPaciente
         LEFT JOIN resultados_examenes r ON r.idExamen = ex.id
-        WHERE ex.fechaSolicitud BETWEEN @desde AND @hasta
+        WHERE ex.fechaSolicitud >= @desde AND ex.fechaSolicitud < @hasta
         ORDER BY ex.fechaSolicitud DESC
       `);
     return r.recordset;
@@ -166,7 +166,7 @@ class ReportesRepository {
         FROM dispensaciones d
         INNER JOIN medicamentos m ON m.id = d.idMedicamento
         INNER JOIN pacientes p ON p.id = d.idPaciente
-        WHERE d.fecha BETWEEN @desde AND @hasta
+        WHERE d.fecha >= @desde AND d.fecha < @hasta
         ORDER BY d.fecha DESC
       `);
     return r.recordset;
