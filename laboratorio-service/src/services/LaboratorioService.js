@@ -105,6 +105,19 @@ class LaboratorioService {
     if (!orden) {
       throw Object.assign(new Error('Orden de examen no encontrada'), { status: 404 });
     }
+    // Caso 15: si la orden trae el costo registrado al pedirla, ese manda
+    // (un cambio posterior del catalogo no lo altera).
+    if (orden.costo != null && orden.precioBase != null) {
+      return {
+        idExamen: orden.id,
+        tipo: orden.tipo,
+        precioBase: this._r(orden.precioBase),
+        descuentoFundacion: this._r(orden.descuento),
+        porcentajeDescuento: this.descuento,
+        total: this._r(orden.costo),
+        registradoAlOrdenar: true
+      };
+    }
     const precioBase = await this.repo.obtenerPrecioBase(orden.tipo);
     if (precioBase == null) {
       throw Object.assign(
@@ -120,7 +133,8 @@ class LaboratorioService {
       precioBase: this._r(precioBase),
       descuentoFundacion: this._r(montoDescuento),
       porcentajeDescuento: this.descuento,
-      total: this._r(total)
+      total: this._r(total),
+      registradoAlOrdenar: false
     };
   }
 

@@ -31,6 +31,16 @@ describe('LaboratorioService', () => {
     expect(r.total).toBe(68);
   });
 
+  // Caso 15: el costo registrado al ordenar manda sobre el catalogo actual.
+  test('calcularCostoConDescuento usa el costo registrado en la orden', async () => {
+    const { svc } = nuevoServicio({
+      orden: { id: 1, tipo: 'Hematologia completa', precioBase: 85, descuento: 17, costo: 68 },
+      precio: 100
+    });
+    const r = await svc.calcularCostoConDescuento(1);
+    expect(r).toMatchObject({ precioBase: 85, descuentoFundacion: 17, total: 68, registradoAlOrdenar: true });
+  });
+
   test('calcularCostoConDescuento: tipo sin precio -> 404', async () => {
     const { svc } = nuevoServicio({ orden: { id: 1, tipo: 'desconocido' }, precio: null });
     await expect(svc.calcularCostoConDescuento(1)).rejects.toMatchObject({ status: 404 });

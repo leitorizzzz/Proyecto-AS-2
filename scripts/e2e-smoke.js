@@ -474,6 +474,51 @@ function familiarE2E(dpi) {
     ok(`${p.tipo} = ${p.precioBase}`);
   } catch (e) { falla(e.message); }
 
+  // Caso 15 sobre una visita propia y el precio propio del smoke.
+  paso('caso 15: el examen queda con su costo con descuento al ordenarlo; cambiar el catalogo no lo altera');
+  try {
+    const TIPO_E2E = 'E2E examen (no usar)';
+    const p = (await req('GET', `${API.laboratorio}/api/laboratorio/precios`, { token: adminToken, esperarStatus: 200 })).data
+      .find(x => x.tipo === TIPO_E2E);
+    const dpi = String(TS + 15).padStart(13, '0').slice(-13);
+    const pac = (await req('POST', `${API.pacientes}/api/pacientes`, {
+      body: { nombres: 'E2E', apellidos: 'Caso 15', fechaNacimiento: '1948-05-05', genero: 'M', dpi,
+              familiar: familiarE2E(String(TS + 16).padStart(13, '0').slice(-13)) },
+      token: adminToken, esperarStatus: 201
+    })).data;
+    const sol = (await req('POST', `${API.pacientes}/api/solicitudes`, {
+      body: { idPaciente: pac.id, especialidad: 'caso15-e2e', motivo: 'caso 15', idEnfermero: idEnf }, token: mgToken, esperarStatus: 201
+    })).data;
+    await req('PATCH', `${API.pacientes}/api/solicitudes/${sol.id}/asignar-cita`, {
+      body: { fechaCita: '2026-12-03', horaCita: '08:00', idMedicoEspecialista: idEsp }, token: cfToken, esperarStatus: 200
+    });
+    const vis = (await req('POST', `${API.pacientes}/api/solicitudes/${sol.id}/convertir-a-visita`, { token: meToken, esperarStatus: 201 })).data;
+    // Tipo sin precio en el catalogo -> 409, no se ordena.
+    await req('POST', `${API.pacientes}/api/visitas/${vis.id}/examenes`, {
+      body: { tipo: `E2E sin precio ${TS}` }, token: meToken, esperarStatus: 409
+    });
+    const ex = (await req('POST', `${API.pacientes}/api/visitas/${vis.id}/examenes`, {
+      body: { tipo: TIPO_E2E }, token: meToken, esperarStatus: 201
+    })).data;
+    const base = p.precioBase, desc = Math.round(base * 0.2 * 100) / 100, costo = Math.round((base - desc) * 100) / 100;
+    if (ex.precioBase !== base || ex.descuento !== desc || ex.costo !== costo) {
+      throw new Error(`orden: ${ex.precioBase}/${ex.descuento}/${ex.costo} != ${base}/${desc}/${costo}`);
+    }
+    await req('PUT', `${API.laboratorio}/api/laboratorio/precios/${p.id}`, {
+      body: { tipo: p.tipo, precioBase: base + 5 }, token: adminToken, esperarStatus: 200
+    });
+    let c;
+    try {
+      c = (await req('GET', `${API.laboratorio}/api/laboratorio/examenes/${ex.id}/costo`, { token: labToken, esperarStatus: 200 })).data;
+    } finally {
+      await req('PUT', `${API.laboratorio}/api/laboratorio/precios/${p.id}`, {
+        body: { tipo: p.tipo, precioBase: base }, token: adminToken, esperarStatus: 200
+      });
+    }
+    if (c.total !== costo || !c.registradoAlOrdenar) throw new Error(`costo tras cambiar catalogo: ${JSON.stringify(c)}`);
+    ok(`examen ${ex.id}: ${base} - ${desc} = ${costo}; catalogo a ${base + 5} y sigue ${c.total}`);
+  } catch (e) { falla(e.message); }
+
   paso('financiero: POST /gastos (admin 201 y aparece en el listado, farmacia 403)');
   try {
     const concepto = `E2E gasto ${Date.now()}`;

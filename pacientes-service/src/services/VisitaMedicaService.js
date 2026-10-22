@@ -92,7 +92,19 @@ class VisitaMedicaService {
       throw Object.assign(new Error('tipo del examen es requerido'), { status: 400 });
     }
     await asegurarPacienteActivo(this.pacienteRepo, visita.idPaciente, 'pedirle examenes');
-    return this.repo.agregarExamen(id, { tipo: String(datos.tipo).trim() });
+    // Caso 15: el costo con el descuento de la fundacion (RN-09) queda
+    // registrado en la orden. Sin precio en el catalogo no se ordena: no se
+    // puede cobrar despues ni se cobra en cero en silencio.
+    const tipo = String(datos.tipo).trim();
+    const precioBase = await this.repo.obtenerPrecioExamen(tipo);
+    if (precioBase == null) {
+      throw Object.assign(
+        new Error(`El examen "${tipo}" no tiene precio configurado en el catalogo de laboratorio; registrelo primero (administracion)`),
+        { status: 409 });
+    }
+    const r = n => Math.round(Number(n) * 100) / 100;
+    const descuento = r(precioBase * this.descuento);
+    return this.repo.agregarExamen(id, { tipo, precioBase: r(precioBase), descuento, costo: r(precioBase - descuento) });
   }
 
   async agregarPrescripcion(id, datos) {

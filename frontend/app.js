@@ -1194,7 +1194,8 @@ async function cargarDetalleVisita() {
       .forEach(sel => { $(sel).disabled = !puedeEditar; });
 
     $('#listaExamenes').innerHTML = (v.examenes || []).map(ex =>
-      `<li>${esc(ex.tipo)} ${chip(ex.estado)}<div class="tiny">${fechaHora(ex.fechaSolicitud)}</div></li>`
+      `<li>${esc(ex.tipo)} ${chip(ex.estado)}<div class="tiny">${fechaHora(ex.fechaSolicitud)}${ex.costo != null
+        ? ` · costo registrado ${money(ex.precioBase)} − ${money(ex.descuento)} = <strong class="num">${money(ex.costo)}</strong>` : ''}</div></li>`
     ).join('') || `<li class="tiny">Sin exámenes solicitados.</li>`;
 
     $('#listaPrescripciones').innerHTML = (v.prescripciones || []).map(rx =>
@@ -1298,7 +1299,7 @@ async function onAgregarExamen() {
       method: 'POST', body: { tipo }
     });
     $('#exTipo').value = '';
-    ok(msg, 'Examen registrado.');
+    ok(msg, 'Examen registrado con su costo (descuento de la fundación aplicado).');
     cargarDetalleVisita();
   } catch (err) { error(msg, err.message); }
 }

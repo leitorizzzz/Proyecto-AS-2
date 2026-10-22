@@ -64,3 +64,10 @@ minúsculas con guion bajo.
 | Cuota vencida | `cuotas_mensuales.estado = 'pendiente'` y hoy (Guatemala) > `fechaVencimiento` (por defecto, último día del mes de la cuota) |
 | Panel del administrador | `GET /api/financiero/alertas` (admin, coordinador_fundacion); tarjeta «Alertas de cobro» del panel |
 | Emisión de cuota pendiente | `POST /api/financiero/cuotas` (admin) |
+
+## Costo del examen (caso 15)
+
+| Plan del SQA | Código |
+|---|---|
+| Costo con descuento registrado al ordenar | `visita_examenes.precioBase`, `descuento`, `costo` (se congelan al `POST /api/visitas/:id/examenes` con el precio de `examenes_precios` y RN-09). Tipo sin precio → 409 |
+| Costo consultado por laboratorio | `GET /api/laboratorio/examenes/:id/costo` devuelve el registrado (`registradoAlOrdenar: true`); solo las órdenes antiguas (NULL) usan el catálogo actual |

@@ -212,6 +212,17 @@ async function inicializarEsquema() {
       CHECK (cantidadEntregada >= 0 AND (cantidadPrescrita IS NULL
              OR (cantidadPrescrita > 0 AND cantidadEntregada <= cantidadPrescrita)));
   `);
+  // --- Caso 15: costo del examen registrado al ordenarlo (RN-09) ---------
+  // Se congela el precio del catalogo y el descuento vigentes al pedirlo;
+  // cambiar el catalogo despues no altera lo ya ordenado. Las ordenes
+  // anteriores a esta columna quedan en NULL y se cobran con el catalogo.
+  for (const col of ['precioBase', 'descuento', 'costo']) {
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('visita_examenes') AND name = '${col}')
+      ALTER TABLE visita_examenes ADD ${col} DECIMAL(10,2) NULL;
+    `);
+  }
+
   // --- Caso 5: familiar responsable y ficha medica 1:1 -------------------
   await pool.request().query(`
     IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'familiares')

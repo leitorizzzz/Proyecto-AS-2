@@ -222,15 +222,27 @@ class VisitaMedicaRepository {
     }
   }
 
-  async agregarExamen(idVisita, { tipo }) {
+  /** Precio base del catalogo de laboratorio (examenes_precios, BD compartida). */
+  async obtenerPrecioExamen(tipo) {
+    const pool = await getPool();
+    const result = await pool.request()
+      .input('tipo', sql.NVarChar(200), tipo)
+      .query('SELECT precioBase FROM examenes_precios WHERE tipo = @tipo');
+    return result.recordset[0] ? Number(result.recordset[0].precioBase) : null;
+  }
+
+  async agregarExamen(idVisita, { tipo, precioBase, descuento, costo }) {
     const pool = await getPool();
     const result = await pool.request()
       .input('idVisita', sql.Int, idVisita)
       .input('tipo', sql.NVarChar(200), tipo)
+      .input('precioBase', sql.Decimal(10, 2), precioBase)
+      .input('descuento', sql.Decimal(10, 2), descuento)
+      .input('costo', sql.Decimal(10, 2), costo)
       .query(`
-        INSERT INTO visita_examenes (idVisita, tipo)
+        INSERT INTO visita_examenes (idVisita, tipo, precioBase, descuento, costo)
         OUTPUT INSERTED.*
-        VALUES (@idVisita, @tipo)
+        VALUES (@idVisita, @tipo, @precioBase, @descuento, @costo)
       `);
     return result.recordset[0];
   }
