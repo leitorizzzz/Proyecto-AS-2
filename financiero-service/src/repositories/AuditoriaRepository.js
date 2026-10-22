@@ -17,10 +17,16 @@ class AuditoriaRepository {
       .input('entidad', sql.NVarChar(50), registro.entidad)
       .input('idEntidad', sql.Int, registro.idEntidad)
       .input('detalle', sql.NVarChar(300), registro.detalle)
+      .input('ip', sql.NVarChar(64), registro.ip)
+      .input('modulo', sql.NVarChar(30), registro.modulo)
+      .input('datosAnteriores', sql.NVarChar(sql.MAX), registro.datosAnterioresJson())
+      .input('datosNuevos', sql.NVarChar(sql.MAX), registro.datosNuevosJson())
       .query(`
-        INSERT INTO auditoria (usuario, idUsuario, accion, entidad, idEntidad, detalle)
+        INSERT INTO auditoria (usuario, idUsuario, accion, entidad, idEntidad, detalle,
+                               ip, modulo, datosAnteriores, datosNuevos)
         OUTPUT INSERTED.*
-        VALUES (@usuario, @idUsuario, @accion, @entidad, @idEntidad, @detalle)
+        VALUES (@usuario, @idUsuario, @accion, @entidad, @idEntidad, @detalle,
+                @ip, @modulo, @datosAnteriores, @datosNuevos)
       `);
     return new RegistroAuditoria(result.recordset[0]);
   }
@@ -49,6 +55,17 @@ async function crearTablaAuditoria(pool) {
       fecha DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
     );
   `);
+  // Caso 24: IP, modulo y datos anteriores / nuevos en JSON. 2705 = la
+  // columna ya existe (otro servicio la agrego en la misma carrera).
+  for (const [col, tipo] of [['ip', 'NVARCHAR(64) NULL'], ['modulo', 'NVARCHAR(30) NULL'],
+                             ['datosAnteriores', 'NVARCHAR(MAX) NULL'], ['datosNuevos', 'NVARCHAR(MAX) NULL']]) {
+    try {
+      await pool.request().query(`
+        IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('auditoria') AND name = '${col}')
+        ALTER TABLE auditoria ADD ${col} ${tipo};
+      `);
+    } catch (err) { if (err.number !== 2705) throw err; }
+  }
   await tolerar(`
     IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_auditoria_fecha')
     CREATE INDEX IX_auditoria_fecha ON auditoria (fecha DESC, entidad);

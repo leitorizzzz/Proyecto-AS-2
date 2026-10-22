@@ -103,6 +103,12 @@ class FinancieroService {
     return this.donanteRepo.listarDonantes({ incluirInactivos });
   }
 
+  async obtenerDonante(id) {
+    const donante = await this.donanteRepo.obtenerDonante(Number(id));
+    if (!donante) throw Object.assign(new Error('Donante no encontrado'), { status: 404 });
+    return donante;
+  }
+
   async desactivarDonante(id) {
     const donante = await this.donanteRepo.obtenerDonante(Number(id));
     if (!donante) throw Object.assign(new Error('Donante no encontrado'), { status: 404 });

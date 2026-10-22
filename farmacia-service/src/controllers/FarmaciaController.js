@@ -1,3 +1,5 @@
+const AuditoriaService = require('../services/AuditoriaService');
+
 /**
  * CAPA DE PRESENTACION (API REST)
  * Traduce peticiones HTTP en llamadas a la capa de logica de negocio.
@@ -9,9 +11,12 @@ class FarmaciaController {
     this.auditoria = auditoriaService;
   }
 
-  /** Registra en auditoria; nunca falla (ver AuditoriaService). */
-  _auditar = (req, accion, entidad, idEntidad, detalle) =>
-    this.auditoria ? this.auditoria.registrar(req.usuario, accion, entidad, idEntidad, detalle) : null;
+  /** Registra en auditoria (usuario, IP, modulo, antes/despues); nunca falla. */
+  _auditar = (req, accion, entidad, idEntidad, detalle, antes = null, despues = null) =>
+    this.auditoria
+      ? this.auditoria.registrar(AuditoriaService.contextoDe(req, 'farmacia'),
+          accion, entidad, idEntidad, detalle, { antes, despues })
+      : null;
 
   _fallo = (res, error) => {
     const status = error.status || 500;
@@ -39,15 +44,16 @@ class FarmaciaController {
   crearMedicamento = async (req, res) => {
     try {
       const nuevo = await this.service.registrarMedicamento(req.body);
-      await this._auditar(req, 'crear', 'medicamento', nuevo.id, nuevo.nombre);
+      await this._auditar(req, 'crear', 'medicamento', nuevo.id, nuevo.nombre, null, nuevo);
       res.status(201).json(nuevo);
     } catch (error) { this._fallo(res, error); }
   };
 
   actualizarMedicamento = async (req, res) => {
     try {
+      const antes = await this.service.obtenerMedicamento(Number(req.params.id));
       const actualizado = await this.service.actualizarMedicamento(Number(req.params.id), req.body);
-      await this._auditar(req, 'modificar', 'medicamento', actualizado.id, actualizado.nombre);
+      await this._auditar(req, 'modificar', 'medicamento', actualizado.id, actualizado.nombre, antes, actualizado);
       res.json(actualizado);
     } catch (error) { this._fallo(res, error); }
   };
@@ -55,16 +61,18 @@ class FarmaciaController {
   /** DELETE /medicamentos/:id: borrado logico (activo = 0). */
   desactivarMedicamento = async (req, res) => {
     try {
+      const antes = await this.service.obtenerMedicamento(Number(req.params.id));
       const m = await this.service.desactivarMedicamento(Number(req.params.id));
-      await this._auditar(req, 'desactivar', 'medicamento', m.id, m.nombre);
+      await this._auditar(req, 'desactivar', 'medicamento', m.id, m.nombre, antes, m);
       res.json(m);
     } catch (error) { this._fallo(res, error); }
   };
 
   reactivarMedicamento = async (req, res) => {
     try {
+      const antes = await this.service.obtenerMedicamento(Number(req.params.id));
       const m = await this.service.reactivarMedicamento(Number(req.params.id));
-      await this._auditar(req, 'reactivar', 'medicamento', m.id, m.nombre);
+      await this._auditar(req, 'reactivar', 'medicamento', m.id, m.nombre, antes, m);
       res.json(m);
     } catch (error) { this._fallo(res, error); }
   };
@@ -73,7 +81,8 @@ class FarmaciaController {
     try {
       const dispensacion = await this.service.dispensarMedicamento(req.body);
       await this._auditar(req, 'crear', 'dispensacion', dispensacion.id,
-        `prescripcion #${dispensacion.idPrescripcion} · paciente #${dispensacion.idPaciente} · ${dispensacion.cantidad} x ${dispensacion.medicamento}`);
+        `prescripcion #${dispensacion.idPrescripcion} · paciente #${dispensacion.idPaciente} · ${dispensacion.cantidad} x ${dispensacion.medicamento}`,
+        null, dispensacion);
       res.status(201).json(dispensacion);
     } catch (error) { this._fallo(res, error); }
   };

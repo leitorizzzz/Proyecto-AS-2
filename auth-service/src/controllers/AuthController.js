@@ -1,3 +1,5 @@
+const AuditoriaService = require('../services/AuditoriaService');
+
 /**
  * CAPA DE PRESENTACION (API REST)
  * Traduce peticiones HTTP en llamadas a la capa de logica de negocio.
@@ -8,14 +10,17 @@ class AuthController {
     this.auditoria = auditoriaService;
   }
 
-  /** Registra en auditoria; nunca falla (ver AuditoriaService). */
-  _auditar = (req, accion, entidad, idEntidad, detalle) =>
-    this.auditoria ? this.auditoria.registrar(req.usuario, accion, entidad, idEntidad, detalle) : null;
+  /** Registra en auditoria (usuario, IP, modulo, antes/despues); nunca falla. */
+  _auditar = (req, accion, entidad, idEntidad, detalle, antes = null, despues = null) =>
+    this.auditoria
+      ? this.auditoria.registrar(AuditoriaService.contextoDe(req, 'usuarios'),
+          accion, entidad, idEntidad, detalle, { antes, despues })
+      : null;
 
   register = async (req, res) => {
     try {
       const usuario = await this.service.registrar(req.body);
-      await this._auditar(req, 'crear', 'usuario', usuario.id, `${usuario.email} (${usuario.rol})`);
+      await this._auditar(req, 'crear', 'usuario', usuario.id, `${usuario.email} (${usuario.rol})`, null, usuario);
       res.status(201).json(usuario);
     } catch (error) {
       res.status(400).json({ error: error.message });
@@ -46,8 +51,9 @@ class AuthController {
 
   desactivarUsuario = async (req, res) => {
     try {
+      const antes = await this.service.obtenerPerfil(Number(req.params.id)).catch(() => null);
       const u = await this.service.desactivarUsuario(Number(req.params.id), req.usuario.sub);
-      await this._auditar(req, 'desactivar', 'usuario', u.id, u.email);
+      await this._auditar(req, 'desactivar', 'usuario', u.id, u.email, antes, u);
       res.json(u);
     } catch (error) {
       res.status(error.status || 500).json({ error: error.message });
@@ -56,8 +62,9 @@ class AuthController {
 
   reactivarUsuario = async (req, res) => {
     try {
+      const antes = await this.service.obtenerPerfil(Number(req.params.id)).catch(() => null);
       const u = await this.service.reactivarUsuario(Number(req.params.id));
-      await this._auditar(req, 'reactivar', 'usuario', u.id, u.email);
+      await this._auditar(req, 'reactivar', 'usuario', u.id, u.email, antes, u);
       res.json(u);
     } catch (error) {
       res.status(error.status || 500).json({ error: error.message });

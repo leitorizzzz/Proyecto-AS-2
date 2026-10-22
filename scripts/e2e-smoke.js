@@ -581,7 +581,7 @@ async function asegurarUsuario(adminToken, u) {
     ok(`donante=${dn.id}`);
   } catch (e) { falla(e.message); }
 
-  paso('auditoria: el paciente B tiene crear, desactivar y reactivar con el usuario admin');
+  paso('auditoria: el paciente B tiene crear, desactivar y reactivar con usuario, IP, modulo y JSON');
   try {
     const hoy = new Date();
     const desde = new Date(hoy.getTime() - 24 * 3600 * 1000).toISOString();
@@ -591,7 +591,15 @@ async function asegurarUsuario(adminToken, u) {
     const acciones = filas.map(f => f.accion).sort().join(',');
     if (acciones !== 'crear,desactivar,reactivar') throw new Error(`acciones=${acciones}`);
     if (!filas.every(f => f.usuario === ADMIN.email)) throw new Error('usuario de auditoria incorrecto');
-    ok(acciones);
+    // Caso 24: IP, modulo y datos anteriores / nuevos en JSON
+    const des = filas.find(f => f.accion === 'desactivar');
+    if (!des.ip || des.modulo !== 'pacientes') throw new Error(`ip=${des.ip} modulo=${des.modulo}`);
+    if (des.datosAnteriores?.activo !== true || des.datosNuevos?.activo !== false) {
+      throw new Error(`antes=${JSON.stringify(des.datosAnteriores)} despues=${JSON.stringify(des.datosNuevos)}`);
+    }
+    const cre = filas.find(f => f.accion === 'crear');
+    if (cre.datosAnteriores !== null || cre.datosNuevos?.id !== pacB.id) throw new Error('crear sin datosNuevos');
+    ok(`${acciones}; ip=${des.ip} modulo=${des.modulo} activo true -> false`);
   } catch (e) { falla(e.message); }
 
   paso('auditoria: dispensacion, visita y solicitud registradas; RBAC y validacion');

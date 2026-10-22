@@ -1783,6 +1783,21 @@ function cargarAuditoria() {
   consultarAuditoria();
 }
 
+/** Campos que cambiaron entre datosAnteriores y datosNuevos (o los nuevos al crear). */
+function cambiosAuditoria(r) {
+  const a = r.datosAnteriores, n = r.datosNuevos;
+  if (!a && !n) return '';
+  const val = v => (v === null || v === undefined ? '∅' : typeof v === 'object' ? JSON.stringify(v) : String(v));
+  const claves = [...new Set([...Object.keys(a || {}), ...Object.keys(n || {})])]
+    .filter(k => !Array.isArray((n || {})[k]) && !Array.isArray((a || {})[k]))
+    .filter(k => !a || val(a[k]) !== val((n || {})[k]));
+  if (!claves.length) return '';
+  const filas = claves.slice(0, 12).map(k => a
+    ? `<li><code>${esc(k)}</code>: ${esc(val(a[k]))} → ${esc(val((n || {})[k]))}</li>`
+    : `<li><code>${esc(k)}</code>: ${esc(val(n[k]))}</li>`).join('');
+  return `<details><summary>${a ? 'Cambios' : 'Datos nuevos'} (${claves.length})</summary><ul class="cambios">${filas}</ul></details>`;
+}
+
 async function consultarAuditoria() {
   const msg = $('#msgAuditoria'); limpiar(msg);
   const desde = $('#audDesde').value, hasta = $('#audHasta').value;
@@ -1798,10 +1813,11 @@ async function consultarAuditoria() {
     $('#tbodyAuditoria').innerHTML = filas.map(r => `
       <tr>
         <td class="tiny">${fechaHora(r.fecha)}</td>
-        <td class="tiny">${esc(r.usuario)}</td>
+        <td class="tiny">${esc(r.usuario)}<div>${esc(r.ip || 'sin IP')}</div></td>
+        <td class="tiny">${esc(r.modulo || '—')}</td>
         <td><span class="chip accion-${esc(r.accion)}">${esc(ETIQUETA_ACCION[r.accion] || r.accion)}</span></td>
         <td>${esc(r.entidad.replace('_', ' '))}${r.idEntidad != null ? ` <span class="num tiny">#${r.idEntidad}</span>` : ''}</td>
-        <td class="tiny">${esc(r.detalle || '')}</td>
+        <td class="tiny">${esc(r.detalle || '')}${cambiosAuditoria(r)}</td>
       </tr>`).join('');
     $('#vacioAuditoria').classList.toggle('hidden', filas.length > 0);
   } catch (err) { error(msg, err.message); }

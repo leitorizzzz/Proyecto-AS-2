@@ -1,3 +1,5 @@
+const AuditoriaService = require('../services/AuditoriaService');
+
 /**
  * CAPA DE PRESENTACION (API REST)
  * Traduce HTTP <-> VisitaMedicaService.
@@ -8,9 +10,12 @@ class VisitaMedicaController {
     this.auditoria = auditoriaService;
   }
 
-  /** Registra en auditoria; nunca falla (ver AuditoriaService). */
-  _auditar = (req, accion, entidad, idEntidad, detalle) =>
-    this.auditoria ? this.auditoria.registrar(req.usuario, accion, entidad, idEntidad, detalle) : null;
+  /** Registra en auditoria (usuario, IP, modulo, antes/despues); nunca falla. */
+  _auditar = (req, accion, entidad, idEntidad, detalle, antes = null, despues = null) =>
+    this.auditoria
+      ? this.auditoria.registrar(AuditoriaService.contextoDe(req, 'visitas'),
+          accion, entidad, idEntidad, detalle, { antes, despues })
+      : null;
 
   _fallo = (res, error) => {
     const status = error.status || 500;
@@ -39,15 +44,18 @@ class VisitaMedicaController {
         Number(req.params.id),
         idMedicoEspecialista
       );
-      await this._auditar(req, 'crear', 'visita', visita.id, `desde solicitud #${req.params.id}`);
+      await this._auditar(req, 'crear', 'visita', visita.id, `desde solicitud #${req.params.id}`, null, visita);
       res.status(201).json(visita);
     } catch (error) { this._fallo(res, error); }
   };
 
   actualizarClinico = async (req, res) => {
     try {
+      const antes = await this.service.obtener(Number(req.params.id));
       const visita = await this.service.actualizarClinico(Number(req.params.id), req.body);
-      await this._auditar(req, 'modificar', 'visita', visita.id, 'notas clinicas');
+      await this._auditar(req, 'modificar', 'visita', visita.id, 'notas clinicas',
+        { diagnostico: antes.diagnostico, observaciones: antes.observaciones, estado: antes.estado },
+        { diagnostico: visita.diagnostico, observaciones: visita.observaciones, estado: visita.estado });
       res.json(visita);
     } catch (error) { this._fallo(res, error); }
   };
@@ -55,7 +63,7 @@ class VisitaMedicaController {
   agregarExamen = async (req, res) => {
     try {
       const examen = await this.service.agregarExamen(Number(req.params.id), req.body);
-      await this._auditar(req, 'crear', 'examen', examen.id, `visita #${req.params.id} · ${req.body.tipo}`);
+      await this._auditar(req, 'crear', 'examen', examen.id, `visita #${req.params.id} · ${req.body.tipo}`, null, examen);
       res.status(201).json(examen);
     } catch (error) { this._fallo(res, error); }
   };
@@ -63,18 +71,20 @@ class VisitaMedicaController {
   agregarPrescripcion = async (req, res) => {
     try {
       const rx = await this.service.agregarPrescripcion(Number(req.params.id), req.body);
-      await this._auditar(req, 'crear', 'prescripcion', rx.id, `visita #${req.params.id} · ${req.body.medicamento}`);
+      await this._auditar(req, 'crear', 'prescripcion', rx.id, `visita #${req.params.id} · ${req.body.medicamento}`, null, rx);
       res.status(201).json(rx);
     } catch (error) { this._fallo(res, error); }
   };
 
   completar = async (req, res) => {
     try {
+      const antes = await this.service.obtener(Number(req.params.id));
       const visita = await this.service.completar(Number(req.params.id));
-      await this._auditar(req, 'modificar', 'visita', visita.id, 'completada');
+      await this._auditar(req, 'modificar', 'visita', visita.id, 'completada',
+        { estado: antes.estado }, { estado: visita.estado, fechaCompletada: visita.fechaCompletada });
       if (visita.cargo) {
         await this._auditar(req, 'crear', 'cargo', visita.cargo.id,
-          `automatico visita #${visita.id} · Q${visita.cargo.monto}`);
+          `automatico visita #${visita.id} · Q${visita.cargo.monto}`, null, visita.cargo);
       }
       res.json(visita);
     } catch (error) { this._fallo(res, error); }

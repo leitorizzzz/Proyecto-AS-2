@@ -1,12 +1,17 @@
+const AuditoriaService = require('../services/AuditoriaService');
+
 class FinancieroController {
   constructor(service, auditoriaService) {
     this.service = service;
     this.auditoria = auditoriaService;
   }
 
-  /** Registra en auditoria; nunca falla (ver AuditoriaService). */
-  _auditar = (req, accion, entidad, idEntidad, detalle) =>
-    this.auditoria ? this.auditoria.registrar(req.usuario, accion, entidad, idEntidad, detalle) : null;
+  /** Registra en auditoria (usuario, IP, modulo, antes/despues); nunca falla. */
+  _auditar = (req, accion, entidad, idEntidad, detalle, antes = null, despues = null) =>
+    this.auditoria
+      ? this.auditoria.registrar(AuditoriaService.contextoDe(req, 'financiero'),
+          accion, entidad, idEntidad, detalle, { antes, despues })
+      : null;
 
   _fallo = (res, error) => {
     const status = error.status || 500;
@@ -21,7 +26,7 @@ class FinancieroController {
   crearCargo = async (req, res) => {
     try {
       const r = await this.service.generarCargo(req.body);
-      await this._auditar(req, 'crear', 'cargo', r.id, `paciente #${r.idPaciente} · ${r.concepto} · Q${r.monto}`);
+      await this._auditar(req, 'crear', 'cargo', r.id, `paciente #${r.idPaciente} · ${r.concepto} · Q${r.monto}`, null, r);
       res.status(201).json(r);
     }
     catch (error) { this._fallo(res, error); }
@@ -30,7 +35,7 @@ class FinancieroController {
   registrarPago = async (req, res) => {
     try {
       const r = await this.service.registrarPagoCuota(req.body);
-      await this._auditar(req, 'crear', 'cuota', r.id, `paciente #${r.idPaciente} · ${r.mes}/${r.anio} pagada`);
+      await this._auditar(req, 'crear', 'cuota', r.id, `paciente #${r.idPaciente} · ${r.mes}/${r.anio} pagada`, null, r);
       res.status(201).json(r);
     }
     catch (error) { this._fallo(res, error); }
@@ -39,7 +44,7 @@ class FinancieroController {
   crearDonante = async (req, res) => {
     try {
       const r = await this.service.registrarDonante(req.body);
-      await this._auditar(req, 'crear', 'donante', r.id, r.nombre);
+      await this._auditar(req, 'crear', 'donante', r.id, r.nombre, null, r);
       res.status(201).json(r);
     }
     catch (error) { this._fallo(res, error); }
@@ -58,8 +63,9 @@ class FinancieroController {
 
   desactivarDonante = async (req, res) => {
     try {
+      const antes = await this.service.obtenerDonante(Number(req.params.id)).catch(() => null);
       const d = await this.service.desactivarDonante(Number(req.params.id));
-      await this._auditar(req, 'desactivar', 'donante', d.id, d.nombre);
+      await this._auditar(req, 'desactivar', 'donante', d.id, d.nombre, antes, d);
       res.json(d);
     }
     catch (error) { this._fallo(res, error); }
@@ -67,8 +73,9 @@ class FinancieroController {
 
   reactivarDonante = async (req, res) => {
     try {
+      const antes = await this.service.obtenerDonante(Number(req.params.id)).catch(() => null);
       const d = await this.service.reactivarDonante(Number(req.params.id));
-      await this._auditar(req, 'reactivar', 'donante', d.id, d.nombre);
+      await this._auditar(req, 'reactivar', 'donante', d.id, d.nombre, antes, d);
       res.json(d);
     }
     catch (error) { this._fallo(res, error); }
@@ -77,7 +84,7 @@ class FinancieroController {
   registrarDonacion = async (req, res) => {
     try {
       const r = await this.service.registrarDonacion(req.body);
-      await this._auditar(req, 'crear', 'donacion', r.id, `donante #${r.idDonante} · Q${r.monto}`);
+      await this._auditar(req, 'crear', 'donacion', r.id, `donante #${r.idDonante} · Q${r.monto}`, null, r);
       res.status(201).json(r);
     }
     catch (error) { this._fallo(res, error); }
@@ -94,7 +101,7 @@ class FinancieroController {
   registrarGasto = async (req, res) => {
     try {
       const r = await this.service.registrarGasto(req.body);
-      await this._auditar(req, 'crear', 'gasto', r.id, `${r.concepto} · Q${r.monto}`);
+      await this._auditar(req, 'crear', 'gasto', r.id, `${r.concepto} · Q${r.monto}`, null, r);
       res.status(201).json(r);
     }
     catch (error) { this._fallo(res, error); }
@@ -111,7 +118,7 @@ class FinancieroController {
   registrarPagoFundacion = async (req, res) => {
     try {
       const r = await this.service.registrarPagoFundacion(req.body);
-      await this._auditar(req, 'crear', 'pago_fundacion', r.id, `${r.concepto} · Q${r.monto}`);
+      await this._auditar(req, 'crear', 'pago_fundacion', r.id, `${r.concepto} · Q${r.monto}`, null, r);
       res.status(201).json(r);
     }
     catch (error) { this._fallo(res, error); }

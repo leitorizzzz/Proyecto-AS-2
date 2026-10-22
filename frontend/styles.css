@@ -515,6 +515,9 @@ td.num, th.num { font-family: var(--font-mono); font-variant-numeric: tabular-nu
 .chip.desactivado::before { content: "⊘"; }
 tr.fila-inactiva td { color: var(--text-mute); }
 
+ul.cambios { margin: 4px 0 0; padding-left: 16px; }
+ul.cambios code { font-family: var(--font-mono); font-size: var(--fs-tiny); }
+
 /* Acciones de auditoria: simbolo + borde, como el resto de los chips. */
 .chip.accion-crear      { border: 1px solid var(--ok); color: var(--ok-ink); }
 .chip.accion-crear::before      { content: "+"; }

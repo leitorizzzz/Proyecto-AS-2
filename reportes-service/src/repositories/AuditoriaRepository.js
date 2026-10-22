@@ -20,7 +20,8 @@ class AuditoriaRepository {
     if (idEntidad != null) { req.input('idEntidad', sql.Int, idEntidad); condiciones.push('idEntidad = @idEntidad'); }
     const where = condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '';
     const r = await req.query(`
-      SELECT TOP (@limite) id, usuario, idUsuario, accion, entidad, idEntidad, detalle, fecha
+      SELECT TOP (@limite) id, usuario, idUsuario, accion, entidad, idEntidad, detalle, fecha,
+             ip, modulo, datosAnteriores, datosNuevos
       FROM auditoria ${where}
       ORDER BY fecha DESC, id DESC
     `);
