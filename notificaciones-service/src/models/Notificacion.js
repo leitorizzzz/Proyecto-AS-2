@@ -14,7 +14,7 @@ class Notificacion {
     estado,
     intentos, maxIntentos,
     proximoIntento, fechaCreacion, fechaEnvio, fechaUltimoIntento,
-    mensajeError
+    mensajeError, idMensajeProveedor
   }) {
     this.id = id || null;
     this.idPaciente = idPaciente;
@@ -30,6 +30,8 @@ class Notificacion {
     this.fechaEnvio = fechaEnvio || null;
     this.fechaUltimoIntento = fechaUltimoIntento || null;
     this.mensajeError = mensajeError || null;
+    // Caso 10: messageId de Brevo; en simulacion "sim-<uuid>".
+    this.idMensajeProveedor = idMensajeProveedor || null;
   }
 }
 

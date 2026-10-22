@@ -21,6 +21,14 @@ src/
 Con `MODO_SIMULACION=true` (o `BREVO_API_KEY` vacio) el servicio guarda
 la notificacion como `enviada` sin llamar a Brevo. Util en dev/CI.
 
+Caso 10 del plan del SQA: cada notificacion enviada guarda en
+`idMensajeProveedor` el ID del mensaje. En modo real es el `messageId`
+que Brevo devuelve en la respuesta 201 (por ejemplo
+`<202610211200.123@smtp-relay.mailin.fr>`) y sirve para buscar el envio en
+*Transactional → Logs* de Brevo. En simulacion es `sim-<uuid>`: un ID con
+ese prefijo prueba que **no** salio ningun correo. El e2e verifica el estado
+`enviada` y el ID `sim-`; el envio real no se ha ejecutado (ver abajo).
+
 ## Endpoints
 
 | Metodo | Ruta | Rol | Descripcion |
@@ -138,7 +146,9 @@ completo: crear una solicitud desde el frontend para un paciente cuyo
 **5. Comprobar que el correo salio y llego.**
 
 - Respuesta del paso 4 con `"estado": "enviada"` = Brevo acepto el
-  mensaje (HTTP 2xx). No garantiza la entrega.
+  mensaje (HTTP 2xx). No garantiza la entrega. Su `idMensajeProveedor`
+  debe ser el `messageId` de Brevo (`<...@smtp-relay.mailin.fr>`), no
+  `sim-...`; si empieza con `sim-`, el servicio sigue simulando.
 - Bandeja de entrada (y spam) de la casilla destino: asunto *"Se ha
   registrado una solicitud medica para Prueba Brevo"*.
 - En Brevo, *Transactional → Logs*: el evento debe pasar de *Sent* a

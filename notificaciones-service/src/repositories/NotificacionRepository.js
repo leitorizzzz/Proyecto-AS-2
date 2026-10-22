@@ -30,14 +30,16 @@ class NotificacionRepository {
     return r.recordset[0] ? new Notificacion(r.recordset[0]) : null;
   }
 
-  async marcarEnviada(id, intentos) {
+  async marcarEnviada(id, intentos, idMensajeProveedor = null) {
     const pool = await getPool();
     await pool.request()
       .input('id', sql.Int, id)
       .input('intentos', sql.Int, intentos)
+      .input('idMensaje', sql.NVarChar(200), idMensajeProveedor)
       .query(`
         UPDATE notificaciones
         SET estado = 'enviada',
+            idMensajeProveedor = @idMensaje,
             fechaEnvio = SYSUTCDATETIME(),
             fechaUltimoIntento = SYSUTCDATETIME(),
             intentos = @intentos,

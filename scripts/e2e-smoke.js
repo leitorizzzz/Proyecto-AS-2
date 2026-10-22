@@ -273,7 +273,12 @@ function familiarE2E(dpi) {
     const r = await req('GET', `${API.notificaciones}/api/notificaciones?limit=20`, { token: adminToken, esperarStatus: 200 });
     const mia = r.data.find(n => n.idPaciente === pacienteId);
     if (!mia) throw new Error('no encontre notificacion del paciente');
-    ok(`id=${mia.id} estado=${mia.estado}`);
+    // Caso 10: log con estado enviada e ID del mensaje (sim-... en simulacion;
+    // este smoke no se corre contra Brevo real).
+    if (mia.estado !== 'enviada' || !mia.idMensajeProveedor) {
+      throw new Error(`estado=${mia.estado} idMensajeProveedor=${mia.idMensajeProveedor}`);
+    }
+    ok(`id=${mia.id} estado=${mia.estado} idMensaje=${mia.idMensajeProveedor}`);
   } catch (e) { falla(e.message); }
 
   // 13 - estado de cuenta del paciente

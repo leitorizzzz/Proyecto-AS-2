@@ -50,7 +50,9 @@ async function inicializarEsquema() {
     ['intentos',          "ALTER TABLE notificaciones ADD intentos INT NOT NULL CONSTRAINT DF_notif_intentos DEFAULT 0"],
     ['maxIntentos',       "ALTER TABLE notificaciones ADD maxIntentos INT NOT NULL CONSTRAINT DF_notif_max DEFAULT 3"],
     ['proximoIntento',    "ALTER TABLE notificaciones ADD proximoIntento DATETIME2 NULL"],
-    ['fechaUltimoIntento',"ALTER TABLE notificaciones ADD fechaUltimoIntento DATETIME2 NULL"]
+    ['fechaUltimoIntento',"ALTER TABLE notificaciones ADD fechaUltimoIntento DATETIME2 NULL"],
+    // Caso 10: ID que devuelve Brevo (messageId) o "sim-..." en simulacion.
+    ['idMensajeProveedor',"ALTER TABLE notificaciones ADD idMensajeProveedor NVARCHAR(200) NULL"]
   ];
   for (const [col, ddl] of alters) {
     // eslint-disable-next-line no-await-in-loop

@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const Notificacion = require('../models/Notificacion');
 
 /**
@@ -9,7 +10,8 @@ const Notificacion = require('../models/Notificacion');
  * 'fallida_definitiva' sin bucle infinito.
  *
  * En MODO_SIMULACION=true no se llama a Brevo: la notificacion se marca
- * como enviada en el primer intento (util para dev / CI).
+ * como enviada en el primer intento (util para dev / CI), con un ID de
+ * mensaje "sim-<uuid>" para distinguirla de un envio real (caso 10).
  */
 class NotificacionesService {
   constructor(repo) {
@@ -58,8 +60,9 @@ class NotificacionesService {
     const intentos = notif.intentos + 1;
 
     if (this.simulacion || !this.apiKey) {
-      await this.repo.marcarEnviada(notif.id, intentos);
-      return { ...notif, estado: Notificacion.ESTADOS.ENVIADA, intentos };
+      const idMensajeProveedor = `sim-${crypto.randomUUID()}`;
+      await this.repo.marcarEnviada(notif.id, intentos, idMensajeProveedor);
+      return { ...notif, estado: Notificacion.ESTADOS.ENVIADA, intentos, idMensajeProveedor };
     }
 
     try {
@@ -81,8 +84,11 @@ class NotificacionesService {
         const text = await resp.text();
         throw new Error(`Brevo respondio ${resp.status}: ${text.slice(0, 300)}`);
       }
-      await this.repo.marcarEnviada(notif.id, intentos);
-      return { ...notif, estado: Notificacion.ESTADOS.ENVIADA, intentos };
+      // Brevo responde 201 con { messageId: "<...@smtp-relay.mailin.fr>" }.
+      let idMensajeProveedor = null;
+      try { idMensajeProveedor = JSON.parse(await resp.text()).messageId || null; } catch { /* cuerpo vacio */ }
+      await this.repo.marcarEnviada(notif.id, intentos, idMensajeProveedor);
+      return { ...notif, estado: Notificacion.ESTADOS.ENVIADA, intentos, idMensajeProveedor };
     } catch (err) {
       const mensaje = err.message || 'Error desconocido';
       if (intentos >= notif.maxIntentos) {

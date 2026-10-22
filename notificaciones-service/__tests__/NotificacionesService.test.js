@@ -47,7 +47,18 @@ describe('NotificacionesService', () => {
     const r = await svc.enviarCorreoSolicitud(SOLICITUD);
     expect(r.estado).toBe(Notificacion.ESTADOS.ENVIADA);
     expect(global.fetch).not.toHaveBeenCalled();
-    expect(repo.marcarEnviada).toHaveBeenCalledWith(1, 1);
+    // Caso 10: el log guarda un ID de mensaje que delata la simulacion.
+    expect(repo.marcarEnviada).toHaveBeenCalledWith(1, 1, expect.stringMatching(/^sim-[0-9a-f-]{36}$/));
+    expect(r.idMensajeProveedor).toMatch(/^sim-/);
+  });
+
+  test('envio real OK: guarda el messageId que devuelve Brevo (caso 10)', async () => {
+    global.fetch = jest.fn(async () => ({ ok: true, status: 201,
+      text: async () => JSON.stringify({ messageId: '<202610211200.123@smtp-relay.mailin.fr>' }) }));
+    const { svc, repo } = nuevoServicio();
+    const r = await svc.enviarCorreoSolicitud(SOLICITUD);
+    expect(r).toMatchObject({ estado: 'enviada', idMensajeProveedor: '<202610211200.123@smtp-relay.mailin.fr>' });
+    expect(repo.marcarEnviada).toHaveBeenCalledWith(1, 1, '<202610211200.123@smtp-relay.mailin.fr>');
   });
 
   test('envio real OK: POST a Brevo con api-key y destinatario', async () => {
