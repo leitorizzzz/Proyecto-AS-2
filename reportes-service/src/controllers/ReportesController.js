@@ -14,9 +14,13 @@ class ReportesController {
       const filtros = {
         desde: req.query.desde,
         hasta: req.query.hasta,
+        // Number('1 OR 1=1') es NaN: el servicio lo rechaza con 400.
         idPaciente: req.query.idPaciente ? Number(req.query.idPaciente) : null
       };
-      const formato = (req.query.formato || 'json').toLowerCase();
+      const formato = String(req.query.formato || 'json').toLowerCase();
+      if (!['json', 'pdf', 'excel', 'xlsx'].includes(formato)) {
+        return res.status(400).json({ error: 'formato debe ser json, pdf o excel' });
+      }
 
       const reporte = await this.service.generarReporte(tipo, filtros);
 

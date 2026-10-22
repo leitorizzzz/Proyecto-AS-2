@@ -897,6 +897,60 @@ function familiarE2E(dpi) {
     ok(`naranja=${pacN.id} (5 d), roja=${pacR.id} (40 d); pagada sale del panel`);
   } catch (e) { falla(e.message); }
 
+  // Caso 23: entradas con SQL contra la BD real. Se guardan como texto
+  // literal o se rechazan; las tablas siguen intactas.
+  paso('caso 23: inyeccion SQL en login, pacientes, laboratorio y reportes -> texto literal o 400/401');
+  try {
+    for (const email of ["admin@asilo.gt' OR '1'='1", "' OR 1=1 --", "admin@asilo.gt'; DROP TABLE usuarios;--"]) {
+      const r = await req('POST', `${API.auth}/api/auth/login`, { body: { email, password: "x' OR '1'='1" } });
+      if (r.status !== 401 && r.status !== 400) throw new Error(`login con ${email} -> ${r.status}`);
+    }
+    const malicioso = "Robert'); DROP TABLE pacientes;--";
+    const pac = (await req('POST', `${API.pacientes}/api/pacientes`, {
+      body: { nombres: malicioso, apellidos: "O'Brien E2E", fechaNacimiento: '1949-09-09', genero: 'M',
+              dpi: String(TS + 41).padStart(13, '0').slice(-13), padecimientos: "1; DELETE FROM visitas_medicas WHERE 1=1;--",
+              familiar: { ...familiarE2E(String(TS + 42).padStart(13, '0').slice(-13)), direccion: "' OR ''='" } },
+      token: adminToken, esperarStatus: 201
+    })).data;
+    const leido = (await req('GET', `${API.pacientes}/api/pacientes/${pac.id}`, { token: adminToken, esperarStatus: 200 })).data;
+    if (leido.nombres !== malicioso || leido.apellidos !== "O'Brien E2E" || leido.familiar?.direccion !== "' OR ''='") {
+      throw new Error(`no se guardo literal: ${leido.nombres} / ${leido.familiar?.direccion}`);
+    }
+    const lista = (await req('GET', `${API.pacientes}/api/pacientes`, { token: adminToken, esperarStatus: 200 })).data;
+    if (!lista.some(p => p.id === pacienteId)) throw new Error('la tabla pacientes perdio registros');
+    const idMalo = await req('GET', `${API.pacientes}/api/pacientes/${encodeURIComponent('1 OR 1=1')}`, { token: adminToken });
+    if (idMalo.status !== 404 && idMalo.status !== 400) throw new Error(`GET /pacientes/1 OR 1=1 -> ${idMalo.status}`);
+    const dpiMalo = await req('GET', `${API.laboratorio}/api/laboratorio/pacientes/dpi/${encodeURIComponent("' OR '1'='1")}`, { token: labToken });
+    if (dpiMalo.status !== 404 && dpiMalo.status !== 400) throw new Error(`dpi malicioso -> ${dpiMalo.status}`);
+    for (const q of [`desde=${encodeURIComponent("2026-01-01' OR '1'='1")}`, `hasta=${encodeURIComponent('2026-12-31; DROP TABLE cargos_servicio;--')}`,
+                     `idPaciente=${encodeURIComponent('1 OR 1=1')}`, `formato=${encodeURIComponent("pdf' --")}`]) {
+      await req('GET', `${API.reportes}/api/reportes/costos-por-paciente?${q}`, { token: adminToken, esperarStatus: 400 });
+    }
+    await req('GET', `${API.reportes}/api/reportes/${encodeURIComponent("examenes' OR 1=1--")}`, { token: adminToken, esperarStatus: 400 });
+    await req('GET', `${API.reportes}/api/reportes/costos-por-paciente`, { token: adminToken, esperarStatus: 200 });
+    ok(`paciente ${pac.id} guardado literal; 3 logins 401; 5 reportes 400; id/dpi maliciosos ${idMalo.status}/${dpiMalo.status}`);
+  } catch (e) { falla(e.message); }
+
+  // Caso 22: el Excel trae formulas reales (lo verifica a fondo la prueba
+  // unitaria; aqui se confirma sobre el servicio desplegado).
+  paso('caso 22: el Excel de costos por paciente tiene formulas SUM en los totales');
+  try {
+    const r = await fetch(`${API.reportes}/api/reportes/costos-por-paciente?formato=excel`, {
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+    if (r.status !== 200) throw new Error(`status ${r.status}`);
+    const ExcelJS = require('exceljs');
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(Buffer.from(await r.arrayBuffer()));
+    const ws = wb.worksheets[0];
+    const total = ws.getRow(ws.rowCount);
+    const f = total.getCell(8).value;
+    if (!f || !/^SUM\(H6:H\d+\)$/.test(f.formula || '')) throw new Error(`total sin formula: ${JSON.stringify(f)}`);
+    const fila = ws.getCell('H6').value;
+    if (!fila?.formula) throw new Error(`total por fila sin formula: ${JSON.stringify(fila)}`);
+    ok(`${f.formula} = ${f.result}; fila 6: ${fila.formula}`);
+  } catch (e) { falla(e.message); }
+
   paso('limpieza: desactivar el medicamento propio del smoke');
   try {
     await req('DELETE', `${API.farmacia}/api/farmacia/medicamentos/${medE2E.id}`, { token: farToken, esperarStatus: 200 });

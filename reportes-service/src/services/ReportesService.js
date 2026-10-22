@@ -30,14 +30,33 @@ class ReportesService {
     }
   }
 
+  /**
+   * Caso 23: desde/hasta son fechas YYYY-MM-DD reales; cualquier otra cosa
+   * (incluido texto con SQL) es 400 antes de llegar a la BD.
+   */
   _rango(filtros) {
     const desde = filtros.desde || '1900-01-01';
     const hasta = filtros.hasta || '2999-12-31';
+    for (const [nombre, v] of [['desde', desde], ['hasta', hasta]]) {
+      if (!ReportesService.esFechaValida(v)) {
+        throw Object.assign(new Error(`${nombre} debe ser una fecha YYYY-MM-DD valida`), { status: 400 });
+      }
+    }
+    if (desde > hasta) throw Object.assign(new Error('desde no puede ser posterior a hasta'), { status: 400 });
     return { desde, hasta };
+  }
+
+  static esFechaValida(v) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(v))) return false;
+    const d = new Date(`${v}T00:00:00Z`);
+    return !isNaN(d) && d.toISOString().slice(0, 10) === v;
   }
 
   async _costosPorPaciente(filtros) {
     const rango = this._rango(filtros);
+    if (filtros.idPaciente != null && !(Number.isInteger(filtros.idPaciente) && filtros.idPaciente > 0)) {
+      throw Object.assign(new Error('idPaciente debe ser un entero positivo'), { status: 400 });
+    }
     const filas = await this.repo.costosPorPaciente({ ...rango, idPaciente: filtros.idPaciente });
     return new Reporte({
       tipo: Reporte.TIPOS.COSTOS_POR_PACIENTE,
@@ -47,12 +66,16 @@ class ReportesService {
         { key: 'idPaciente', label: 'ID' },
         { key: 'paciente', label: 'Paciente' },
         { key: 'dpi', label: 'DPI' },
-        { key: 'totalMedicamentos', label: 'Medicamentos (Q)', tipo: 'moneda' },
-        { key: 'totalCargos', label: 'Cargos (Q)', tipo: 'moneda' },
-        { key: 'totalGeneral', label: 'Total (Q)', tipo: 'moneda' }
+        { key: 'consulta', label: 'Consulta (Q)', tipo: 'moneda' },
+        { key: 'laboratorio', label: 'Laboratorio (Q)', tipo: 'moneda' },
+        { key: 'farmacia', label: 'Farmacia (Q)', tipo: 'moneda' },
+        { key: 'otros', label: 'Otros cargos (Q)', tipo: 'moneda' },
+        // En Excel va como formula de la fila (suma de los rubros).
+        { key: 'totalGeneral', label: 'Total (Q)', tipo: 'moneda',
+          formula: ['consulta', 'laboratorio', 'farmacia', 'otros'] }
       ],
       filas,
-      totales: this._sumar(filas, ['totalMedicamentos', 'totalCargos', 'totalGeneral'])
+      totales: this._sumar(filas, ['consulta', 'laboratorio', 'farmacia', 'otros', 'totalGeneral'])
     });
   }
 
@@ -166,7 +189,7 @@ class ReportesService {
 
   _sumar(filas, keys) {
     const t = {};
-    for (const k of keys) t[k] = filas.reduce((a, f) => a + (Number(f[k]) || 0), 0);
+    for (const k of keys) t[k] = Math.round(filas.reduce((a, f) => a + (Number(f[k]) || 0), 0) * 100) / 100;
     return t;
   }
 
@@ -176,10 +199,14 @@ class ReportesService {
     const doc = new PdfKit({ size: 'LETTER', margin: 48 });
     doc.pipe(stream);
 
-    doc.fontSize(18).font('Helvetica-Bold').text(reporte.titulo);
+    // Cabecera institucional (mismo acento de marca que la UI).
+    doc.rect(0, 0, doc.page.width, 6).fill(ReportesService.MARCA.acento);
+    doc.fillColor(ReportesService.MARCA.acento).fontSize(9).font('Helvetica-Bold')
+      .text(ReportesService.MARCA.institucion.toUpperCase(), { characterSpacing: 1 });
+    doc.fillColor('#09090B').fontSize(18).font('Helvetica-Bold').text(reporte.titulo);
     doc.moveDown(0.3);
     doc.fontSize(9).font('Helvetica').fillColor('#555')
-      .text(`Asilo Cabeza de Algodon - generado ${new Date(reporte.generadoEn).toLocaleString('es-GT')}`);
+      .text(`${ReportesService.MARCA.sistema} - generado ${new Date(reporte.generadoEn).toLocaleString('es-GT')}`);
     if (reporte.filtros?.desde || reporte.filtros?.hasta) {
       doc.text(`Periodo: ${this._fecha(reporte.filtros.desde)} a ${this._fecha(reporte.filtros.hasta)}`);
     }
@@ -223,50 +250,84 @@ class ReportesService {
     doc.end();
   }
 
+  /** Celdas de Excel con formula real y su resultado precalculado. */
+  _formulaFila(reporte, fila, filaExcel, ws, col) {
+    const letras = col.formula.map(k => ws.getColumn(reporte.columnas.findIndex(c => c.key === k) + 1).letter);
+    return { formula: letras.map(l => `${l}${filaExcel}`).join('+'), result: Number(fila[col.key]) || 0 };
+  }
+
   async exportarExcel(reporte, stream) {
     const wb = new ExcelJS.Workbook();
     wb.creator = 'Asilo Cabeza de Algodon';
     wb.created = new Date();
-    const ws = wb.addWorksheet(reporte.titulo.slice(0, 30));
-
-    ws.mergeCells(1, 1, 1, reporte.columnas.length);
-    ws.getCell(1, 1).value = reporte.titulo;
-    ws.getCell(1, 1).font = { size: 16, bold: true };
-
-    ws.mergeCells(2, 1, 2, reporte.columnas.length);
-    const rango = reporte.filtros?.desde && reporte.filtros?.hasta
-      ? `Periodo: ${this._fecha(reporte.filtros.desde)} a ${this._fecha(reporte.filtros.hasta)}`
-      : `Generado: ${new Date(reporte.generadoEn).toLocaleString('es-GT')}`;
-    ws.getCell(2, 1).value = rango;
-    ws.getCell(2, 1).font = { italic: true, color: { argb: 'FF666666' } };
-
-    const headerRow = ws.addRow(['']); // padding row
-    ws.addRow(reporte.columnas.map(c => c.label));
-    const headerIdx = ws.rowCount;
-    ws.getRow(headerIdx).font = { bold: true };
-    ws.getRow(headerIdx).eachCell(cell => {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEEEEEE' } };
-      cell.border = { bottom: { style: 'thin', color: { argb: 'FF444444' } } };
+    const ws = wb.addWorksheet(reporte.titulo.slice(0, 30), {
+      pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+      headerFooter: { oddFooter: `&L${ReportesService.MARCA.institucion}&RPagina &P de &N` }
     });
+    const n = reporte.columnas.length;
+    const borde = { style: 'thin', color: { argb: 'FFD4D4D8' } };
 
+    // Cabecera institucional: banda de marca, titulo, periodo y fecha.
+    ws.mergeCells(1, 1, 1, n);
+    Object.assign(ws.getCell(1, 1), {
+      value: ReportesService.MARCA.institucion.toUpperCase(),
+      font: { bold: true, size: 11, color: { argb: 'FFFFFFFF' } },
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD11A6D' } },
+      alignment: { vertical: 'middle' }
+    });
+    ws.getRow(1).height = 22;
+    ws.mergeCells(2, 1, 2, n);
+    Object.assign(ws.getCell(2, 1), { value: reporte.titulo, font: { size: 16, bold: true, color: { argb: 'FF09090B' } } });
+    ws.mergeCells(3, 1, 3, n);
+    const periodo = reporte.filtros?.desde && reporte.filtros?.hasta
+      ? `Periodo: ${this._fecha(reporte.filtros.desde)} a ${this._fecha(reporte.filtros.hasta)} · `
+      : '';
+    Object.assign(ws.getCell(3, 1), {
+      value: `${periodo}Generado: ${new Date(reporte.generadoEn).toLocaleString('es-GT')} · ${ReportesService.MARCA.sistema}`,
+      font: { italic: true, size: 9, color: { argb: 'FF52525B' } }
+    });
+    ws.addRow([]);
+
+    const header = ws.addRow(reporte.columnas.map(c => c.label));
+    const headerIdx = header.number;
+    header.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    header.eachCell(cell => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF18181B' } };
+      cell.border = { top: borde, bottom: borde, left: borde, right: borde };
+    });
+    ws.views = [{ state: 'frozen', ySplit: headerIdx }];
+
+    const primera = headerIdx + 1;
     for (const fila of reporte.filas) {
       const row = ws.addRow(reporte.columnas.map(c => this._valorExcel(fila[c.key], c.tipo)));
       reporte.columnas.forEach((c, i) => {
-        if (c.tipo === 'moneda') row.getCell(i + 1).numFmt = '"Q"#,##0.00';
-        if (c.tipo === 'fecha') row.getCell(i + 1).numFmt = 'yyyy-mm-dd hh:mm';
+        const cell = row.getCell(i + 1);
+        if (c.formula) cell.value = this._formulaFila(reporte, fila, row.number, ws, c);
+        if (c.tipo === 'moneda') cell.numFmt = '"Q"#,##0.00';
+        if (c.tipo === 'fecha') cell.numFmt = 'yyyy-mm-dd hh:mm';
+        cell.border = { bottom: borde };
       });
     }
+    const ultima = ws.rowCount;
+    ws.autoFilter = { from: { row: headerIdx, column: 1 }, to: { row: headerIdx, column: n } };
 
+    // Caso 22: los totales son formulas SUM sobre las filas de datos (con
+    // el resultado precalculado para visores que no recalculan).
     if (reporte.totales) {
-      const totalRow = ws.addRow(reporte.columnas.map(c =>
-        reporte.totales[c.key] != null ? reporte.totales[c.key] : (c === reporte.columnas[0] ? 'Total' : null)
-      ));
-      // primera columna dice "Total" si no era numerica
+      const totalRow = ws.addRow(reporte.columnas.map(() => null));
+      reporte.columnas.forEach((c, i) => {
+        const cell = totalRow.getCell(i + 1);
+        if (reporte.totales[c.key] != null) {
+          const l = ws.getColumn(i + 1).letter;
+          cell.value = reporte.filas.length
+            ? { formula: `SUM(${l}${primera}:${l}${ultima})`, result: reporte.totales[c.key] }
+            : 0;
+        }
+        if (c.tipo === 'moneda') cell.numFmt = '"Q"#,##0.00';
+        cell.border = { top: { style: 'double', color: { argb: 'FF09090B' } } };
+      });
       if (reporte.totales[reporte.columnas[0].key] == null) totalRow.getCell(1).value = 'Total';
       totalRow.font = { bold: true };
-      reporte.columnas.forEach((c, i) => {
-        if (c.tipo === 'moneda') totalRow.getCell(i + 1).numFmt = '"Q"#,##0.00';
-      });
     }
 
     ws.columns.forEach((col, i) => {
@@ -305,5 +366,11 @@ class ReportesService {
     return isNaN(d) ? String(v) : d.toISOString().slice(0, 10);
   }
 }
+
+ReportesService.MARCA = Object.freeze({
+  institucion: 'Asilo de Ancianos "Cabeza de Algodon" - Mazatenango',
+  sistema: 'Sistema de Gestion Integral',
+  acento: '#D11A6D'
+});
 
 module.exports = ReportesService;

@@ -16,26 +16,29 @@ class ReportesRepository {
 
     const filtro = idPaciente ? 'AND p.id = @idPaciente' : '';
     const r = await req.query(`
+      -- Costos cobrados al paciente, por rubro. Sale solo de cargos_servicio
+      -- (y su desglose cargos_detalle): el cargo de la visita ya incluye la
+      -- farmacia dispensada, asi que sumar tambien dispensaciones contaba
+      -- dos veces los medicamentos. Cargos manuales sin desglose = "otros".
       SELECT
         p.id AS idPaciente,
         (p.nombres + ' ' + p.apellidos) AS paciente,
         p.dpi AS dpi,
-        ISNULL(disp.totalMedicamentos, 0) AS totalMedicamentos,
-        ISNULL(cargos.totalCargos, 0) AS totalCargos,
-        (ISNULL(disp.totalMedicamentos, 0) + ISNULL(cargos.totalCargos, 0)) AS totalGeneral
+        c.consulta, c.laboratorio, c.farmacia, c.otros,
+        (c.consulta + c.laboratorio + c.farmacia + c.otros) AS totalGeneral
       FROM pacientes p
-      LEFT JOIN (
-        SELECT idPaciente, SUM(costoTotal) AS totalMedicamentos
-        FROM dispensaciones WHERE fecha BETWEEN @desde AND @hasta
-        GROUP BY idPaciente
-      ) disp ON disp.idPaciente = p.id
-      LEFT JOIN (
-        SELECT idPaciente, SUM(monto) AS totalCargos
-        FROM cargos_servicio WHERE fecha BETWEEN @desde AND @hasta
-        GROUP BY idPaciente
-      ) cargos ON cargos.idPaciente = p.id
-      WHERE (disp.totalMedicamentos IS NOT NULL OR cargos.totalCargos IS NOT NULL)
-      ${filtro}
+      INNER JOIN (
+        SELECT cs.idPaciente,
+               SUM(CASE WHEN d.rubro = 'consulta'    THEN d.monto ELSE 0 END) AS consulta,
+               SUM(CASE WHEN d.rubro = 'laboratorio' THEN d.monto ELSE 0 END) AS laboratorio,
+               SUM(CASE WHEN d.rubro = 'farmacia'    THEN d.monto ELSE 0 END) AS farmacia,
+               SUM(CASE WHEN d.id IS NULL THEN cs.monto ELSE 0 END) AS otros
+        FROM cargos_servicio cs
+        LEFT JOIN cargos_detalle d ON d.idCargo = cs.id
+        WHERE cs.fecha BETWEEN @desde AND @hasta
+        GROUP BY cs.idPaciente
+      ) c ON c.idPaciente = p.id
+      WHERE 1 = 1 ${filtro}
       ORDER BY totalGeneral DESC
     `);
     return r.recordset;
