@@ -10,6 +10,7 @@ function crearRutasFinanciero(ctrl) {
 
   router.get('/estado-cuenta/:idPaciente', ctrl.estadoCuenta);
   router.post('/cargos', soloAdmin, ctrl.crearCargo);
+  router.post('/cargos/:id/abonos', soloAdmin, ctrl.abonarCargo);
   router.post('/pagos-cuota', soloAdmin, ctrl.registrarPago);
 
   router.get('/donantes', ctrl.listarDonantes);

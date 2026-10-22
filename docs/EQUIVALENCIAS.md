@@ -23,6 +23,7 @@ minúsculas con guion bajo.
 | Cargo automático de la visita | `cargos_servicio` con `origen = 'visita'` e `idVisita` (índice único: un cargo por visita) | lo escribe pacientes-service al cerrar la visita, en la misma transacción |
 | Desglose del cargo (consulta / laboratorio / farmacia) | `cargos_detalle.rubro` = `consulta` / `laboratorio` / `farmacia` | financiero-service |
 | Tarifa de consulta | `tarifas_servicio` con `codigo = 'consulta_especialista'` (semilla Q150.00) | financiero-service |
+| Abono / pago a un cargo | `abonos_cargo`; suma ≤ monto del cargo (`cargos_servicio.montoPagado`, CHECK) | financiero-service |
 | Log de notificaciones | `notificaciones` | notificaciones-service |
 | Bitácora de auditoría | `auditoria` | la escriben auth, pacientes, farmacia y financiero; la lee reportes |
 | Usuario del sistema | `usuarios` | auth-service |
@@ -32,11 +33,11 @@ minúsculas con guion bajo.
 | Plan del SQA | Código |
 |---|---|
 | PENDIENTE_ASIGNACION / CITA_ASIGNADA / EN_ATENCION | `pendiente_asignacion` / `cita_asignada` / `en_atencion` (solicitud) |
-| Visita COMPLETA | `completada` (`en_atencion` mientras se trabaja) |
+| Visita COMPLETA / INCOMPLETA | `completada` / `incompleta` (cierre rechazado por campos faltantes; sigue editable). `en_atencion` mientras se trabaja |
 | Prescripción pendiente / parcial / despachada | `pendiente` / `parcial` / `dispensada` (`visita_prescripciones.cantidadPrescrita` y `cantidadEntregada`) |
 | Examen pendiente / disponible | `pendiente` / `disponible` |
 | Notificación enviado / error | `enviada` / `fallida` (reintentable) y `fallida_definitiva` (agotó intentos) |
-| Cargo pendiente | `pendiente` |
+| Cargo pendiente / pagado | `pendiente` / `parcial` (con abonos) / `pagado` |
 
 ## Roles
 

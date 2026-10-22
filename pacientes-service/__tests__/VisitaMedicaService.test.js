@@ -29,6 +29,7 @@ function crearRepoMock(visita) {
     marcarCompletada: jest.fn(async () => ({ ...visita, estado: VisitaMedica.ESTADOS.COMPLETADA })),
     agregarExamen: jest.fn(async () => ({ id: 1 })),
     agregarPrescripcion: jest.fn(async () => ({ id: 1 })),
+    marcarIncompleta: jest.fn(async () => {}),
     // La transaccion real vive en el repositorio; aqui se ejecuta el
     // calculo del cargo con datos de ejemplo y se simula el cierre.
     completarConCargo: jest.fn(async (id, calcularCargo) => {

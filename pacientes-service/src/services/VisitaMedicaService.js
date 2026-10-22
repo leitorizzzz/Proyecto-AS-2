@@ -67,9 +67,9 @@ class VisitaMedicaService {
 
   async actualizarClinico(id, { diagnostico, observaciones }) {
     const visita = await this._obtener(id);
-    if (visita.estado !== VisitaMedica.ESTADOS.EN_ATENCION) {
+    if (!visita.estaAbierta()) {
       throw Object.assign(
-        new Error(`Solo se puede editar una visita en estado 'en_atencion' (actual: '${visita.estado}')`),
+        new Error(`Solo se puede editar una visita en estado 'en_atencion' o 'incompleta' (actual: '${visita.estado}')`),
         { status: 409 }
       );
     }
@@ -81,8 +81,8 @@ class VisitaMedicaService {
 
   async agregarExamen(id, datos) {
     const visita = await this._obtener(id);
-    if (visita.estado !== VisitaMedica.ESTADOS.EN_ATENCION) {
-      throw Object.assign(new Error('Solo se pueden agregar examenes a una visita en atencion'), { status: 409 });
+    if (!visita.estaAbierta()) {
+      throw Object.assign(new Error('Solo se pueden agregar examenes a una visita en atencion o incompleta'), { status: 409 });
     }
     if (!datos || !datos.tipo || String(datos.tipo).trim() === '') {
       throw Object.assign(new Error('tipo del examen es requerido'), { status: 400 });
@@ -93,8 +93,8 @@ class VisitaMedicaService {
 
   async agregarPrescripcion(id, datos) {
     const visita = await this._obtener(id);
-    if (visita.estado !== VisitaMedica.ESTADOS.EN_ATENCION) {
-      throw Object.assign(new Error('Solo se pueden agregar prescripciones a una visita en atencion'), { status: 409 });
+    if (!visita.estaAbierta()) {
+      throw Object.assign(new Error('Solo se pueden agregar prescripciones a una visita en atencion o incompleta'), { status: 409 });
     }
     if (!datos || !datos.medicamento || String(datos.medicamento).trim() === '') {
       throw Object.assign(new Error('medicamento es requerido'), { status: 400 });
@@ -121,26 +121,26 @@ class VisitaMedicaService {
 
   /**
    * Marcar visita como completa. Exige diagnostico y observaciones no vacios.
+   * Caso 14: si faltan, la visita queda 'incompleta' (sigue editable) y el
+   * error trae camposFaltantes para que la UI los resalte.
    * Al completar: la solicitud enlazada pasa a 'completada'.
    */
   async completar(id) {
     const visita = await this._obtener(id);
-    if (visita.estado !== VisitaMedica.ESTADOS.EN_ATENCION) {
+    if (!visita.estaAbierta()) {
       throw Object.assign(
-        new Error(`Solo se puede completar una visita en 'en_atencion' (actual: '${visita.estado}')`),
+        new Error(`Solo se puede completar una visita en 'en_atencion' o 'incompleta' (actual: '${visita.estado}')`),
         { status: 409 }
       );
     }
-    if (!visita.diagnostico || String(visita.diagnostico).trim() === '') {
+    const camposFaltantes = VisitaMedica.CAMPOS_OBLIGATORIOS_CIERRE
+      .filter(c => !visita[c] || String(visita[c]).trim() === '');
+    if (camposFaltantes.length) {
+      await this.repo.marcarIncompleta(id);
+      const texto = camposFaltantes.map(c => (c === 'diagnostico' ? 'falta diagnostico' : 'faltan observaciones'));
       throw Object.assign(
-        new Error('No se puede completar la visita: falta diagnostico'),
-        { status: 400 }
-      );
-    }
-    if (!visita.observaciones || String(visita.observaciones).trim() === '') {
-      throw Object.assign(
-        new Error('No se puede completar la visita: faltan observaciones'),
-        { status: 400 }
+        new Error(`No se puede completar la visita: ${texto.join(' y ')}. La visita queda incompleta.`),
+        { status: 400, camposFaltantes, estadoVisita: VisitaMedica.ESTADOS.INCOMPLETA }
       );
     }
 

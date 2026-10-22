@@ -496,6 +496,14 @@ td.num, th.num { font-family: var(--font-mono); font-variant-numeric: tabular-nu
 .chip.disponible::before, .chip.enviada::before,
 .chip.dispensada::before { content: "✓"; }
 
+/* Caso 14: campo obligatorio que falta para cerrar la visita. */
+textarea.campo-faltante, input.campo-faltante {
+  border: 2px solid var(--err); background: var(--err-tint);
+}
+.falta-aviso { margin-left: 8px; color: var(--err-ink); font-weight: 700; font-size: var(--fs-tiny); }
+.chip.incompleta { background: var(--warn-tint); border: 2px solid var(--warn); color: var(--warn-ink); }
+.chip.incompleta::before { content: "!"; }
+
 /* Despacho parcial: borde punteado grueso y medio circulo. */
 .chip.parcial { background: var(--info-tint); border: 2px dashed var(--info); color: var(--info-ink); }
 .chip.parcial::before { content: "◑"; }

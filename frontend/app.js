@@ -113,6 +113,7 @@ async function api(base, path, opts = {}) {
     const msg = (body && body.error) || (typeof body === 'string' ? body : `HTTP ${resp.status}`);
     const err = new Error(msg);
     err.status = resp.status;
+    err.body = body;            // p. ej. camposFaltantes al cerrar una visita
     throw err;
   }
   return body;
@@ -339,6 +340,12 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   $('#fPaciente').addEventListener('change', cargarEstadoCuenta);
   $('#selectorVisita').addEventListener('change', cargarDetalleVisita);
+  ['#vDiagnostico', '#vObservaciones'].forEach(sel => $(sel).addEventListener('input', () => {
+    if ($(sel).value.trim()) {
+      $(sel).classList.remove('campo-faltante'); $(sel).removeAttribute('aria-invalid');
+      $(sel === '#vDiagnostico' ? '#faltaDiagnostico' : '#faltaObservaciones').classList.add('hidden');
+    }
+  }));
   $('#btnGuardarClinico').addEventListener('click', onGuardarClinico);
   $('#btnCompletarVisita').addEventListener('click', onCompletarVisita);
   $('#btnAgregarExamen').addEventListener('click', onAgregarExamen);
@@ -1035,6 +1042,21 @@ async function cargarVisitasTab() {
 
 function chipTexto(estado) { return estado || '—'; }
 
+const CAMPOS_VISITA = {
+  diagnostico: ['#vDiagnostico', '#faltaDiagnostico'],
+  observaciones: ['#vObservaciones', '#faltaObservaciones']
+};
+/** Resalta (borde, fondo y texto, no solo color) los campos que faltan. */
+function marcarCamposFaltantes(campos) {
+  for (const [campo, [selCampo, selAviso]] of Object.entries(CAMPOS_VISITA)) {
+    const falta = campos.includes(campo);
+    $(selCampo).classList.toggle('campo-faltante', falta);
+    if (falta) $(selCampo).setAttribute('aria-invalid', 'true');
+    else $(selCampo).removeAttribute('aria-invalid');
+    $(selAviso).classList.toggle('hidden', !falta);
+  }
+}
+
 async function cargarDetalleVisita() {
   const id = Number($('#selectorVisita').value);
   if (!id) {
@@ -1055,7 +1077,11 @@ async function cargarDetalleVisita() {
     $('#vDiagnostico').value = v.diagnostico || '';
     $('#vObservaciones').value = v.observaciones || '';
 
-    const puedeEditar = puedeAccion('editarVisita') && v.estado === 'en_atencion';
+    const puedeEditar = puedeAccion('editarVisita') && ['en_atencion', 'incompleta'].includes(v.estado);
+    // Caso 14: una visita incompleta muestra que campos faltan para cerrarla.
+    marcarCamposFaltantes(v.estado === 'incompleta'
+      ? ['diagnostico', 'observaciones'].filter(c => !v[c] || !String(v[c]).trim())
+      : []);
     $('#vDiagnostico').disabled = !puedeEditar;
     $('#vObservaciones').disabled = !puedeEditar;
     $('#btnGuardarClinico').disabled = !puedeEditar;
@@ -1119,6 +1145,7 @@ async function onCompletarVisita() {
   const msg = $('#msgCompletar'); limpiar(msg);
   const idVisita = state.visitaSeleccionada;
   let resultado = null;
+  let huboFaltantes = false;
   const cerrada = await confirmar(
     $('#visitaTitulo').textContent,
     'La visita y su solicitud quedarán completadas y ya no se podrán editar. ' +
@@ -1128,10 +1155,25 @@ async function onCompletarVisita() {
       textoConfirmar: 'Marcar como completa',
       textoCancelar: 'Volver',
       alEnviar: async () => {
-        resultado = await api(API.pacientes, `/api/visitas/${idVisita}/completar`, { method: 'POST' });
+        try {
+          resultado = await api(API.pacientes, `/api/visitas/${idVisita}/completar`, { method: 'POST' });
+        } catch (err) {
+          if (err.body?.camposFaltantes) {
+            marcarCamposFaltantes(err.body.camposFaltantes);
+            huboFaltantes = true;
+          }
+          throw err;
+        }
       }
     });
-  if (!cerrada) return;
+  if (!cerrada) {
+    // Volver despues de un rechazo: la visita quedo incompleta.
+    if (huboFaltantes) {
+      await cargarDetalleVisita();
+      warn(msg, 'La visita quedó incompleta: complete los campos resaltados, guarde y vuelva a cerrarla.');
+    }
+    return;
+  }
   const cg = resultado?.cargo;
   ok(msg, cg
     ? `Visita completada. Cargo #${cg.id} por ${money(cg.monto)} a la cuenta del familiar: ` +
@@ -1612,8 +1654,13 @@ async function cargarEstadoCuenta() {
         <td>${esc(x.concepto)}${(x.detalles || []).length ? `<div class="tiny">${x.detalles.map(d =>
           `${esc(d.rubro)}: ${esc(d.descripcion)} ${money(d.montoBase)} − ${money(d.descuento)} = ${money(d.monto)}`).join('<br>')}</div>` : ''}</td>
         <td>${chip(x.estado)}</td>
-        <td class="right num">${money(x.monto)}${x.saldo != null && x.saldo !== x.monto ? `<div class="tiny">saldo ${money(x.saldo)}</div>` : ''}</td>
+        <td class="right num">${money(x.monto)}${x.saldo != null && x.saldo !== x.monto ? `<div class="tiny">saldo ${money(x.saldo)}</div>` : ''}${
+          puedeAccion('escribirCajaFin') && x.saldo > 0
+            ? `<div><button class="btn-link" data-abonar="${x.id}">Abonar</button></div>` : ''}</td>
       </tr>`).join('') || `<tr><td colspan="4" class="tiny">Sin cargos.</td></tr>`;
+    state.cargosCuenta = c.cargos;
+    $$('#tbodyCargos [data-abonar]').forEach(b =>
+      b.addEventListener('click', () => abonarCargo(Number(b.dataset.abonar))));
     $('#tbodyCuotas').innerHTML = c.cuotas.map(x => `
       <tr>
         <td>${x.mes}/${x.anio}</td>
@@ -1622,6 +1669,28 @@ async function cargarEstadoCuenta() {
         <td class="right num">${money(x.monto)}</td>
       </tr>`).join('') || `<tr><td colspan="4" class="tiny">Sin cuotas.</td></tr>`;
   } catch (err) { console.error(err); }
+}
+
+/** Caso 20: abono a un cargo; el sistema rechaza montos mayores al saldo. */
+async function abonarCargo(id) {
+  const c = (state.cargosCuenta || []).find(x => x.id === id);
+  if (!c) return;
+  const ok_ = await abrirDialogo({
+    eyebrow: 'Abonar a un cargo',
+    titulo: c.concepto,
+    cuerpo: `
+      <p>Saldo pendiente: <strong class="num">${money(c.saldo)}</strong> de ${money(c.monto)}.
+         No se aceptan abonos mayores al saldo.</p>
+      <label for="dlgAbono">Monto del abono (Q)</label>
+      <input type="number" id="dlgAbono" name="monto" min="0.01" max="${c.saldo}" step="0.01" required value="${c.saldo}">
+      <label for="dlgAbonoConcepto">Concepto (opcional)</label>
+      <input id="dlgAbonoConcepto" name="concepto" placeholder="Pago en efectivo, transferencia...">`,
+    textoConfirmar: 'Registrar abono',
+    alEnviar: v => api(API.financiero, `/api/financiero/cargos/${id}/abonos`, {
+      method: 'POST', body: { monto: Number(v.monto), concepto: v.concepto || null }
+    })
+  });
+  if (ok_) cargarEstadoCuenta();
 }
 
 async function onRegistrarCargo(e) {

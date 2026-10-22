@@ -37,8 +37,17 @@ class VisitaMedica {
   }
 }
 
+/** Abierta = se puede editar y cerrar. */
+VisitaMedica.prototype.estaAbierta = function () {
+  return this.estado === VisitaMedica.ESTADOS.EN_ATENCION || this.estado === VisitaMedica.ESTADOS.INCOMPLETA;
+};
+
+/** Caso 14: sin estos campos la visita no se cierra y queda 'incompleta'. */
+VisitaMedica.CAMPOS_OBLIGATORIOS_CIERRE = Object.freeze(['diagnostico', 'observaciones']);
+
 VisitaMedica.ESTADOS = Object.freeze({
   EN_ATENCION: 'en_atencion',
+  INCOMPLETA: 'incompleta',
   COMPLETADA: 'completada',
   CANCELADA: 'cancelada'
 });

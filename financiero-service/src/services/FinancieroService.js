@@ -50,6 +50,40 @@ class FinancieroService {
     }));
   }
 
+  async obtenerCargo(id) {
+    const cargo = await this.cuentaRepo.obtenerCargo(Number(id));
+    if (!cargo) throw Object.assign(new Error('Cargo no encontrado'), { status: 404 });
+    return cargo;
+  }
+
+  /**
+   * Caso 20: abono a un cargo. Nunca deja el saldo negativo: un abono mayor
+   * que lo que falta se rechaza (409), no se trunca.
+   */
+  async registrarAbono(idCargo, { monto, concepto } = {}, idUsuario = null) {
+    const m = Number(monto);
+    if (!Number.isFinite(m) || m <= 0 || Math.abs(Math.round(m * 100) - m * 100) > 1e-6) {
+      throw Object.assign(new Error('monto debe ser mayor a 0 y con maximo 2 decimales'), { status: 400 });
+    }
+    const cargo = await this.cuentaRepo.obtenerCargo(Number(idCargo));
+    if (!cargo) throw Object.assign(new Error('Cargo no encontrado'), { status: 404 });
+    if (cargo.estado === CargoServicio.ESTADOS.PAGADO || cargo.saldo <= 0) {
+      throw Object.assign(new Error(`El cargo ${cargo.id} ya esta pagado`), { status: 409 });
+    }
+    if (m > cargo.saldo) {
+      throw Object.assign(
+        new Error(`El abono Q${m.toFixed(2)} excede el saldo del cargo (Q${cargo.saldo.toFixed(2)}): no se permiten saldos negativos`),
+        { status: 409 }
+      );
+    }
+    const r = await this.cuentaRepo.registrarAbono(cargo.id, { monto: m, concepto, idUsuario });
+    if (!r) {
+      // Otro abono simultaneo dejo menos saldo del que se valido arriba.
+      throw Object.assign(new Error('El saldo del cargo cambio; el abono excederia el saldo'), { status: 409 });
+    }
+    return { ...r.cargo, abono: r.abono };
+  }
+
   async registrarPagoCuota({ idPaciente, mes, anio, monto }) {
     if (!idPaciente || !mes || !anio)
       throw Object.assign(new Error('idPaciente, mes y anio son requeridos'), { status: 400 });

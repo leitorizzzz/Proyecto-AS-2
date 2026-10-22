@@ -1,6 +1,7 @@
 const { sql, getPool } = require('./database');
 const CargoServicio = require('../models/CargoServicio');
 const CuotaMensual = require('../models/CuotaMensual');
+const AbonoCargo = require('../models/AbonoCargo');
 
 /**
  * Repositorio de la cuenta corriente de un paciente: cargos por servicio
@@ -44,6 +45,47 @@ class CuentaRepository {
         montoBase: Number(d.montoBase), descuento: Number(d.descuento), monto: Number(d.monto)
       }))
     }));
+  }
+
+  async obtenerCargo(id) {
+    const pool = await getPool();
+    const r = await pool.request().input('id', sql.Int, id)
+      .query('SELECT * FROM cargos_servicio WHERE id = @id');
+    return r.recordset[0] ? new CargoServicio(r.recordset[0]) : null;
+  }
+
+  /**
+   * Abono a un cargo en una transaccion: bloquea el cargo, sube montoPagado
+   * solo si no supera el monto (UPDATE condicionado) y registra el abono.
+   * Devuelve null si el abono dejaria el saldo negativo.
+   */
+  async registrarAbono(idCargo, { monto, concepto, idUsuario }) {
+    const pool = await getPool();
+    const tx = new sql.Transaction(pool);
+    await tx.begin();
+    const rq = () => new sql.Request(tx);
+    try {
+      const up = await rq().input('id', sql.Int, idCargo).input('monto', sql.Decimal(10, 2), monto).query(`
+        UPDATE cargos_servicio WITH (UPDLOCK, ROWLOCK)
+        SET montoPagado = montoPagado + @monto,
+            estado = CASE WHEN montoPagado + @monto >= monto THEN 'pagado' ELSE 'parcial' END
+        OUTPUT INSERTED.*
+        WHERE id = @id AND estado <> 'pagado' AND montoPagado + @monto <= monto
+      `);
+      if (up.rowsAffected[0] !== 1) { await tx.rollback(); return null; }
+      const abono = (await rq()
+        .input('idCargo', sql.Int, idCargo)
+        .input('monto', sql.Decimal(10, 2), monto)
+        .input('concepto', sql.NVarChar(300), concepto || null)
+        .input('idUsuario', sql.Int, idUsuario ?? null)
+        .query(`INSERT INTO abonos_cargo (idCargo, monto, concepto, idUsuario)
+                OUTPUT INSERTED.* VALUES (@idCargo, @monto, @concepto, @idUsuario)`)).recordset[0];
+      await tx.commit();
+      return { cargo: new CargoServicio(up.recordset[0]), abono: new AbonoCargo(abono) };
+    } catch (err) {
+      await tx.rollback().catch(() => {});
+      throw err;
+    }
   }
 
   async saldoPendientePorPaciente(idPaciente) {

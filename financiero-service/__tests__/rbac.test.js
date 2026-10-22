@@ -18,7 +18,7 @@ function app() {
   const creado = (_r, res) => res.status(201).json({ id: 1 });
   const ctrlStub = {
     estadoCuenta: (_r, res) => res.json({}),
-    crearCargo: creado, registrarPago: creado,
+    crearCargo: creado, registrarPago: creado, abonarCargo: creado,
     listarDonantes: lista, crearDonante: creado,
     desactivarDonante: (_r, res) => res.json({}), reactivarDonante: (_r, res) => res.json({}),
     listarDonaciones: lista, registrarDonacion: creado,
@@ -49,6 +49,10 @@ describe('RBAC financiero-service', () => {
 
   test('listar gastos con rol coordinador_fundacion -> 200', async () => {
     expect((await request(srv).get('/api/financiero/gastos').set(con('coordinador_fundacion'))).status).toBe(200);
+  });
+
+  test('abonar a un cargo con rol coordinador_fundacion -> 403 (solo admin)', async () => {
+    expect((await request(srv).post('/api/financiero/cargos/1/abonos').set(con('coordinador_fundacion')).send({})).status).toBe(403);
   });
 
   test('desactivar donante con rol coordinador_fundacion -> 403', async () => {

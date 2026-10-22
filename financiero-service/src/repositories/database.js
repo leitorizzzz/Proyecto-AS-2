@@ -167,6 +167,20 @@ async function inicializarEsquema() {
     );
   `);
 
+  // Abonos a cargos (caso 20). La suma nunca supera el monto del cargo.
+  await pool.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'abonos_cargo')
+    CREATE TABLE abonos_cargo (
+      id INT IDENTITY(1,1) PRIMARY KEY,
+      idCargo INT NOT NULL,
+      monto DECIMAL(10,2) NOT NULL CHECK (monto > 0),
+      concepto NVARCHAR(300) NULL,
+      idUsuario INT NULL,
+      fecha DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+      CONSTRAINT FK_abonos_cargo FOREIGN KEY (idCargo) REFERENCES cargos_servicio(id)
+    );
+  `);
+
   // Tarifas de servicios propios del cargo de visita (consulta del
   // especialista). El precio de laboratorio y farmacia sale de sus catalogos.
   await pool.request().query(`

@@ -19,7 +19,12 @@ class VisitaMedicaController {
 
   _fallo = (res, error) => {
     const status = error.status || 500;
-    res.status(status).json({ error: error.message });
+    const cuerpo = { error: error.message };
+    if (error.camposFaltantes) {
+      cuerpo.camposFaltantes = error.camposFaltantes;
+      cuerpo.estadoVisita = error.estadoVisita;
+    }
+    res.status(status).json(cuerpo);
   };
 
   obtener = async (req, res) => {
@@ -87,7 +92,13 @@ class VisitaMedicaController {
           `automatico visita #${visita.id} · Q${visita.cargo.monto}`, null, visita.cargo);
       }
       res.json(visita);
-    } catch (error) { this._fallo(res, error); }
+    } catch (error) {
+      if (error.camposFaltantes) {
+        await this._auditar(req, 'modificar', 'visita', Number(req.params.id),
+          `intento de cierre: faltan ${error.camposFaltantes.join(', ')}`, null, { estado: error.estadoVisita });
+      }
+      this._fallo(res, error);
+    }
   };
 }
 

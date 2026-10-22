@@ -672,6 +672,19 @@ async function asegurarUsuario(adminToken, u) {
     ok(`stock intacto (${despues})`);
   } catch (e) { falla(e.message); }
 
+  paso('caso 14: cerrar la visita B sin diagnostico ni observaciones -> 400, campos faltantes e incompleta');
+  try {
+    const r = await req('POST', `${API.pacientes}/api/visitas/${visitaB.id}/completar`, { token: meToken, esperarStatus: 400 });
+    if (JSON.stringify(r.data.camposFaltantes) !== '["diagnostico","observaciones"]') {
+      throw new Error(`camposFaltantes=${JSON.stringify(r.data.camposFaltantes)}`);
+    }
+    const v = (await req('GET', `${API.pacientes}/api/visitas/${visitaB.id}`, { token: meToken, esperarStatus: 200 })).data;
+    if (v.estado !== 'incompleta') throw new Error(`estado=${v.estado}`);
+    const cta = (await req('GET', `${API.financiero}/api/financiero/estado-cuenta/${pacB.id}`, { token: adminToken, esperarStatus: 200 })).data;
+    if (cta.cargos.some(c => c.idVisita === visitaB.id)) throw new Error('se genero cargo de una visita rechazada');
+    ok('incompleta, sin cargo');
+  } catch (e) { falla(e.message); }
+
   paso('caso 18/19: cerrar la visita B cobra lo entregado hasta ese momento');
   try {
     await req('PATCH', `${API.pacientes}/api/visitas/${visitaB.id}`, {
@@ -681,6 +694,26 @@ async function asegurarUsuario(adminToken, u) {
     const far = r.data.cargo.detalles.filter(d => d.rubro === 'farmacia').reduce((a, d) => a + d.monto, 0);
     if (Math.round(far * 100) / 100 !== 0.96) throw new Error(`farmacia en el cargo = ${far}`);
     ok(`cargo ${r.data.cargo.id} Q${r.data.cargo.monto} (farmacia 0.96)`);
+  } catch (e) { falla(e.message); }
+
+  paso('caso 20: abonos al cargo de la visita B nunca dejan saldo negativo');
+  try {
+    const cta = (await req('GET', `${API.financiero}/api/financiero/estado-cuenta/${pacB.id}`, { token: adminToken, esperarStatus: 200 })).data;
+    const c = cta.cargos.find(x => x.idVisita === visitaB.id && x.origen === 'visita');
+    const exceso = await req('POST', `${API.financiero}/api/financiero/cargos/${c.id}/abonos`, {
+      body: { monto: Math.round((c.saldo + 0.01) * 100) / 100 }, token: adminToken, esperarStatus: 409
+    });
+    const a1 = (await req('POST', `${API.financiero}/api/financiero/cargos/${c.id}/abonos`, {
+      body: { monto: 20, concepto: 'E2E abono' }, token: adminToken, esperarStatus: 201 })).data;
+    if (a1.estado !== 'parcial' || Math.abs(a1.saldo - (c.saldo - 20)) > 0.001) throw new Error(`tras abono 1: ${a1.estado} ${a1.saldo}`);
+    const a2 = (await req('POST', `${API.financiero}/api/financiero/cargos/${c.id}/abonos`, {
+      body: { monto: a1.saldo, concepto: 'E2E abono' }, token: adminToken, esperarStatus: 201 })).data;
+    if (a2.estado !== 'pagado' || a2.saldo !== 0) throw new Error(`tras abono 2: ${a2.estado} ${a2.saldo}`);
+    await req('POST', `${API.financiero}/api/financiero/cargos/${c.id}/abonos`, { body: { monto: 1 }, token: adminToken, esperarStatus: 409 });
+    await req('POST', `${API.financiero}/api/financiero/cargos/${c.id}/abonos`, { body: { monto: 1 }, token: cfToken, esperarStatus: 403 });
+    const despues = (await req('GET', `${API.financiero}/api/financiero/estado-cuenta/${pacB.id}`, { token: adminToken, esperarStatus: 200 })).data;
+    if (despues.saldoCargos < 0) throw new Error(`saldo negativo ${despues.saldoCargos}`);
+    ok(`exceso rechazado (${String(exceso.data.error).slice(0, 40)}...); 20 + ${a1.saldo} -> pagado; saldo ${despues.saldoCargos}`);
   } catch (e) { falla(e.message); }
 
   paso('caso 18: completar la entrega despues del cierre -> dispensada y cargo complementario');

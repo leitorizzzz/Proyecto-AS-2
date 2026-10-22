@@ -71,6 +71,15 @@ class VisitaMedicaRepository {
     return this.obtenerPorId(result.recordset[0].id);
   }
 
+  /** Caso 14: intento de cierre sin campos obligatorios. */
+  async marcarIncompleta(id) {
+    const pool = await getPool();
+    await pool.request()
+      .input('id', sql.Int, id)
+      .query(`UPDATE visitas_medicas SET estado = 'incompleta'
+              WHERE id = @id AND estado IN ('en_atencion', 'incompleta')`);
+  }
+
   async actualizarClinico(id, { diagnostico, observaciones }) {
     const pool = await getPool();
     await pool.request()
