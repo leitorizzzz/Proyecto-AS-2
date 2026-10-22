@@ -1195,8 +1195,13 @@ async function cargarDetalleVisita() {
 
     $('#listaExamenes').innerHTML = (v.examenes || []).map(ex =>
       `<li>${esc(ex.tipo)} ${chip(ex.estado)}<div class="tiny">${fechaHora(ex.fechaSolicitud)}${ex.costo != null
-        ? ` · costo registrado ${money(ex.precioBase)} − ${money(ex.descuento)} = <strong class="num">${money(ex.costo)}</strong>` : ''}</div></li>`
+        ? ` · costo registrado ${money(ex.precioBase)} − ${money(ex.descuento)} = <strong class="num">${money(ex.costo)}</strong>` : ''}</div>${
+        ex.estado === 'disponible' ? `<button class="btn-link" data-resultado="${ex.id}">Ver resultado</button>` : ''}</li>`
     ).join('') || `<li class="tiny">Sin exámenes solicitados.</li>`;
+
+    // Caso 16: el especialista consulta el resultado en cuanto esta disponible.
+    $$('#listaExamenes [data-resultado]').forEach(b =>
+      b.addEventListener('click', () => verResultadoExamen(Number(b.dataset.resultado), b)));
 
     $('#listaPrescripciones').innerHTML = (v.prescripciones || []).map(rx =>
       `<li><strong>${esc(rx.medicamento)}</strong>${rx.dosis ? ' — ' + esc(rx.dosis) : ''} ${chip(rx.estado || 'pendiente')}
@@ -1288,6 +1293,17 @@ async function onCompletarVisita() {
 const CARGO_RUBROS = ['consulta', 'laboratorio', 'farmacia'];
 function sumaRubro(cargo, rubro) {
   return (cargo.detalles || []).filter(d => d.rubro === rubro).reduce((a, d) => a + Number(d.monto), 0);
+}
+
+async function verResultadoExamen(idExamen) {
+  try {
+    const r = await api(API.laboratorio, `/api/laboratorio/resultados/examen/${idExamen}`);
+    const valor = r.tipoResultado === 'numerico' ? r.valorNumerico
+      : r.tipoResultado === 'archivo' ? r.archivoAdjunto : r.valorTexto;
+    avisar(`Resultado del examen #${idExamen}`, `
+      <p>${chip(r.estado || 'disponible')} · disponible desde ${fechaHora(r.fechaDisponible)}</p>
+      <p><strong>${esc(r.tipoResultado)}:</strong> ${esc(valor ?? '—')}</p>`);
+  } catch (err) { avisar('Resultado no disponible', `<div class="msg error">✕ Error — ${esc(err.message)}</div>`); }
 }
 
 async function onAgregarExamen() {

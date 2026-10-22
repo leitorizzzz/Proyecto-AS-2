@@ -237,6 +237,17 @@ function familiarE2E(dpi) {
     ok(`estado=${r.data.estado}`);
   } catch (e) { falla(e.message); return finalizar(); }
 
+  // Caso 16: el especialista ve el resultado disponible en su visita.
+  paso('caso 16: el especialista ve el examen disponible y lee el resultado');
+  try {
+    const v = (await req('GET', `${API.pacientes}/api/visitas/${visitaId}`, { token: meToken, esperarStatus: 200 })).data;
+    const ex = (v.examenes || []).find(x => x.id === examenId);
+    if (ex?.estado !== 'disponible') throw new Error(`examen en la visita: ${ex?.estado}`);
+    const r = (await req('GET', `${API.laboratorio}/api/laboratorio/resultados/examen/${examenId}`, { token: meToken, esperarStatus: 200 })).data;
+    if (r.valorTexto !== 'Dentro de rango (e2e)') throw new Error(`resultado: ${JSON.stringify(r)}`);
+    ok(`examen ${examenId} disponible: "${r.valorTexto}"`);
+  } catch (e) { falla(e.message); }
+
   // 09 - farmacia dispensa
   paso('farmacia: POST /api/farmacia/dispensaciones (RN-06 + RN-09)');
   try {
