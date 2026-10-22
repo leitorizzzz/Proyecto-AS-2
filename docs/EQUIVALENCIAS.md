@@ -54,3 +54,13 @@ minúsculas con guion bajo.
 | Farmacia / Laboratorio | `farmacia` / `laboratorio` |
 | Administrador | `admin` |
 
+
+## Alertas de cobro (caso 21)
+
+| Plan del SQA | Código |
+|---|---|
+| Indicador naranja | nivel `naranja`: saldo ≥ `UMBRAL_ALERTA_NARANJA` (por defecto la mitad de `UMBRAL_ALERTA_SALDO`) o alguna cuota vencida |
+| Indicador rojo | nivel `roja`: saldo ≥ `UMBRAL_ALERTA_SALDO` o cuota con más de `DIAS_MORA_ROJA` (30) días de mora |
+| Cuota vencida | `cuotas_mensuales.estado = 'pendiente'` y hoy (Guatemala) > `fechaVencimiento` (por defecto, último día del mes de la cuota) |
+| Panel del administrador | `GET /api/financiero/alertas` (admin, coordinador_fundacion); tarjeta «Alertas de cobro» del panel |
+| Emisión de cuota pendiente | `POST /api/financiero/cuotas` (admin) |

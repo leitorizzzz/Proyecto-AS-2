@@ -807,6 +807,51 @@ function familiarE2E(dpi) {
     ok(`aviso ${aMg.id}: "${aMg.mensaje.slice(0, 50)}..."`);
   } catch (e) { falla(e.message); }
 
+  // Caso 21: dos pacientes propios con cuotas emitidas que vencen en fechas
+  // controladas (una con 5 dias de mora, otra con 40).
+  paso('caso 21: cuota con 5 dias de mora -> naranja, con 40 dias -> roja; pagada sale del panel');
+  try {
+    const diaGt = dias => new Date(Date.now() - 6 * 3600e3 - dias * 864e5).toISOString().slice(0, 10);
+    const crearPac = async (n, ap) => (await req('POST', `${API.pacientes}/api/pacientes`, {
+      body: { nombres: 'E2E', apellidos: ap, fechaNacimiento: '1946-06-06', genero: 'F',
+              dpi: String(TS + n).padStart(13, '0').slice(-13), familiar: familiarE2E(String(TS + n + 1).padStart(13, '0').slice(-13)) },
+      token: adminToken, esperarStatus: 201
+    })).data;
+    const pacN = await crearPac(31, 'Alerta naranja');
+    const pacR = await crearPac(33, 'Alerta roja');
+    const qN = (await req('POST', `${API.financiero}/api/financiero/cuotas`, {
+      body: { idPaciente: pacN.id, mes: 1, anio: 2025, monto: 300, fechaVencimiento: diaGt(5) }, token: adminToken, esperarStatus: 201
+    })).data;
+    await req('POST', `${API.financiero}/api/financiero/cuotas`, {
+      body: { idPaciente: pacR.id, mes: 2, anio: 2025, monto: 300, fechaVencimiento: diaGt(40) }, token: adminToken, esperarStatus: 201
+    });
+    if (qN.estado !== 'pendiente') throw new Error(`cuota emitida en estado ${qN.estado}`);
+    // Emitir dos veces el mismo periodo -> 409; coordinador no emite (403).
+    await req('POST', `${API.financiero}/api/financiero/cuotas`, {
+      body: { idPaciente: pacN.id, mes: 1, anio: 2025, monto: 300 }, token: adminToken, esperarStatus: 409
+    });
+    await req('POST', `${API.financiero}/api/financiero/cuotas`, {
+      body: { idPaciente: pacN.id, mes: 3, anio: 2025, monto: 300 }, token: cfToken, esperarStatus: 403
+    });
+    const panel = (await req('GET', `${API.financiero}/api/financiero/alertas`, { token: adminToken, esperarStatus: 200 })).data;
+    const aN = panel.find(a => a.idPaciente === pacN.id), aR = panel.find(a => a.idPaciente === pacR.id);
+    if (aN?.alerta?.nivel !== 'naranja' || aN.alerta.diasMoraMax !== 5) throw new Error(`naranja: ${JSON.stringify(aN?.alerta)}`);
+    if (aR?.alerta?.nivel !== 'roja' || aR.alerta.diasMoraMax !== 40) throw new Error(`roja: ${JSON.stringify(aR?.alerta)}`);
+    if (panel.findIndex(a => a.alerta.nivel === 'naranja') < panel.findLastIndex(a => a.alerta.nivel === 'roja')) {
+      throw new Error('el panel no lista las rojas primero');
+    }
+    const ec = (await req('GET', `${API.financiero}/api/financiero/estado-cuenta/${pacN.id}`, { token: adminToken, esperarStatus: 200 })).data;
+    if (ec.alerta?.nivel !== 'naranja' || ec.cuotas[0]?.diasMora !== 5) throw new Error(`estado de cuenta: ${JSON.stringify(ec.alerta)}`);
+    await req('GET', `${API.financiero}/api/financiero/alertas`, { token: enfToken, esperarStatus: 403 });
+    // Pagar la cuota vencida quita la alerta.
+    await req('POST', `${API.financiero}/api/financiero/pagos-cuota`, {
+      body: { idPaciente: pacN.id, mes: 1, anio: 2025 }, token: adminToken, esperarStatus: 201
+    });
+    const panel2 = (await req('GET', `${API.financiero}/api/financiero/alertas`, { token: cfToken, esperarStatus: 200 })).data;
+    if (panel2.some(a => a.idPaciente === pacN.id)) throw new Error('la cuota pagada sigue en alertas');
+    ok(`naranja=${pacN.id} (5 d), roja=${pacR.id} (40 d); pagada sale del panel`);
+  } catch (e) { falla(e.message); }
+
   paso('limpieza: desactivar el medicamento propio del smoke');
   try {
     await req('DELETE', `${API.farmacia}/api/farmacia/medicamentos/${medE2E.id}`, { token: farToken, esperarStatus: 200 });

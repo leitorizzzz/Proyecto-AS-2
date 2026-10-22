@@ -45,6 +45,9 @@
   --warn:      #A16207;
   --warn-tint: #FEF3C7;
   --warn-ink:  #713F12;
+  --naranja:      #C2410C;
+  --naranja-tint: #FFEDD5;
+  --naranja-ink:  #7C2D12;
 
   --err:       #B91C1C;
   --err-tint:  #FEE2E2;
@@ -519,6 +522,16 @@ textarea.campo-faltante, input.campo-faltante {
 /* Despacho parcial: borde punteado grueso y medio circulo. */
 .chip.parcial { background: var(--info-tint); border: 2px dashed var(--info); color: var(--info-ink); }
 .chip.parcial::before { content: "◑"; }
+
+/* Caso 21: alertas de cobro. Simbolo + patron de borde, no solo color. */
+.chip.alerta-naranja { background: var(--naranja-tint); border: 2px dashed var(--naranja); color: var(--naranja-ink); }
+.chip.alerta-naranja::before { content: "◆"; }
+.chip.alerta-roja { background: var(--err-tint); border: 3px solid var(--err); color: var(--err-ink); font-weight: 700; }
+.chip.alerta-roja::before { content: "▲"; }
+.chip.vencida { background: var(--naranja-tint); border: 1px dashed var(--naranja); color: var(--naranja-ink); }
+.chip.vencida::before { content: "⏰"; }
+tr.fila-alerta-roja td:first-child { box-shadow: inset 4px 0 0 var(--err); }
+tr.fila-alerta-naranja td:first-child { box-shadow: inset 4px 0 0 var(--naranja); }
 
 .chip.cancelada,
 .chip.fallida,

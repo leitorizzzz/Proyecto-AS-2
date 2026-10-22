@@ -111,12 +111,45 @@ class CuentaRepository {
       .input('anio', sql.SmallInt, cuota.anio)
       .input('monto', sql.Decimal(10, 2), cuota.monto)
       .input('estado', sql.NVarChar(20), cuota.estado)
+      .input('fechaVencimiento', sql.Date, cuota.fechaVencimiento)
       .query(`
-        INSERT INTO cuotas_mensuales (idPaciente, mes, anio, monto, estado)
+        INSERT INTO cuotas_mensuales (idPaciente, mes, anio, monto, estado, fechaVencimiento)
         OUTPUT INSERTED.*
-        VALUES (@idPaciente, @mes, @anio, @monto, @estado)
+        VALUES (@idPaciente, @mes, @anio, @monto, @estado, @fechaVencimiento)
       `);
     return new CuotaMensual(result.recordset[0]);
+  }
+
+  /**
+   * Caso 21: cuentas con algo por cobrar (saldo de cargos o cuotas
+   * pendientes), con el nombre del paciente (tabla pacientes, BD compartida)
+   * y sus cuotas pendientes para calcular la mora.
+   */
+  async cuentasPorCobrar() {
+    const pool = await getPool();
+    const [cuentas, cuotas] = await Promise.all([
+      pool.request().query(`
+        SELECT p.id AS idPaciente, p.nombres, p.apellidos, p.activo,
+               ISNULL(c.saldo, 0) AS saldoCargos, ISNULL(q.saldo, 0) AS saldoCuotas
+        FROM pacientes p
+        LEFT JOIN (SELECT idPaciente,
+                          SUM(CASE WHEN estado = 'pagado' THEN 0 ELSE monto - montoPagado END) AS saldo
+                   FROM cargos_servicio GROUP BY idPaciente) c ON c.idPaciente = p.id
+        LEFT JOIN (SELECT idPaciente, SUM(monto) AS saldo
+                   FROM cuotas_mensuales WHERE estado = 'pendiente' GROUP BY idPaciente) q ON q.idPaciente = p.id
+        WHERE ISNULL(c.saldo, 0) > 0 OR ISNULL(q.saldo, 0) > 0
+      `),
+      pool.request().query(`SELECT * FROM cuotas_mensuales WHERE estado = 'pendiente'`)
+    ]);
+    const pendientes = cuotas.recordset.map(r => new CuotaMensual(r));
+    return cuentas.recordset.map(r => ({
+      idPaciente: r.idPaciente,
+      paciente: `${r.nombres} ${r.apellidos}`,
+      activo: r.activo !== false,
+      saldoCargos: Number(r.saldoCargos),
+      saldoCuotas: Number(r.saldoCuotas),
+      cuotas: pendientes.filter(q => q.idPaciente === r.idPaciente)
+    }));
   }
 
   async obtenerCuota(idPaciente, mes, anio) {

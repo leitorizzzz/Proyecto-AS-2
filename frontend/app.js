@@ -303,6 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#formResultado').addEventListener('submit', onRegistrarResultado);
   $('#formCargo').addEventListener('submit', onRegistrarCargo);
   $('#formCuota').addEventListener('submit', onRegistrarCuota);
+  $('#btnEmitirCuota').addEventListener('click', onEmitirCuota);
   $('#formDonante').addEventListener('submit', onRegistrarDonante);
   $('#formDonacion').addEventListener('submit', onRegistrarDonacion);
   $('#formGasto').addEventListener('submit', onRegistrarGasto);
@@ -614,9 +615,7 @@ async function cargarDashboard() {
     $('#tbodyDashSolic').innerHTML = rows ||
       `<tr><td colspan="4" class="tiny">Sin solicitudes todavía — aparecerán aquí cuando el médico general registre una.</td></tr>`;
 
-    // KPI alertas de saldo: consulta financiero para los primeros 10
-    // pacientes (compromiso simple entre latencia y cobertura).
-    cargarKpiAlertasSaldo(pacientes.filter(p => p.activo !== false).slice(0, 20));
+    cargarAlertasCobro();
     cargarAvisos();
   } catch (err) {
     $('#kpiPacientes').textContent = '—';
@@ -649,25 +648,42 @@ async function cargarAvisos() {
   } catch { $('#listaAvisos').innerHTML = '<li class="tiny">No se pudieron cargar los avisos.</li>'; }
 }
 
-async function cargarKpiAlertasSaldo(pacientes) {
-  if (!pacientes.length) {
-    $('#kpiAlertasSaldo').textContent = '0';
+/* Caso 21: alertas de cobro naranja / roja (solo quienes llevan la caja). */
+const ROLES_ALERTAS_COBRO = ['admin', 'coordinador_fundacion', 'fundacion'];
+function chipAlerta(alerta) {
+  if (!alerta) return '<span class="tiny">Sin alertas</span>';
+  return `<span class="chip alerta-${alerta.nivel}">${alerta.nivel === 'roja' ? 'roja' : 'naranja'}</span>`;
+}
+async function cargarAlertasCobro() {
+  const box = $('#kpiAlertasBox');
+  box.classList.remove('ok', 'warn', 'error');
+  const puede = ROLES_ALERTAS_COBRO.includes(state.usuario?.rol);
+  $('#cardAlertasCobro').classList.toggle('hidden', !puede);
+  if (!puede) {
+    $('#kpiAlertasSaldo').textContent = '—';
+    $('#kpiAlertasHint').textContent = 'visible para administración y caja';
     return;
   }
   try {
-    const resultados = await Promise.all(pacientes.map(p =>
-      api(API.financiero, `/api/financiero/estado-cuenta/${p.id}`)
-        .catch(() => null)
-    ));
-    const altas = resultados.filter(r => r && r.alerta && r.alerta.nivel === 'alto');
-    $('#kpiAlertasSaldo').textContent = altas.length;
-    const box = $('#kpiAlertasBox');
-    box.classList.remove('ok', 'warn', 'error');
-    if (altas.length > 0) box.classList.add('error');
-    else if (resultados.some(r => r && r.alerta)) box.classList.add('warn');
-    else box.classList.add('ok');
-  } catch {
+    const lista = await api(API.financiero, '/api/financiero/alertas');
+    const rojas = lista.filter(a => a.alerta.nivel === 'roja').length;
+    const naranjas = lista.length - rojas;
+    $('#kpiAlertasSaldo').textContent = rojas;
+    $('#kpiAlertasHint').textContent = `▲ ${rojas} roja${rojas === 1 ? '' : 's'} · ◆ ${naranjas} naranja${naranjas === 1 ? '' : 's'}`;
+    box.classList.add(rojas ? 'error' : naranjas ? 'warn' : 'ok');
+    $('#contadorAlertasCobro').textContent = `${lista.length} cuenta${lista.length === 1 ? '' : 's'}`;
+    $('#tbodyAlertasCobro').innerHTML = lista.map(a => `
+      <tr class="fila-alerta-${a.alerta.nivel}">
+        <td>${chipAlerta(a.alerta)}</td>
+        <td>${esc(a.paciente)}${a.activo ? '' : ' <span class="tiny">(egresado)</span>'}</td>
+        <td class="tiny">${esc(a.alerta.motivos.join('; '))}</td>
+        <td class="right num">${a.alerta.cuotasVencidas}</td>
+        <td class="right num">${a.alerta.diasMoraMax ? `${a.alerta.diasMoraMax} d` : '—'}</td>
+        <td class="right num">${money(a.saldoTotal)}</td>
+      </tr>`).join('') || '<tr><td colspan="6" class="tiny">✓ Ok — ninguna cuenta con alerta.</td></tr>';
+  } catch (err) {
     $('#kpiAlertasSaldo').textContent = '—';
+    $('#tbodyAlertasCobro').innerHTML = `<tr><td colspan="6"><div class="msg error">No se pudieron cargar las alertas: ${esc(err.message)}</div></td></tr>`;
   }
 }
 
@@ -1728,7 +1744,7 @@ async function cargarEstadoCuenta() {
     $('#kpiSaldoCuotas').textContent = money(c.saldoCuotas);
     $('#kpiCantCargos').textContent = `${c.cargos.length} cargos`;
     $('#kpiCantCuotas').textContent = `${c.cuotas.length} cuotas`;
-    $('#kpiAlerta').textContent = c.alerta ? c.alerta.mensaje : 'Sin alertas';
+    $('#kpiAlerta').innerHTML = c.alerta ? `${chipAlerta(c.alerta)} ${esc(c.alerta.motivos.join('; '))}` : 'Sin alertas';
     const ultMovEl = $('#kpiUltMov');
     if (ultMovEl) {
       const movs = [
@@ -1753,10 +1769,11 @@ async function cargarEstadoCuenta() {
     $('#tbodyCuotas').innerHTML = c.cuotas.map(x => `
       <tr>
         <td>${x.mes}/${x.anio}</td>
-        <td>${chip(x.estado)}</td>
+        <td>${chip(x.estado)}${x.diasMora ? ` <span class="chip vencida">vencida ${x.diasMora} d</span>` : ''}</td>
+        <td class="tiny">${x.fechaVencimiento ? fechaCorta(x.fechaVencimiento) : '—'}</td>
         <td class="tiny">${x.fechaPago ? fechaCorta(x.fechaPago) : '—'}</td>
         <td class="right num">${money(x.monto)}</td>
-      </tr>`).join('') || `<tr><td colspan="4" class="tiny">Sin cuotas.</td></tr>`;
+      </tr>`).join('') || `<tr><td colspan="5" class="tiny">Sin cuotas.</td></tr>`;
   } catch (err) { console.error(err); }
 }
 
@@ -1811,6 +1828,26 @@ async function onRegistrarCuota(e) {
     await api(API.financiero, '/api/financiero/pagos-cuota', { method: 'POST', body });
     ok(msg, 'Pago de cuota registrado.');
     e.target.reset();
+    if (Number($('#fPaciente').value) === body.idPaciente) cargarEstadoCuenta();
+  } catch (err) { error(msg, err.message); }
+}
+
+/** Caso 21: emite la cuota como pendiente; si vence sin pago entra a las alertas. */
+async function onEmitirCuota() {
+  const msg = $('#msgCuota'); limpiar(msg);
+  const form = $('#formCuota');
+  if (!form.reportValidity()) return;
+  const body = {
+    idPaciente: Number($('#qPaciente').value),
+    mes: Number($('#qMes').value),
+    anio: Number($('#qAnio').value),
+    monto: Number($('#qMonto').value),
+    ...($('#qVence').value ? { fechaVencimiento: $('#qVence').value } : {})
+  };
+  try {
+    const c = await api(API.financiero, '/api/financiero/cuotas', { method: 'POST', body });
+    ok(msg, `Cuota ${c.mes}/${c.anio} emitida como pendiente; vence el ${fechaCorta(c.fechaVencimiento)}.`);
+    form.reset();
     if (Number($('#fPaciente').value) === body.idPaciente) cargarEstadoCuenta();
   } catch (err) { error(msg, err.message); }
 }

@@ -43,6 +43,21 @@ class FinancieroController {
     catch (error) { this._fallo(res, error); }
   };
 
+  alertas = async (req, res) => {
+    try { res.json(await this.service.alertasCobro()); }
+    catch (error) { this._fallo(res, error); }
+  };
+
+  emitirCuota = async (req, res) => {
+    try {
+      const r = await this.service.emitirCuota(req.body);
+      await this._auditar(req, 'crear', 'cuota', r.id,
+        `paciente #${r.idPaciente} · ${r.mes}/${r.anio} emitida · vence ${r.fechaVencimiento}`, null, r);
+      res.status(201).json(r);
+    }
+    catch (error) { this._fallo(res, error); }
+  };
+
   registrarPago = async (req, res) => {
     try {
       const r = await this.service.registrarPagoCuota(req.body);

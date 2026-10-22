@@ -132,9 +132,20 @@
           <div class="kpi-hint">en atención</div>
         </div>
         <div class="kpi" id="kpiAlertasBox">
-          <div class="kpi-label">Alertas de saldo</div>
+          <div class="kpi-label">Alertas de cobro</div>
           <div class="kpi-value num" id="kpiAlertasSaldo">—</div>
-          <div class="kpi-hint">pacientes sobre el umbral</div>
+          <div class="kpi-hint" id="kpiAlertasHint">cuentas en rojo</div>
+        </div>
+      </div>
+
+      <div class="card hidden" style="margin-top:22px" id="cardAlertasCobro">
+        <h3>Alertas de cobro <span class="contador" id="contadorAlertasCobro"></span></h3>
+        <p class="hint">▲ Roja: saldo sobre el umbral o cuota con más de 30 días de mora. ◆ Naranja: saldo cerca del umbral o cuota recién vencida.</p>
+        <div class="tabla-wrap">
+          <table>
+            <thead><tr><th>Nivel</th><th>Paciente</th><th>Motivo</th><th class="right">Cuotas vencidas</th><th class="right">Mora máx.</th><th class="right">Saldo</th></tr></thead>
+            <tbody id="tbodyAlertasCobro"><tr><td colspan="6"><span class="cargando">Cargando</span></td></tr></tbody>
+          </table>
         </div>
       </div>
 
@@ -560,7 +571,7 @@
               <h4>Cuotas</h4>
               <div class="tabla-wrap">
                 <table>
-                  <thead><tr><th>Período</th><th>Estado</th><th>Fecha pago</th><th class="right">Monto</th></tr></thead>
+                  <thead><tr><th>Período</th><th>Estado</th><th>Vence</th><th>Fecha pago</th><th class="right">Monto</th></tr></thead>
                   <tbody id="tbodyCuotas"></tbody>
                 </table>
               </div>
@@ -582,8 +593,8 @@
           </form>
         </div>
         <div class="card">
-          <h3>Registrar / pagar cuota</h3>
-          <p class="hint">Si la cuota del período no existe, se crea y se marca pagada en un mismo paso.</p>
+          <h3>Emitir / pagar cuota</h3>
+          <p class="hint">«Emitir pendiente» crea la cuota sin pagarla (vence el último día del mes, o en la fecha indicada) y entra a las alertas si vence sin pago. «Registrar pago» la crea si no existe y la marca pagada.</p>
           <form id="formCuota">
             <label for="qPaciente">Paciente</label><select id="qPaciente" required></select>
             <div class="fila-2">
@@ -591,7 +602,11 @@
               <div><label for="qAnio">Año</label><input type="number" id="qAnio" min="2020" max="2100" value="2026" required></div>
             </div>
             <label for="qMonto">Monto (Q)</label><input type="number" id="qMonto" step="0.01" min="0.01" required>
-            <button type="submit" class="btn">Registrar pago</button>
+            <label for="qVence">Vence (opcional, solo al emitir)</label><input type="date" id="qVence">
+            <div class="fila-2">
+              <button type="submit" class="btn">Registrar pago</button>
+              <button type="button" class="btn ghost" id="btnEmitirCuota">Emitir pendiente</button>
+            </div>
             <div id="msgCuota" role="status" aria-live="polite"></div>
           </form>
         </div>

@@ -29,18 +29,26 @@ function nuevoServicio({ cargos = [], cuotas = [], saldoCargos = 0, saldoCuotas 
 
 describe('FinancieroService', () => {
 
-  test('alerta nivel bajo cuando saldo > 0 y < umbral', async () => {
+  // Caso 21: los niveles son naranja (>= mitad del umbral) y roja (>= umbral).
+  test('alerta naranja cuando saldo >= mitad del umbral y < umbral', async () => {
+    const { svc } = nuevoServicio({ saldoCargos: 600, saldoCuotas: 0, umbral: 1000 });
+    const r = await svc.estadoCuenta(1);
+    expect(r.saldoTotal).toBe(600);
+    expect(r.alerta?.nivel).toBe('naranja');
+  });
+
+  test('sin alerta con saldo bajo y sin cuotas vencidas', async () => {
     const { svc } = nuevoServicio({ saldoCargos: 450, saldoCuotas: 0, umbral: 1000 });
     const r = await svc.estadoCuenta(1);
     expect(r.saldoTotal).toBe(450);
-    expect(r.alerta?.nivel).toBe('bajo');
+    expect(r.alerta).toBeNull();
   });
 
-  test('alerta nivel alto cuando saldo >= umbral', async () => {
+  test('alerta roja cuando saldo >= umbral', async () => {
     const { svc } = nuevoServicio({ saldoCargos: 800, saldoCuotas: 300, umbral: 1000 });
     const r = await svc.estadoCuenta(1);
     expect(r.saldoTotal).toBe(1100);
-    expect(r.alerta?.nivel).toBe('alto');
+    expect(r.alerta?.nivel).toBe('roja');
     expect(r.alerta.mensaje).toMatch(/supera el umbral/i);
   });
 

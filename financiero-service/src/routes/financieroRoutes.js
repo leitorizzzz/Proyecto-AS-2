@@ -9,6 +9,9 @@ function crearRutasFinanciero(ctrl) {
   const soloAdmin = autorizarRoles('admin');
 
   router.get('/estado-cuenta/:idPaciente', ctrl.estadoCuenta);
+  // Caso 21: panel de alertas de cobro (quienes llevan la caja).
+  router.get('/alertas', autorizarRoles('admin', 'coordinador_fundacion', 'fundacion'), ctrl.alertas);
+  router.post('/cuotas', soloAdmin, ctrl.emitirCuota);
   router.post('/cargos', soloAdmin, ctrl.crearCargo);
   router.post('/cargos/:id/abonos', soloAdmin, ctrl.abonarCargo);
   router.post('/pagos-cuota', soloAdmin, ctrl.registrarPago);

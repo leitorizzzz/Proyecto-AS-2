@@ -5,13 +5,14 @@ const Donacion = require('../models/Donacion');
 const GastoOperativo = require('../models/GastoOperativo');
 const PagoFundacion = require('../models/PagoFundacion');
 const { asegurarTitularCompleto } = require('./reglasCuenta');
+const alertasCobro = require('./alertasCobro');
 
 /**
  * CAPA DE LOGICA DE NEGOCIO
  * Reglas del dominio Entradas / Salidas / Caja del asilo.
  * - Estado de cuenta por paciente (cargos + cuotas).
  * - Registro atomico de cuota + pago.
- * - Alerta de saldo cuando supera un umbral configurable.
+ * - Alertas de cobro naranja / roja por saldo y cuotas vencidas (caso 21).
  */
 class FinancieroService {
   constructor(cuentaRepo, donanteRepo, movimientosRepo, familiarRepo) {
@@ -20,6 +21,9 @@ class FinancieroService {
     this.movimientosRepo = movimientosRepo;
     this.familiarRepo = familiarRepo;
     this.umbralAlerta = Number(process.env.UMBRAL_ALERTA_SALDO || 1000);
+    this.configAlertas = alertasCobro.configAlertas();
+    // Inyectable en pruebas; en produccion es la fecha de hoy en Guatemala.
+    this.hoy = () => alertasCobro.hoyGuatemala();
   }
 
   // --- Cuenta del paciente ---
@@ -32,10 +36,51 @@ class FinancieroService {
       this.cuentaRepo.saldoCuotasPendientes(idPaciente)
     ]);
     const saldoTotal = this._r(saldoCargos + saldoCuotas);
-    const alerta = this.generarAlertaSaldo(saldoTotal);
+    const alerta = this.generarAlertaSaldo(saldoTotal, cuotas);
     const familiar = this.familiarRepo ? await this.familiarRepo.obtenerPrincipal(idPaciente) : null;
     return { idPaciente, saldoCargos: this._r(saldoCargos), saldoCuotas: this._r(saldoCuotas),
-             saldoTotal, alerta, familiar, cargos, cuotas };
+             saldoTotal, alerta, familiar, cargos,
+             cuotas: cuotas.map(c => ({ ...c, diasMora: alertasCobro.diasMora(c, this.hoy()) })) };
+  }
+
+  /** Caso 21: cuentas con alerta naranja o roja, las rojas primero. */
+  async alertasCobro() {
+    const hoy = this.hoy();
+    const cuentas = await this.cuentaRepo.cuentasPorCobrar();
+    const orden = { roja: 0, naranja: 1 };
+    return cuentas
+      .map(c => {
+        const saldoTotal = this._r(c.saldoCargos + c.saldoCuotas);
+        return { idPaciente: c.idPaciente, paciente: c.paciente, activo: c.activo,
+                 saldoCargos: this._r(c.saldoCargos), saldoCuotas: this._r(c.saldoCuotas), saldoTotal,
+                 alerta: this.generarAlertaSaldo(saldoTotal, c.cuotas, hoy) };
+      })
+      .filter(c => c.alerta)
+      .sort((a, b) => orden[a.alerta.nivel] - orden[b.alerta.nivel] || b.saldoTotal - a.saldoTotal);
+  }
+
+  /**
+   * Caso 21: emite la cuota del periodo como pendiente (sin pagarla). Su
+   * vencimiento por defecto es el ultimo dia del mes.
+   */
+  async emitirCuota({ idPaciente, mes, anio, monto, fechaVencimiento }) {
+    if (!idPaciente || !mes || !anio)
+      throw Object.assign(new Error('idPaciente, mes y anio son requeridos'), { status: 400 });
+    if (!Number.isInteger(Number(mes)) || Number(mes) < 1 || Number(mes) > 12)
+      throw Object.assign(new Error('mes debe estar entre 1 y 12'), { status: 400 });
+    if (monto == null || !(Number(monto) > 0))
+      throw Object.assign(new Error('monto debe ser mayor a 0'), { status: 400 });
+    if (fechaVencimiento && (!/^\d{4}-\d{2}-\d{2}$/.test(String(fechaVencimiento)) || isNaN(Date.parse(fechaVencimiento))))
+      throw Object.assign(new Error('fechaVencimiento debe tener formato YYYY-MM-DD'), { status: 400 });
+    asegurarTitularCompleto(
+      this.familiarRepo ? await this.familiarRepo.obtenerPrincipal(Number(idPaciente)) : null, idPaciente);
+    if (await this.cuentaRepo.obtenerCuota(Number(idPaciente), Number(mes), Number(anio)))
+      throw Object.assign(new Error(`La cuota ${mes}/${anio} del paciente ${idPaciente} ya existe`), { status: 409 });
+    return this.cuentaRepo.guardarCuota(new CuotaMensual({
+      idPaciente: Number(idPaciente), mes: Number(mes), anio: Number(anio), monto: Number(monto),
+      estado: CuotaMensual.ESTADOS.PENDIENTE,
+      fechaVencimiento: fechaVencimiento || alertasCobro.vencimientoPorDefecto(mes, anio)
+    }));
   }
 
   async generarCargo({ idPaciente, concepto, monto }) {
@@ -109,7 +154,8 @@ class FinancieroService {
         mes: Number(mes),
         anio: Number(anio),
         monto: Number(monto),
-        estado: CuotaMensual.ESTADOS.PENDIENTE
+        estado: CuotaMensual.ESTADOS.PENDIENTE,
+        fechaVencimiento: alertasCobro.vencimientoPorDefecto(mes, anio)
       }));
     }
     if (cuota.estado === CuotaMensual.ESTADOS.PAGADA)
@@ -119,17 +165,9 @@ class FinancieroService {
     return this.cuentaRepo.pagarCuota(cuota.id);
   }
 
-  generarAlertaSaldo(saldoTotal) {
-    if (saldoTotal >= this.umbralAlerta) {
-      return {
-        nivel: 'alto',
-        mensaje: `Saldo pendiente Q${this._r(saldoTotal)} supera el umbral Q${this.umbralAlerta}`
-      };
-    }
-    if (saldoTotal > 0) {
-      return { nivel: 'bajo', mensaje: `Saldo pendiente Q${this._r(saldoTotal)}` };
-    }
-    return null;
+  /** Caso 21: alerta naranja / roja por saldo y cuotas vencidas (ver alertasCobro). */
+  generarAlertaSaldo(saldoTotal, cuotas = [], hoy = this.hoy()) {
+    return alertasCobro.evaluarAlerta({ saldoTotal, cuotas, hoy, config: this.configAlertas });
   }
 
   // --- Donantes / donaciones ---

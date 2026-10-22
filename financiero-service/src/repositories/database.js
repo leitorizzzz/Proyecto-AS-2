@@ -198,6 +198,18 @@ async function inicializarEsquema() {
     VALUES ('consulta_especialista', 'Consulta con medico especialista de la fundacion', 150.00);
   `);
 
+  // Caso 21: vencimiento de la cuota. Las existentes vencen el ultimo dia
+  // de su mes (mismo criterio que alertasCobro.vencimientoPorDefecto).
+  await pool.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM sys.columns
+                   WHERE object_id = OBJECT_ID('cuotas_mensuales') AND name = 'fechaVencimiento')
+    ALTER TABLE cuotas_mensuales ADD fechaVencimiento DATE NULL;
+  `);
+  await pool.request().query(`
+    UPDATE cuotas_mensuales SET fechaVencimiento = EOMONTH(DATEFROMPARTS(anio, mes, 1))
+    WHERE fechaVencimiento IS NULL;
+  `);
+
   // Tabla compartida de auditoria (idempotente; ver AuditoriaRepository).
   // require diferido: AuditoriaRepository depende de este modulo.
   await require('./AuditoriaRepository').crearTablaAuditoria(pool);

@@ -19,6 +19,7 @@ function app() {
   const ctrlStub = {
     estadoCuenta: (_r, res) => res.json({}),
     crearCargo: creado, registrarPago: creado, abonarCargo: creado,
+    alertas: lista, emitirCuota: creado,
     listarDonantes: lista, crearDonante: creado,
     desactivarDonante: (_r, res) => res.json({}), reactivarDonante: (_r, res) => res.json({}),
     listarDonaciones: lista, registrarDonacion: creado,
@@ -41,6 +42,18 @@ describe('RBAC financiero-service', () => {
 
   test('registrar pago a fundacion con rol farmacia -> 403', async () => {
     expect((await request(srv).post('/api/financiero/pagos-fundacion').set(con('farmacia')).send({})).status).toBe(403);
+  });
+
+  // Caso 21: el panel de alertas es de quienes llevan la caja; emitir cuota, solo admin.
+  test('alertas de cobro: admin y coordinador_fundacion 200, enfermero 403', async () => {
+    expect((await request(srv).get('/api/financiero/alertas').set(con('admin'))).status).toBe(200);
+    expect((await request(srv).get('/api/financiero/alertas').set(con('coordinador_fundacion'))).status).toBe(200);
+    expect((await request(srv).get('/api/financiero/alertas').set(con('enfermero'))).status).toBe(403);
+  });
+
+  test('emitir cuota: admin 201, coordinador_fundacion 403', async () => {
+    expect((await request(srv).post('/api/financiero/cuotas').set(con('admin')).send({})).status).toBe(201);
+    expect((await request(srv).post('/api/financiero/cuotas').set(con('coordinador_fundacion')).send({})).status).toBe(403);
   });
 
   test('registrar gasto con rol admin -> 201', async () => {
