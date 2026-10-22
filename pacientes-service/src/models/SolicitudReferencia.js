@@ -19,7 +19,8 @@ class SolicitudReferencia {
     horaCita,
     idMedicoEspecialista,
     fechaCreacion,
-    fechaActualizacion
+    fechaActualizacion,
+    idEnfermero
   }) {
     this.id = id || null;
     this.idPaciente = idPaciente;
@@ -32,6 +33,8 @@ class SolicitudReferencia {
     this.idMedicoEspecialista = idMedicoEspecialista || null;
     this.fechaCreacion = fechaCreacion || new Date().toISOString();
     this.fechaActualizacion = fechaActualizacion || this.fechaCreacion;
+    // Caso 7: enfermero(a) que acompana al paciente a la cita.
+    this.idEnfermero = idEnfermero ?? null;
   }
 }
 

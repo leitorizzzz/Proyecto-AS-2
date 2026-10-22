@@ -62,11 +62,12 @@ class VisitaMedicaRepository {
       .input('idPaciente', sql.Int, visita.idPaciente)
       .input('idMedicoEspecialista', sql.Int, visita.idMedicoEspecialista)
       .input('estado', sql.NVarChar(30), visita.estado)
+      .input('idFichaMedica', sql.Int, visita.idFichaMedica)
       .query(`
         INSERT INTO visitas_medicas
-          (idSolicitudReferencia, idPaciente, idMedicoEspecialista, estado)
+          (idSolicitudReferencia, idPaciente, idMedicoEspecialista, estado, idFichaMedica)
         OUTPUT INSERTED.id
-        VALUES (@idSolicitudReferencia, @idPaciente, @idMedicoEspecialista, @estado)
+        VALUES (@idSolicitudReferencia, @idPaciente, @idMedicoEspecialista, @estado, @idFichaMedica)
       `);
     return this.obtenerPorId(result.recordset[0].id);
   }
@@ -160,7 +161,11 @@ class VisitaMedicaRepository {
         ORDER BY d.id
       `)).recordset;
 
-      const cargo = calcularCargo({ visita, tarifa, examenes, dispensaciones });
+      const familiar = (await rq().input('idPaciente', sql.Int, visita.idPaciente).query(
+        'SELECT * FROM familiares WHERE idPaciente = @idPaciente AND principal = 1 AND activo = 1'
+      )).recordset[0] || null;
+
+      const cargo = calcularCargo({ visita, tarifa, examenes, dispensaciones, familiar });
 
       const insertado = (await rq()
         .input('idPaciente', sql.Int, cargo.idPaciente)

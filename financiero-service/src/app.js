@@ -8,6 +8,7 @@ const CuentaRepository = require('./repositories/CuentaRepository');
 const DonanteRepository = require('./repositories/DonanteRepository');
 const MovimientosRepository = require('./repositories/MovimientosRepository');
 const FinancieroService = require('./services/FinancieroService');
+const FamiliarReadRepository = require('./repositories/FamiliarReadRepository');
 const FinancieroController = require('./controllers/FinancieroController');
 const AuditoriaRepository = require('./repositories/AuditoriaRepository');
 const AuditoriaService = require('./services/AuditoriaService');
@@ -16,7 +17,7 @@ const crearRutasFinanciero = require('./routes/financieroRoutes');
 const cuentaRepo = new CuentaRepository();
 const donanteRepo = new DonanteRepository();
 const movimientosRepo = new MovimientosRepository();
-const financieroService = new FinancieroService(cuentaRepo, donanteRepo, movimientosRepo);
+const financieroService = new FinancieroService(cuentaRepo, donanteRepo, movimientosRepo, new FamiliarReadRepository());
 const financieroController = new FinancieroController(financieroService, new AuditoriaService(new AuditoriaRepository()));
 
 const app = express();

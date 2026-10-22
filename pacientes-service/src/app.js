@@ -23,6 +23,12 @@ const AuditoriaService = require('./services/AuditoriaService');
 const crearRutasPacientes = require('./routes/pacientesRoutes');
 const crearRutasSolicitudes = require('./routes/solicitudRoutes');
 const crearRutasVisitas = require('./routes/visitaMedicaRoutes');
+const crearRutasAvisos = require('./routes/avisosRoutes');
+const FamiliarRepository = require('./repositories/FamiliarRepository');
+const UsuarioReadRepository = require('./repositories/UsuarioReadRepository');
+const AvisoRepository = require('./repositories/AvisoRepository');
+const AvisoService = require('./services/AvisoService');
+const AvisoController = require('./controllers/AvisoController');
 
 // --- Ensamblado de capas ---
 // El servicio de Pacientes agrupa 3 dominios relacionados: Paciente,
@@ -35,8 +41,11 @@ const notificacionesClient = new NotificacionesClient({
   baseUrl: process.env.NOTIFICACIONES_URL
 });
 
-const pacienteService = new PacienteService(pacienteRepository);
-const solicitudService = new SolicitudService(solicitudRepository, pacienteRepository, notificacionesClient);
+const familiarRepository = new FamiliarRepository();
+const avisoRepository = new AvisoRepository();
+const pacienteService = new PacienteService(pacienteRepository, familiarRepository);
+const solicitudService = new SolicitudService(solicitudRepository, pacienteRepository, notificacionesClient,
+  new UsuarioReadRepository(), avisoRepository);
 const visitaService = new VisitaMedicaService(visitaRepository, solicitudService, pacienteRepository);
 
 const auditoriaService = new AuditoriaService(new AuditoriaRepository());
@@ -55,6 +64,7 @@ app.get('/health', (req, res) => {
 app.use('/api/pacientes', crearRutasPacientes(pacienteController));
 app.use('/api/solicitudes', crearRutasSolicitudes(solicitudController, visitaController));
 app.use('/api/visitas', crearRutasVisitas(visitaController));
+app.use('/api/avisos', crearRutasAvisos(new AvisoController(new AvisoService(avisoRepository))));
 
 const PORT = process.env.PORT || 3002;
 

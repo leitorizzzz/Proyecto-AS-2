@@ -97,11 +97,17 @@ async function asegurarUsuario(adminToken, u) {
 }
 
 // -------- main ----------
+// Caso 5: todo interno se registra con su familiar responsable completo.
+function familiarE2E(dpi) {
+  return { nombres: 'Familiar', apellidos: 'E2E Responsable', dpi, parentesco: 'hijo(a)',
+           telefono: '55550000', email: 'e2e.familiar@example.com', direccion: 'Mazatenango (e2e)' };
+}
+
 (async function main() {
   console.log(`\nSmoke E2E apuntando a http://${BASE_HOST}\n`);
 
-  let adminToken, mgToken, cfToken, meToken, labToken, farToken;
-  let pacienteId, solicitudId, visitaId, prescripcionId, examenId, idEsp;
+  let adminToken, mgToken, cfToken, meToken, labToken, farToken, enfToken;
+  let pacienteId, solicitudId, visitaId, prescripcionId, examenId, idEsp, idEnf, idMg;
   let medE2E;   // medicamento propio: no se toca el stock del inventario real
   let cargoVisita; // cargo generado al cerrar la visita (caso 19)
   const TS = Date.now();
@@ -111,14 +117,15 @@ async function asegurarUsuario(adminToken, u) {
   try { adminToken = await login(ADMIN.email, ADMIN.password); ok(); }
   catch (e) { falla(e.message); return finalizar(); }
 
-  paso('asegurar usuarios de prueba (medico_general, coord, especialista, laboratorio, farmacia)');
+  paso('asegurar usuarios de prueba (medico_general, coord, especialista, laboratorio, farmacia, enfermero)');
   try {
     const usuarios = [
       { nombre: 'E2E Medico General',   email: 'e2e.medicogeneral@asilo.gt', password: 'E2eDemo1234', rol: 'medico_general' },
       { nombre: 'E2E Coordinador',       email: 'e2e.coordinador@asilo.gt',   password: 'E2eDemo1234', rol: 'coordinador_fundacion' },
       { nombre: 'E2E Especialista',      email: 'e2e.especialista@asilo.gt',  password: 'E2eDemo1234', rol: 'medico_especialista' },
       { nombre: 'E2E Laboratorio',       email: 'e2e.laboratorio@asilo.gt',   password: 'E2eDemo1234', rol: 'laboratorio' },
-      { nombre: 'E2E Farmacia',          email: 'e2e.farmacia@asilo.gt',      password: 'E2eDemo1234', rol: 'farmacia' }
+      { nombre: 'E2E Farmacia',          email: 'e2e.farmacia@asilo.gt',      password: 'E2eDemo1234', rol: 'farmacia' },
+      { nombre: 'E2E Enfermero',         email: 'e2e.enfermero@asilo.gt',     password: 'E2eDemo1234', rol: 'enfermero' }
     ];
     for (const u of usuarios) await asegurarUsuario(adminToken, u);
     mgToken  = await login('e2e.medicogeneral@asilo.gt', 'E2eDemo1234');
@@ -126,10 +133,13 @@ async function asegurarUsuario(adminToken, u) {
     meToken  = await login('e2e.especialista@asilo.gt',  'E2eDemo1234');
     labToken = await login('e2e.laboratorio@asilo.gt',   'E2eDemo1234');
     farToken = await login('e2e.farmacia@asilo.gt',      'E2eDemo1234');
+    enfToken = await login('e2e.enfermero@asilo.gt',     'E2eDemo1234');
+    idEnf = (await req('GET', `${API.auth}/api/auth/me`, { token: enfToken, esperarStatus: 200 })).data.id;
+    idMg  = (await req('GET', `${API.auth}/api/auth/me`, { token: mgToken,  esperarStatus: 200 })).data.id;
     // id del especialista para asignar cita
     const me = await req('GET', `${API.auth}/api/auth/me`, { token: meToken, esperarStatus: 200 });
     idEsp = me.data.id;
-    ok(`idEspecialista=${idEsp}`);
+    ok(`idEspecialista=${idEsp} idEnfermero=${idEnf}`);
   } catch (e) { falla(e.message); return finalizar(); }
 
   // 01 - crear paciente
@@ -140,7 +150,7 @@ async function asegurarUsuario(adminToken, u) {
       body: {
         nombres: 'E2E', apellidos: `Smoke ${new Date().toISOString().slice(0,10)}`,
         fechaNacimiento: '1945-01-01', genero: 'M', dpi,
-        familiarEmail: 'e2e.familiar@example.com'
+        familiar: familiarE2E(String(TS + 1).padStart(13, '0').slice(-13))
       },
       token: adminToken, esperarStatus: 201
     });
@@ -152,7 +162,7 @@ async function asegurarUsuario(adminToken, u) {
   paso('medico_general: POST /api/solicitudes (dispara notificacion)');
   try {
     const r = await req('POST', `${API.pacientes}/api/solicitudes`, {
-      body: { idPaciente: pacienteId, especialidad: 'cardiologia-e2e', motivo: 'Smoke e2e' },
+      body: { idPaciente: pacienteId, especialidad: 'cardiologia-e2e', motivo: 'Smoke e2e', idEnfermero: idEnf },
       token: mgToken, esperarStatus: 201
     });
     solicitudId = r.data.id;
@@ -300,7 +310,7 @@ async function asegurarUsuario(adminToken, u) {
     const creado = await req('POST', `${API.pacientes}/api/pacientes`, {
       body: {
         nombres: 'E2E', apellidos: 'Descartable',
-        fechaNacimiento: '1950-01-01', genero: 'M', dpi
+        fechaNacimiento: '1950-01-01', genero: 'M', dpi, familiar: familiarE2E(dpi)
       },
       token: adminToken, esperarStatus: 201
     });
@@ -370,15 +380,19 @@ async function asegurarUsuario(adminToken, u) {
   paso('RN-02: segunda solicitud activa misma especialidad -> 409');
   try {
     const a = await req('POST', `${API.pacientes}/api/solicitudes`, {
-      body: { idPaciente: pacienteId, especialidad: 'rn02-e2e', motivo: 'RN-02 e2e' },
+      body: { idPaciente: pacienteId, especialidad: 'rn02-e2e', motivo: 'RN-02 e2e', idEnfermero: idEnf },
       token: mgToken, esperarStatus: 201
     });
     solicitudCancelable = a.data.id;
-    await req('POST', `${API.pacientes}/api/solicitudes`, {
-      body: { idPaciente: pacienteId, especialidad: 'rn02-e2e', motivo: 'duplicada' },
+    const dup = await req('POST', `${API.pacientes}/api/solicitudes`, {
+      body: { idPaciente: pacienteId, especialidad: 'rn02-e2e', motivo: 'duplicada', idEnfermero: idEnf },
       token: mgToken, esperarStatus: 409
     });
-    ok(`primera id=${solicitudCancelable}, duplicada rechazada`);
+    // Caso 9: el rechazo indica cual es la solicitud activa que lo bloquea.
+    if (dup.data?.solicitudActiva?.id !== solicitudCancelable) {
+      throw new Error(`409 sin la solicitud activa: ${JSON.stringify(dup.data)}`);
+    }
+    ok(`primera id=${solicitudCancelable}, duplicada rechazada senalando la activa (${dup.data.solicitudActiva.estado})`);
   } catch (e) { falla(e.message); }
 
   paso('medico_general: PATCH /api/solicitudes/:id/cancelar -> cancelada');
@@ -410,7 +424,7 @@ async function asegurarUsuario(adminToken, u) {
   try {
     await req('DELETE', `${API.pacientes}/api/pacientes/${pacienteId}`, { token: adminToken, esperarStatus: 200 });
     const r = await req('POST', `${API.pacientes}/api/solicitudes`, {
-      body: { idPaciente: pacienteId, especialidad: 'inactivo-e2e', motivo: 'paciente desactivado' },
+      body: { idPaciente: pacienteId, especialidad: 'inactivo-e2e', motivo: 'paciente desactivado', idEnfermero: idEnf },
       token: mgToken, esperarStatus: 409
     });
     await req('PATCH', `${API.pacientes}/api/pacientes/${pacienteId}/reactivar`, { token: adminToken, esperarStatus: 200 });
@@ -494,11 +508,11 @@ async function asegurarUsuario(adminToken, u) {
     const dpi = String(TS + 7).padStart(13, '0').slice(-13);
     pacB = (await req('POST', `${API.pacientes}/api/pacientes`, {
       body: { nombres: 'E2E', apellidos: `Inactivable ${new Date().toISOString().slice(0, 10)}`,
-              fechaNacimiento: '1944-04-04', genero: 'F', dpi },
+              fechaNacimiento: '1944-04-04', genero: 'F', dpi, familiar: familiarE2E(String(TS + 8).padStart(13, '0').slice(-13)) },
       token: adminToken, esperarStatus: 201
     })).data;
     const sol = (await req('POST', `${API.pacientes}/api/solicitudes`, {
-      body: { idPaciente: pacB.id, especialidad: 'inactivable-e2e', motivo: 'e2e borrado logico' },
+      body: { idPaciente: pacB.id, especialidad: 'inactivable-e2e', motivo: 'e2e borrado logico', idEnfermero: idEnf },
       token: mgToken, esperarStatus: 201
     })).data;
     await req('PATCH', `${API.pacientes}/api/solicitudes/${sol.id}/asignar-cita`, {
@@ -729,6 +743,68 @@ async function asegurarUsuario(adminToken, u) {
     const v = (await req('GET', `${API.pacientes}/api/visitas/${visitaB.id}`, { token: meToken, esperarStatus: 200 })).data;
     if (Number(v.costoFarmacia) !== 4.8) throw new Error(`costoFarmacia=${v.costoFarmacia}`);
     ok('cargo complementario Q3.84; costo farmacia de la visita Q4.80');
+  } catch (e) { falla(e.message); }
+
+  // Casos 5, 7, 12 y 13 sobre el paciente y la solicitud principales del smoke.
+  paso('caso 5: alta sin familiar o con familiar incompleto -> 400 con los campos que faltan');
+  try {
+    const base = { nombres: 'E2E', apellidos: 'Sin familiar', fechaNacimiento: '1950-02-02', genero: 'F' };
+    const sin = await req('POST', `${API.pacientes}/api/pacientes`, {
+      body: { ...base, dpi: String(TS + 21).padStart(13, '0').slice(-13) }, token: adminToken, esperarStatus: 400
+    });
+    const inc = await req('POST', `${API.pacientes}/api/pacientes`, {
+      body: { ...base, dpi: String(TS + 22).padStart(13, '0').slice(-13),
+              familiar: { ...familiarE2E(String(TS + 23).padStart(13, '0').slice(-13)), telefono: '', direccion: '' } },
+      token: adminToken, esperarStatus: 400
+    });
+    const faltan = inc.data?.camposFaltantes || [];
+    if (!faltan.includes('telefono') || !faltan.includes('direccion')) throw new Error(`camposFaltantes=${JSON.stringify(faltan)}`);
+    ok(`sin familiar: ${(sin.data?.camposFaltantes || []).length} campos; incompleto: ${faltan.join(', ')}`);
+  } catch (e) { falla(e.message); }
+
+  paso('caso 5: el paciente E2E tiene familiar responsable completo y ficha medica 1:1');
+  let fichaE2E;
+  try {
+    const p = (await req('GET', `${API.pacientes}/api/pacientes/${pacienteId}`, { token: adminToken, esperarStatus: 200 })).data;
+    if (!p.familiar || p.familiar.parentesco !== 'hijo(a)' || !p.familiar.direccion) throw new Error(`familiar=${JSON.stringify(p.familiar)}`);
+    if (!p.ficha || p.ficha.idPaciente !== pacienteId) throw new Error(`ficha=${JSON.stringify(p.ficha)}`);
+    fichaE2E = p.ficha;
+    ok(`familiar id=${p.familiar.id}, ficha id=${p.ficha.id}`);
+  } catch (e) { falla(e.message); }
+
+  paso('caso 13: la visita quedo en_atencion vinculada a la ficha del paciente');
+  try {
+    const v = (await req('GET', `${API.pacientes}/api/visitas/${visitaId}`, { token: meToken, esperarStatus: 200 })).data;
+    if (!fichaE2E || v.idFichaMedica !== fichaE2E.id) throw new Error(`idFichaMedica=${v.idFichaMedica}, ficha=${fichaE2E?.id}`);
+    ok(`visita ${v.id} -> ficha ${v.idFichaMedica}`);
+  } catch (e) { falla(e.message); }
+
+  paso('caso 7: la solicitud lleva al enfermero; sin el o con un no-enfermero -> 400; enfermero y especialista no crean (403)');
+  try {
+    const sol = (await req('GET', `${API.pacientes}/api/solicitudes/${solicitudId}`, { token: mgToken, esperarStatus: 200 })).data;
+    if (sol.idEnfermero !== idEnf) throw new Error(`idEnfermero=${sol.idEnfermero}`);
+    const cuerpo = { idPaciente: pacienteId, especialidad: 'caso7-e2e', motivo: 'caso 7' };
+    await req('POST', `${API.pacientes}/api/solicitudes`, { body: cuerpo, token: mgToken, esperarStatus: 400 });
+    await req('POST', `${API.pacientes}/api/solicitudes`, { body: { ...cuerpo, idEnfermero: idEsp }, token: mgToken, esperarStatus: 400 });
+    await req('POST', `${API.pacientes}/api/solicitudes`, { body: { ...cuerpo, idEnfermero: idEnf }, token: enfToken, esperarStatus: 403 });
+    await req('POST', `${API.pacientes}/api/solicitudes`, { body: { ...cuerpo, idEnfermero: idEnf }, token: meToken, esperarStatus: 403 });
+    ok(`solicitud ${solicitudId} con enfermero ${idEnf}; 2 x 400 y 2 x 403`);
+  } catch (e) { falla(e.message); }
+
+  paso('caso 12: asignar cita dejo aviso interno al medico general y al enfermero; marcar leido');
+  try {
+    const avisosMg  = (await req('GET', `${API.pacientes}/api/avisos`, { token: mgToken,  esperarStatus: 200 })).data;
+    const avisosEnf = (await req('GET', `${API.pacientes}/api/avisos`, { token: enfToken, esperarStatus: 200 })).data;
+    const aMg  = avisosMg.find(a => a.idSolicitud === solicitudId && a.tipo === 'cita_asignada');
+    const aEnf = avisosEnf.find(a => a.idSolicitud === solicitudId && a.tipo === 'cita_asignada');
+    if (!aMg || !aEnf) throw new Error(`aviso medico=${!!aMg} enfermero=${!!aEnf}`);
+    // Un usuario no marca avisos ajenos.
+    await req('PATCH', `${API.pacientes}/api/avisos/${aMg.id}/leido`, { token: enfToken, esperarStatus: 404 });
+    const leido = (await req('PATCH', `${API.pacientes}/api/avisos/${aMg.id}/leido`, { token: mgToken, esperarStatus: 200 })).data;
+    if (!leido.leido) throw new Error('no quedo leido');
+    const noLeidos = (await req('GET', `${API.pacientes}/api/avisos?noLeidos=true`, { token: mgToken, esperarStatus: 200 })).data;
+    if (noLeidos.some(a => a.id === aMg.id)) throw new Error('el leido sigue en noLeidos');
+    ok(`aviso ${aMg.id}: "${aMg.mensaje.slice(0, 50)}..."`);
   } catch (e) { falla(e.message); }
 
   paso('limpieza: desactivar el medicamento propio del smoke');

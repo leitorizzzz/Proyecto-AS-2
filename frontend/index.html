@@ -92,6 +92,7 @@
     <div class="user-block">
       <span class="who" id="usuarioNombre">—</span>
       <span class="rol" id="usuarioRol">—</span>
+      <button class="btn-link avisos-badge hidden" id="badgeAvisos" type="button" aria-label="Avisos sin leer"></button>
       <div style="margin-top:14px">
         <button class="btn-link" id="btnSalir" aria-label="Cerrar sesión">
           <svg class="ico" width="14" height="14" style="vertical-align:middle"><use href="#i-logout"/></svg>
@@ -135,6 +136,12 @@
           <div class="kpi-value num" id="kpiAlertasSaldo">—</div>
           <div class="kpi-hint">pacientes sobre el umbral</div>
         </div>
+      </div>
+
+      <div class="card" style="margin-top:22px" id="cardAvisos">
+        <h3>Mis avisos <span class="contador" id="contadorAvisos"></span></h3>
+        <p class="hint">Notificaciones internas para usted, por ejemplo cuando se asigna la cita de una solicitud suya.</p>
+        <ul class="avisos" id="listaAvisos"><li class="tiny">Cargando…</li></ul>
       </div>
 
       <div class="card" style="margin-top:22px">
@@ -209,6 +216,24 @@
             <input id="pDireccion">
             <label for="pPadecimientos">Padecimientos conocidos</label>
             <textarea id="pPadecimientos" rows="2" placeholder="Hipertensión, diabetes, artritis..."></textarea>
+              <fieldset class="familiar" id="fsFamiliarAlta">
+                <legend>Familiar responsable (titular de la cuenta) — todos los campos son obligatorios</legend>
+                <div class="fila-2">
+                  <div><label for="frNombres">Nombres</label><input id="frNombres" required></div>
+                  <div><label for="frApellidos">Apellidos</label><input id="frApellidos" required></div>
+                </div>
+                <div class="fila-2">
+                  <div><label for="frDpi">DPI (13 dígitos)</label><input id="frDpi" inputmode="numeric" maxlength="13" pattern="[0-9]{13}" required></div>
+                  <div><label for="frParentesco">Parentesco</label><input id="frParentesco" list="listaParentescos" placeholder="hija, hijo, sobrino..." required></div>
+                </div>
+                <div class="fila-2">
+                  <div><label for="frTelefono">Teléfono</label><input id="frTelefono" inputmode="tel" required></div>
+                  <div><label for="frEmail">Correo (recibe los avisos)</label><input id="frEmail" type="email" required></div>
+                </div>
+                <label for="frDireccion">Dirección</label><input id="frDireccion" required>
+              </fieldset>
+            <datalist id="listaParentescos"><option value="hija"><option value="hijo"><option value="esposa"><option value="esposo"><option value="nieta"><option value="nieto"><option value="sobrina"><option value="sobrino"><option value="hermana"><option value="hermano"></datalist>
+            <p class="tiny">Al registrar se abre también la ficha médica del paciente.</p>
             <button type="submit" class="btn" id="btnCrearPaciente">Registrar paciente</button>
             <div id="msgPaciente" role="status" aria-live="polite"></div>
           </form>
@@ -256,6 +281,8 @@
               <option value="oftalmologia"><option value="traumatologia"><option value="dermatologia">
               <option value="endocrinologia">
             </datalist>
+            <label for="sEnfermero">Enfermero(a) que acompaña</label>
+            <select id="sEnfermero" required></select>
             <label for="sMotivo">Motivo</label>
             <textarea id="sMotivo" rows="3" required placeholder="Descripción del motivo de la referencia"></textarea>
             <button type="submit" class="btn" id="btnCrearSolicitud">Crear solicitud</button>
@@ -494,6 +521,7 @@
         <label for="fPaciente">Paciente</label>
         <select id="fPaciente"></select>
         <div id="estadoCuentaBox" style="margin-top:18px" class="hidden">
+          <p class="titular" id="titularCuenta"></p>
           <div class="panel-grid">
             <div class="kpi hero">
               <div class="kpi-badge">Saldo</div>

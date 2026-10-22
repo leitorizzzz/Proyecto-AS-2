@@ -496,6 +496,18 @@ td.num, th.num { font-family: var(--font-mono); font-variant-numeric: tabular-nu
 .chip.disponible::before, .chip.enviada::before,
 .chip.dispensada::before { content: "✓"; }
 
+/* Caso 5: familiar responsable dentro del alta. */
+fieldset.familiar { border: 1px solid var(--line); border-radius: var(--radius); padding: 4px 16px 14px; margin: 18px 0 0; }
+fieldset.familiar legend { font-size: var(--fs-meta); font-weight: 600; padding: 0 6px; color: var(--text-strong); }
+/* Caso 12: avisos internos. */
+ul.avisos { list-style: none; margin: 0; padding: 0; }
+ul.avisos li { padding: 10px 0; border-bottom: 1px solid var(--line-weak); font-size: var(--fs-meta); display: flex; gap: 12px; justify-content: space-between; align-items: baseline; }
+ul.avisos li:last-child { border-bottom: 0; }
+ul.avisos li.no-leido { font-weight: 600; }
+ul.avisos li.no-leido::before { content: "●"; color: var(--accent); margin-right: 6px; }
+.avisos-badge { display: block; margin-top: 8px; font-weight: 700; }
+p.titular { font-size: var(--fs-meta); margin: 0 0 14px; }
+
 /* Caso 14: campo obligatorio que falta para cerrar la visita. */
 textarea.campo-faltante, input.campo-faltante {
   border: 2px solid var(--err); background: var(--err-tint);

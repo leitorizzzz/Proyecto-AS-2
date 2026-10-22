@@ -1,5 +1,6 @@
 const SolicitudReferencia = require('../models/SolicitudReferencia');
 const { asegurarPacienteActivo } = require('./reglasPaciente');
+const Aviso = require('../models/Aviso');
 
 const ESPECIALIDAD_MAX = 100;
 const MOTIVO_MAX = 1000;
@@ -13,10 +14,24 @@ const HORA_REGEX = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
  * especialidad simultaneamente.
  */
 class SolicitudService {
-  constructor(solicitudRepository, pacienteRepository, notificacionesClient) {
+  constructor(solicitudRepository, pacienteRepository, notificacionesClient, usuarioRepository, avisoRepository) {
     this.repo = solicitudRepository;
     this.pacienteRepo = pacienteRepository;
     this.notificacionesClient = notificacionesClient; // opcional
+    this.usuarioRepo = usuarioRepository;
+    this.avisoRepo = avisoRepository;
+  }
+
+  /** Caso 7: el enfermero asignado debe existir, ser enfermero y estar activo. */
+  async _asegurarEnfermero(idEnfermero) {
+    if (!idEnfermero || !Number.isInteger(Number(idEnfermero))) {
+      throw Object.assign(new Error('idEnfermero es requerido: el enfermero(a) que acompana al paciente'), { status: 400 });
+    }
+    const u = await this.usuarioRepo.obtenerPorId(Number(idEnfermero));
+    if (!u || u.rol !== 'enfermero' || u.activo === false) {
+      throw Object.assign(new Error(`El usuario ${idEnfermero} no es un enfermero activo`), { status: 400 });
+    }
+    return u;
   }
 
   listar() {
@@ -37,7 +52,7 @@ class SolicitudService {
     return this.repo.obtenerPorPaciente(idPaciente);
   }
 
-  async crear({ idPaciente, especialidad, motivo }, idMedicoGeneral, authHeader) {
+  async crear({ idPaciente, especialidad, motivo, idEnfermero }, idMedicoGeneral, authHeader) {
     if (!idPaciente || Number.isNaN(Number(idPaciente))) {
       throw Object.assign(new Error('idPaciente es requerido'), { status: 400 });
     }
@@ -55,13 +70,15 @@ class SolicitudService {
     }
 
     const paciente = await asegurarPacienteActivo(this.pacienteRepo, idPaciente, 'crear solicitudes');
+    await this._asegurarEnfermero(idEnfermero);
 
     // RN-02
     const duplicada = await this.repo.existeSolicitudActiva(Number(idPaciente), especialidad);
     if (duplicada) {
+      const ref = duplicada.id ? ` (solicitud #${duplicada.id}, estado '${duplicada.estado}')` : '';
       throw Object.assign(
-        new Error(`Ya existe una solicitud activa para el paciente ${idPaciente} en la especialidad "${especialidad}"`),
-        { status: 409 }
+        new Error(`Ya existe una solicitud activa para el paciente ${idPaciente} en la especialidad "${especialidad}"${ref}`),
+        { status: 409, solicitudActiva: duplicada.id ? { id: duplicada.id, estado: duplicada.estado } : null }
       );
     }
 
@@ -70,7 +87,8 @@ class SolicitudService {
       idMedicoGeneral,
       especialidad: especialidad.trim(),
       motivo: motivo.trim(),
-      estado: SolicitudReferencia.ESTADOS.PENDIENTE_ASIGNACION
+      estado: SolicitudReferencia.ESTADOS.PENDIENTE_ASIGNACION,
+      idEnfermero: Number(idEnfermero)
     });
     const guardada = await this.repo.guardar(solicitud);
 
@@ -101,13 +119,20 @@ class SolicitudService {
     if (!idMedicoEspecialista || Number.isNaN(Number(idMedicoEspecialista))) {
       throw Object.assign(new Error('idMedicoEspecialista es requerido'), { status: 400 });
     }
-    await asegurarPacienteActivo(this.pacienteRepo, solicitud.idPaciente, 'asignarle citas');
+    const paciente = await asegurarPacienteActivo(this.pacienteRepo, solicitud.idPaciente, 'asignarle citas');
+    const datos = { fechaCita, horaCita: String(horaCita), idMedicoEspecialista: Number(idMedicoEspecialista) };
 
-    return this.repo.asignarCita(id, {
-      fechaCita,
-      horaCita: String(horaCita),
-      idMedicoEspecialista: Number(idMedicoEspecialista)
-    });
+    // Caso 12: aviso interno al medico general que refirio (medico del
+    // asilo) y al enfermero que acompana, en la misma transaccion.
+    const especialista = await this.usuarioRepo.obtenerPorId(datos.idMedicoEspecialista);
+    const mensaje = `Cita asignada: ${paciente.nombres} ${paciente.apellidos}, ${solicitud.especialidad}, ` +
+      `${String(fechaCita).slice(0, 10)} ${String(horaCita).slice(0, 5)}` +
+      (especialista ? ` con ${especialista.nombre}` : '') + ` (solicitud #${solicitud.id})`;
+    const destinatarios = [...new Set([solicitud.idMedicoGeneral, solicitud.idEnfermero].filter(Boolean))];
+    const avisos = destinatarios.map(idUsuario => ({
+      idUsuario, tipo: Aviso.TIPOS.CITA_ASIGNADA, mensaje, idSolicitud: solicitud.id
+    }));
+    return this.repo.asignarCitaConAvisos(id, datos, avisos, this.avisoRepo);
   }
 
   async marcarEnAtencion(id) {

@@ -19,7 +19,8 @@ class SolicitudController {
 
   _fallo = (res, error) => {
     const status = error.status || 500;
-    res.status(status).json({ error: error.message });
+    // RN-02: el 409 identifica la solicitud activa que bloquea la nueva.
+    res.status(status).json({ error: error.message, ...(error.solicitudActiva ? { solicitudActiva: error.solicitudActiva } : {}) });
   };
 
   listar = async (req, res) => {

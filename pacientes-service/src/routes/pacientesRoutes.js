@@ -17,6 +17,7 @@ function crearRutasPacientes(pacienteController) {
   router.get('/:id', pacienteController.obtener);
   router.post('/', registraPacientes, pacienteController.crear);
   router.put('/:id', registraPacientes, pacienteController.actualizar);
+  router.put('/:id/familiar', registraPacientes, pacienteController.actualizarFamiliar);
   router.delete('/:id', autorizarRoles('admin'), pacienteController.desactivar);
   router.patch('/:id/reactivar', autorizarRoles('admin'), pacienteController.reactivar);
 

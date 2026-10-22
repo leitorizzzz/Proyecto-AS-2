@@ -212,6 +212,71 @@ async function inicializarEsquema() {
       CHECK (cantidadEntregada >= 0 AND (cantidadPrescrita IS NULL
              OR (cantidadPrescrita > 0 AND cantidadEntregada <= cantidadPrescrita)));
   `);
+  // --- Caso 5: familiar responsable y ficha medica 1:1 -------------------
+  await pool.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'familiares')
+    CREATE TABLE familiares (
+      id INT IDENTITY(1,1) PRIMARY KEY,
+      idPaciente INT NOT NULL,
+      nombres NVARCHAR(200) NOT NULL,
+      apellidos NVARCHAR(200) NOT NULL,
+      dpi NVARCHAR(13) NOT NULL,
+      parentesco NVARCHAR(50) NOT NULL,
+      telefono NVARCHAR(30) NOT NULL,
+      email NVARCHAR(200) NOT NULL,
+      direccion NVARCHAR(300) NOT NULL,
+      principal BIT NOT NULL CONSTRAINT DF_familiares_principal DEFAULT 1,
+      activo BIT NOT NULL CONSTRAINT DF_familiares_activo DEFAULT 1,
+      fechaRegistro DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+      CONSTRAINT FK_familiares_paciente FOREIGN KEY (idPaciente) REFERENCES pacientes(id)
+    );
+  `);
+  // Un solo familiar principal activo por paciente.
+  await pool.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_familiar_principal')
+    CREATE UNIQUE INDEX UX_familiar_principal ON familiares (idPaciente)
+      WHERE principal = 1 AND activo = 1;
+  `);
+  await pool.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'fichas_medicas')
+    CREATE TABLE fichas_medicas (
+      id INT IDENTITY(1,1) PRIMARY KEY,
+      idPaciente INT NOT NULL UNIQUE,
+      grupoSanguineo NVARCHAR(5) NULL,
+      alergias NVARCHAR(MAX) NULL,
+      antecedentes NVARCHAR(MAX) NULL,
+      fechaApertura DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+      CONSTRAINT FK_fichas_paciente FOREIGN KEY (idPaciente) REFERENCES pacientes(id)
+    );
+  `);
+
+  // --- Caso 7: enfermero asignado; caso 13: visita vinculada a la ficha ---
+  for (const [tabla, col, tipo] of [['solicitudes_referencia', 'idEnfermero', 'INT NULL'],
+                                    ['visitas_medicas', 'idFichaMedica', 'INT NULL']]) {
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('${tabla}') AND name = '${col}')
+      ALTER TABLE ${tabla} ADD ${col} ${tipo};
+    `);
+  }
+
+  // --- Caso 12: notificaciones internas para el personal ----------------
+  await pool.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'avisos')
+    CREATE TABLE avisos (
+      id INT IDENTITY(1,1) PRIMARY KEY,
+      idUsuario INT NOT NULL,
+      tipo NVARCHAR(30) NOT NULL,
+      mensaje NVARCHAR(500) NOT NULL,
+      idSolicitud INT NULL,
+      leido BIT NOT NULL CONSTRAINT DF_avisos_leido DEFAULT 0,
+      fecha DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+    );
+  `);
+  await pool.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_avisos_usuario')
+    CREATE INDEX IX_avisos_usuario ON avisos (idUsuario, leido, fecha DESC);
+  `);
+
   // Tabla compartida de auditoria (idempotente; ver AuditoriaRepository).
   // require diferido: AuditoriaRepository depende de este modulo.
   await require('./AuditoriaRepository').crearTablaAuditoria(pool);

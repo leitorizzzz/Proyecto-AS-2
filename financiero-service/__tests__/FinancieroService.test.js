@@ -21,7 +21,10 @@ function nuevoServicio({ cargos = [], cuotas = [], saldoCargos = 0, saldoCuotas 
   };
   const donRepo = {};
   const movRepo = {};
-  return { svc: new FinancieroService(cuentaRepo, donRepo, movRepo), cuentaRepo };
+  // Caso 20: el titular de la cuenta (familiar responsable) con datos completos.
+  const familiarRepo = { obtenerPrincipal: jest.fn(async () => ({ id: 3, nombres: 'Ana', apellidos: 'G',
+    dpi: '1234567890123', parentesco: 'hija', telefono: '55551234', email: 'a@example.com', direccion: 'Zona 1' })) };
+  return { svc: new FinancieroService(cuentaRepo, donRepo, movRepo, familiarRepo), cuentaRepo };
 }
 
 describe('FinancieroService', () => {

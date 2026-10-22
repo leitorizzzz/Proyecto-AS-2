@@ -18,10 +18,11 @@ class CuentaRepository {
       .input('concepto', sql.NVarChar(300), cargo.concepto)
       .input('monto', sql.Decimal(10, 2), cargo.monto)
       .input('estado', sql.NVarChar(20), cargo.estado)
+      .input('idFamiliar', sql.Int, cargo.idFamiliar)
       .query(`
-        INSERT INTO cargos_servicio (idPaciente, concepto, monto, estado)
+        INSERT INTO cargos_servicio (idPaciente, concepto, monto, estado, idFamiliar, origen)
         OUTPUT INSERTED.*
-        VALUES (@idPaciente, @concepto, @monto, @estado)
+        VALUES (@idPaciente, @concepto, @monto, @estado, @idFamiliar, 'manual')
       `);
     return new CargoServicio(result.recordset[0]);
   }

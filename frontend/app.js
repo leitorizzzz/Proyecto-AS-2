@@ -309,6 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#formPagoFund').addEventListener('submit', onRegistrarPagoFundacion);
   $('#formPrecio').addEventListener('submit', onCrearPrecio);
   $('#formUsuario').addEventListener('submit', onCrearUsuario);
+  $('#badgeAvisos').addEventListener('click', () => cambiarTab('dashboard'));
   $('#formAuditoria').addEventListener('submit', e => { e.preventDefault(); consultarAuditoria(); });
   // El formulario del dialogo nunca debe enviarse de forma nativa (recargaria
   // la pagina); abrirDialogo() pone su propio onsubmit mientras esta abierto.
@@ -616,6 +617,7 @@ async function cargarDashboard() {
     // KPI alertas de saldo: consulta financiero para los primeros 10
     // pacientes (compromiso simple entre latencia y cobertura).
     cargarKpiAlertasSaldo(pacientes.filter(p => p.activo !== false).slice(0, 20));
+    cargarAvisos();
   } catch (err) {
     $('#kpiPacientes').textContent = '—';
     $('#kpiSolicitudesActivas').textContent = '—';
@@ -624,6 +626,27 @@ async function cargarDashboard() {
     $('#tbodyDashSolic').innerHTML =
       `<tr><td colspan="4"><div class="msg error">No se pudo cargar el panel: ${esc(err.message)}</div></td></tr>`;
   }
+}
+
+/* Caso 12: notificaciones internas del usuario. */
+async function cargarAvisos() {
+  try {
+    const avisos = await api(API.pacientes, '/api/avisos');
+    const noLeidos = avisos.filter(a => !a.leido).length;
+    $('#contadorAvisos').textContent = noLeidos ? `${noLeidos} sin leer` : `${avisos.length} avisos`;
+    $('#listaAvisos').innerHTML = avisos.slice(0, 10).map(a => `
+      <li class="${a.leido ? '' : 'no-leido'}">
+        <span>${esc(a.mensaje)}<span class="tiny"> · ${fechaHora(a.fecha)}</span></span>
+        ${a.leido ? '<span class="tiny">leído</span>' : `<button class="btn-link" data-aviso="${a.id}">Marcar leído</button>`}
+      </li>`).join('') || '<li class="tiny">Sin avisos.</li>';
+    $$('#listaAvisos [data-aviso]').forEach(b => b.addEventListener('click', async () => {
+      await api(API.pacientes, `/api/avisos/${b.dataset.aviso}/leido`, { method: 'PATCH' }).catch(() => {});
+      cargarAvisos();
+    }));
+    const badge = $('#badgeAvisos');
+    badge.textContent = `● ${noLeidos} aviso${noLeidos === 1 ? '' : 's'} sin leer`;
+    badge.classList.toggle('hidden', noLeidos === 0);
+  } catch { $('#listaAvisos').innerHTML = '<li class="tiny">No se pudieron cargar los avisos.</li>'; }
 }
 
 async function cargarKpiAlertasSaldo(pacientes) {
@@ -679,7 +702,9 @@ async function cargarPacientes() {
       <tr class="${p.activo === false ? 'fila-inactiva' : ''}">
         <td>
           <strong>${esc(p.nombres)} ${esc(p.apellidos)}</strong>
-          <div class="tiny">${esc(p.familiarEmail || 'sin correo de familiar')}</div>
+          <div class="tiny">${p.familiar
+            ? `Resp.: ${esc(p.familiar.nombres)} ${esc(p.familiar.apellidos)} (${esc(p.familiar.parentesco)}) · ${esc(p.familiar.telefono)}`
+            : '<span class="falta-aviso">✕ Sin familiar responsable</span>'}</div>
         </td>
         <td class="num">${esc(p.dpi)}</td>
         <td>${fechaCorta(p.fechaNacimiento)}</td>
@@ -690,6 +715,8 @@ async function cargarPacientes() {
     $('#tbodyPacientes').innerHTML = rows;
     $$('#tbodyPacientes [data-editar-paciente]').forEach(b =>
       b.addEventListener('click', () => editarPaciente(Number(b.dataset.editarPaciente))));
+    $$('#tbodyPacientes [data-familiar-paciente]').forEach(b =>
+      b.addEventListener('click', () => editarFamiliar(Number(b.dataset.familiarPaciente))));
     $$('#tbodyPacientes [data-activo-paciente]').forEach(b =>
       b.addEventListener('click', () =>
         cambiarActivoPaciente(Number(b.dataset.activoPaciente), b.dataset.accion === 'reactivar')));
@@ -707,14 +734,52 @@ async function cargarPacientes() {
 
 function accionesPaciente(p, puedeEditar, puedeDesactivar) {
   const acciones = [];
-  if (puedeEditar && p.activo !== false)
+  if (puedeEditar && p.activo !== false) {
     acciones.push(`<button class="btn-link" data-editar-paciente="${p.id}">Editar</button>`);
+    acciones.push(`<button class="btn-link" data-familiar-paciente="${p.id}">Familiar</button>`);
+  }
   if (puedeDesactivar) {
     acciones.push(p.activo === false
       ? `<button class="btn-link" data-activo-paciente="${p.id}" data-accion="reactivar">Reactivar</button>`
       : `<button class="btn-link danger" data-activo-paciente="${p.id}" data-accion="desactivar">Desactivar</button>`);
   }
   return acciones.join(' &middot; ') || '<span class="tiny">—</span>';
+}
+
+/** Caso 5 / 20: alta o correccion del familiar responsable (datos completos). */
+async function editarFamiliar(id) {
+  const p = (state.pacientes || []).find(x => x.id === id);
+  if (!p) return;
+  const f = p.familiar || {};
+  const v = s => esc(s || '');
+  const guardado = await abrirDialogo({
+    eyebrow: p.familiar ? 'Familiar responsable' : 'Registrar familiar responsable',
+    titulo: `${p.nombres} ${p.apellidos}`,
+    cuerpo: `
+        <fieldset class="familiar" id="fsFamiliarDialogo">
+          <legend>Familiar responsable (titular de la cuenta) — todos los campos son obligatorios</legend>
+          <div class="fila-2">
+            <div><label for="dlgFrNombres">Nombres</label><input id="dlgFrNombres" name="nombres" value="${v(f.nombres)}" required></div>
+            <div><label for="dlgFrApellidos">Apellidos</label><input id="dlgFrApellidos" name="apellidos" value="${v(f.apellidos)}" required></div>
+          </div>
+          <div class="fila-2">
+            <div><label for="dlgFrDpi">DPI (13 dígitos)</label><input id="dlgFrDpi" name="dpi" value="${v(f.dpi)}" inputmode="numeric" maxlength="13" pattern="[0-9]{13}" required></div>
+            <div><label for="dlgFrParentesco">Parentesco</label><input id="dlgFrParentesco" name="parentesco" value="${v(f.parentesco)}" list="listaParentescos" placeholder="hija, hijo, sobrino..." required></div>
+          </div>
+          <div class="fila-2">
+            <div><label for="dlgFrTelefono">Teléfono</label><input id="dlgFrTelefono" name="telefono" value="${v(f.telefono)}" inputmode="tel" required></div>
+            <div><label for="dlgFrEmail">Correo (recibe los avisos)</label><input id="dlgFrEmail" name="email" value="${v(f.email)}" type="email" required></div>
+          </div>
+          <label for="dlgFrDireccion">Dirección</label><input id="dlgFrDireccion" name="direccion" value="${v(f.direccion)}" required>
+        </fieldset>
+      <p class="tiny">Es el titular de la cuenta: sin estos datos completos no se pueden registrar cargos ni cerrar visitas.</p>`,
+    textoConfirmar: 'Guardar familiar',
+    alEnviar: datos => api(API.pacientes, `/api/pacientes/${id}/familiar`, { method: 'PUT', body: datos })
+  });
+  if (guardado) {
+    ok($('#msgPaciente'), `Familiar responsable de ${p.nombres} ${p.apellidos} guardado.`);
+    cargarPacientes();
+  }
 }
 
 async function cambiarActivoPaciente(id, reactivar) {
@@ -817,14 +882,20 @@ async function onCrearPaciente(e) {
     dpi: $('#pDpi').value.trim(),
     telefono: $('#pTelefono').value.trim() || null,
     contactoEmergencia: $('#pContacto').value.trim() || null,
-    familiarEmail: $('#pFamiliarEmail').value.trim() || null,
     direccion: $('#pDireccion').value.trim() || null,
-    padecimientos: $('#pPadecimientos').value.trim() || null
+    padecimientos: $('#pPadecimientos').value.trim() || null,
+    // Caso 5: familiar responsable (datos completos) + ficha medica automatica.
+    familiar: {
+      nombres: $('#frNombres').value.trim(), apellidos: $('#frApellidos').value.trim(),
+      dpi: $('#frDpi').value.trim(), parentesco: $('#frParentesco').value.trim(),
+      telefono: $('#frTelefono').value.trim(), email: $('#frEmail').value.trim(),
+      direccion: $('#frDireccion').value.trim()
+    }
   };
   const btn = $('#btnCrearPaciente'); btn.disabled = true;
   try {
-    await api(API.pacientes, '/api/pacientes', { method: 'POST', body });
-    ok(msg, `Paciente ${body.nombres} ${body.apellidos} registrado.`);
+    const p = await api(API.pacientes, '/api/pacientes', { method: 'POST', body });
+    ok(msg, `Paciente ${body.nombres} ${body.apellidos} registrado, con ${p.familiar ? p.familiar.parentesco + ' ' + p.familiar.nombres : 'familiar'} como responsable y ficha médica #${p.ficha?.id ?? '—'}.`);
     e.target.reset();
     cargarPacientes();
   } catch (err) {
@@ -851,6 +922,7 @@ async function cargarSolicitudes() {
     }
   }
 
+  if (puedeCrear) cargarEnfermerosSelect();
   try {
     const [solicitudes, pacientes] = await Promise.all([
       api(API.pacientes, '/api/solicitudes'),
@@ -896,6 +968,18 @@ async function cargarSolicitudes() {
   }
 }
 
+/** Caso 7: enfermeros activos para acompanar al paciente. */
+async function cargarEnfermerosSelect() {
+  const sel = $('#sEnfermero');
+  const prev = sel.value;
+  try {
+    const lista = await api(API.auth, '/api/auth/usuarios?rol=enfermero');
+    sel.innerHTML = `<option value="">Elegir…</option>` +
+      lista.map(u => `<option value="${u.id}">${esc(u.nombre)} — ${esc(u.email)}</option>`).join('');
+    if (prev) sel.value = prev;
+  } catch { sel.innerHTML = '<option value="">No se pudo cargar la lista de enfermeros</option>'; }
+}
+
 function formatoHora(h) {
   if (!h) return '';
   if (typeof h === 'string' && /^\d{2}:\d{2}/.test(h)) return h.slice(0,5);
@@ -909,7 +993,8 @@ async function onCrearSolicitud(e) {
   const body = {
     idPaciente: Number($('#sPaciente').value),
     especialidad: $('#sEspecialidad').value.trim().toLowerCase(),
-    motivo: $('#sMotivo').value.trim()
+    motivo: $('#sMotivo').value.trim(),
+    idEnfermero: Number($('#sEnfermero').value)   // caso 7
   };
   try {
     await api(API.pacientes, '/api/solicitudes', { method: 'POST', body });
@@ -1073,6 +1158,7 @@ async function cargarDetalleVisita() {
     $('#visitaEstadoChip').textContent = v.estado;
     $('#visitaMeta').textContent =
       `Paciente #${v.idPaciente} · Médico especialista #${v.idMedicoEspecialista} · Fecha ${fechaHora(v.fecha)}` +
+      (v.idFichaMedica ? ` · Ficha médica #${v.idFichaMedica}` : '') +
       ` · Costo acumulado con descuento: laboratorio ${money(v.costoLaboratorio || 0)}, farmacia ${money(v.costoFarmacia || 0)}`;
     $('#vDiagnostico').value = v.diagnostico || '';
     $('#vObservaciones').value = v.observaciones || '';
@@ -1634,6 +1720,9 @@ async function cargarEstadoCuenta() {
   try {
     const c = await api(API.financiero, `/api/financiero/estado-cuenta/${id}`);
     $('#estadoCuentaBox').classList.remove('hidden');
+    $('#titularCuenta').innerHTML = c.familiar
+      ? `Titular de la cuenta: <strong>${esc(c.familiar.nombres)} ${esc(c.familiar.apellidos)}</strong> (${esc(c.familiar.parentesco)}) · DPI ${esc(c.familiar.dpi)} · ${esc(c.familiar.telefono)} · ${esc(c.familiar.email)}`
+      : '<span class="falta-aviso">✕ Sin familiar responsable: no se pueden registrar cargos ni cuotas.</span>';
     $('#kpiSaldoTotal').textContent = money(c.saldoTotal);
     $('#kpiSaldoCargos').textContent = money(c.saldoCargos);
     $('#kpiSaldoCuotas').textContent = money(c.saldoCuotas);

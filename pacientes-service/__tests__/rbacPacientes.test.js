@@ -20,6 +20,7 @@ function app() {
     obtener: (_r, res) => res.json({}),
     crear: (_r, res) => res.status(201).json({ id: 1 }),
     actualizar: (_r, res) => res.json({ id: 1 }),
+    actualizarFamiliar: (_r, res) => res.json({ id: 1 }),
     desactivar: (_r, res) => res.json({ id: 1, activo: false }),
     reactivar: (_r, res) => res.json({ id: 1, activo: true })
   };

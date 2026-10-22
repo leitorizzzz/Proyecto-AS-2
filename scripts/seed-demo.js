@@ -5,7 +5,8 @@
  *
  * Que carga:
  *  - 1 usuario por rol clave (contrasenas de demo en scripts/README.md).
- *  - 6 pacientes con familiarEmail para disparar notificaciones reales.
+ *  - 6 pacientes, cada uno con su familiar responsable completo (caso 5) y
+ *    ficha medica; el correo del familiar recibe las notificaciones.
  *  - 2 medicamentos extra (los 3 base los crea farmacia-service).
  *  - 1 solicitud en cada estado: pendiente_asignacion, cita_asignada,
  *    en_atencion, completada, cancelada (con sus visitas y
@@ -47,12 +48,18 @@ const USUARIOS = [
 ];
 
 const PACIENTES = [
-  { nombres: 'Rosa',    apellidos: 'Gomez Cruz',    fechaNacimiento: '1938-04-22', genero: 'F', dpi: '1111111110101', telefono: '55551111', familiarEmail: 'familia.gomez@example.com',    padecimientos: 'Diabetes, hipertension' },
-  { nombres: 'Pedro',   apellidos: 'Lopez Mendez',  fechaNacimiento: '1942-02-15', genero: 'M', dpi: '2222222220101', telefono: '55552222', familiarEmail: 'familia.lopez@example.com',    padecimientos: 'Artritis' },
-  { nombres: 'Dolores', apellidos: 'Herrera Diaz',  fechaNacimiento: '1935-11-05', genero: 'F', dpi: '3333333330101', telefono: '55553333', familiarEmail: 'familia.herrera@example.com',  padecimientos: 'Alzheimer temprano' },
-  { nombres: 'Esteban', apellidos: 'Castillo Luna', fechaNacimiento: '1947-07-30', genero: 'M', dpi: '4444444440101', telefono: '55554444', familiarEmail: 'familia.castillo@example.com', padecimientos: 'EPOC' },
-  { nombres: 'Lucia',   apellidos: 'Morales Paz',   fechaNacimiento: '1940-09-18', genero: 'F', dpi: '5555555550101', telefono: '55555555', familiarEmail: 'familia.morales@example.com',  padecimientos: 'Osteoporosis' },
-  { nombres: 'Hector',  apellidos: 'Rodas Soto',    fechaNacimiento: '1933-01-10', genero: 'M', dpi: '6666666660101', telefono: '55556666', familiarEmail: 'familia.rodas@example.com',    padecimientos: 'Parkinson leve' }
+  { nombres: 'Rosa',    apellidos: 'Gomez Cruz',    fechaNacimiento: '1938-04-22', genero: 'F', dpi: '1111111110101', telefono: '55551111', familiarEmail: 'familia.gomez@example.com',    padecimientos: 'Diabetes, hipertension',
+    familiar: { nombres: 'Carmen', apellidos: 'Gomez Ruiz', dpi: '1111111110201', parentesco: 'hija', telefono: '55551111', email: 'familia.gomez@example.com', direccion: 'Mazatenango, Suchitepequez' } },
+  { nombres: 'Pedro',   apellidos: 'Lopez Mendez',  fechaNacimiento: '1942-02-15', genero: 'M', dpi: '2222222220101', telefono: '55552222', familiarEmail: 'familia.lopez@example.com',    padecimientos: 'Artritis',
+    familiar: { nombres: 'Luis', apellidos: 'Lopez Arana', dpi: '2222222220201', parentesco: 'hijo', telefono: '55552222', email: 'familia.lopez@example.com', direccion: 'Mazatenango, Suchitepequez' } },
+  { nombres: 'Dolores', apellidos: 'Herrera Diaz',  fechaNacimiento: '1935-11-05', genero: 'F', dpi: '3333333330101', telefono: '55553333', familiarEmail: 'familia.herrera@example.com',  padecimientos: 'Alzheimer temprano',
+    familiar: { nombres: 'Marta', apellidos: 'Herrera Paz', dpi: '3333333330201', parentesco: 'sobrina', telefono: '55553333', email: 'familia.herrera@example.com', direccion: 'Mazatenango, Suchitepequez' } },
+  { nombres: 'Esteban', apellidos: 'Castillo Luna', fechaNacimiento: '1947-07-30', genero: 'M', dpi: '4444444440101', telefono: '55554444', familiarEmail: 'familia.castillo@example.com', padecimientos: 'EPOC',
+    familiar: { nombres: 'Jorge', apellidos: 'Castillo Mejia', dpi: '4444444440201', parentesco: 'hijo', telefono: '55554444', email: 'familia.castillo@example.com', direccion: 'Mazatenango, Suchitepequez' } },
+  { nombres: 'Lucia',   apellidos: 'Morales Paz',   fechaNacimiento: '1940-09-18', genero: 'F', dpi: '5555555550101', telefono: '55555555', familiarEmail: 'familia.morales@example.com',  padecimientos: 'Osteoporosis',
+    familiar: { nombres: 'Ana', apellidos: 'Morales Diaz', dpi: '5555555550201', parentesco: 'hija', telefono: '55555555', email: 'familia.morales@example.com', direccion: 'Mazatenango, Suchitepequez' } },
+  { nombres: 'Hector',  apellidos: 'Rodas Soto',    fechaNacimiento: '1933-01-10', genero: 'M', dpi: '6666666660101', telefono: '55556666', familiarEmail: 'familia.rodas@example.com',    padecimientos: 'Parkinson leve',
+    familiar: { nombres: 'Rene', apellidos: 'Rodas Lima', dpi: '6666666660201', parentesco: 'nieto', telefono: '55556666', email: 'familia.rodas@example.com', direccion: 'Mazatenango, Suchitepequez' } }
 ];
 
 const MEDICAMENTOS_EXTRA = [
@@ -126,6 +133,8 @@ async function login(email, password) {
   const tokenCF = await login('coordinador@asilo.gt',    'Demo1234');
   const tokenME = await login('especialista@asilo.gt',   'Demo1234');
   const tokenLB = await login('laboratorio@asilo.gt',    'Demo1234');
+  const tokenEN = await login('enfermeria@asilo.gt',     'Demo1234');
+  const idEnfermero = (await peticion('GET', `${API.auth}/api/auth/me`, { token: tokenEN })).data?.id;
   log('tokens listos');
 
   // Para asegurar que haya una solicitud en cada estado para la demo,
@@ -161,7 +170,7 @@ async function login(email, password) {
     // 1) Crear como medico_general
     const r = await peticion('POST', `${API.pacientes}/api/solicitudes`, {
       body: { idPaciente: paciente.id, especialidad: a.especialidad,
-              motivo: `Caso demo: ${a.objetivo}` },
+              motivo: `Caso demo: ${a.objetivo}`, idEnfermero },
       token: tokenMG
     });
     if (!r.ok) { warn(`crear ${a.paciente}/${a.especialidad}: ${JSON.stringify(r.data)}`); continue; }
@@ -206,7 +215,7 @@ async function login(email, password) {
       await peticion('POST', `${API.pacientes}/api/visitas/${visita.id}/prescripciones`, {
         body: { medicamento: `${losartan.nombre} ${losartan.presentacion || ''}`.trim(),
                 dosis: '1 cada 24h', indicaciones: 'Con agua',
-                idMedicamento: losartan.id },
+                idMedicamento: losartan.id, cantidadPrescrita: 30 },
         token: tokenME
       });
     }

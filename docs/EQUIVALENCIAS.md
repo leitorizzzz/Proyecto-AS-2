@@ -24,6 +24,10 @@ minúsculas con guion bajo.
 | Desglose del cargo (consulta / laboratorio / farmacia) | `cargos_detalle.rubro` = `consulta` / `laboratorio` / `farmacia` | financiero-service |
 | Tarifa de consulta | `tarifas_servicio` con `codigo = 'consulta_especialista'` (semilla Q150.00) | financiero-service |
 | Abono / pago a un cargo | `abonos_cargo`; suma ≤ monto del cargo (`cargos_servicio.montoPagado`, CHECK) | financiero-service |
+| Familiar responsable (datos completos) | `familiares` (nombres, apellidos, dpi, parentesco, telefono, email, direccion; uno `principal` activo por paciente). `pacientes.familiarEmail` se mantiene como copia del correo del principal | pacientes-service; financiero-service lo lee como titular de la cuenta |
+| Ficha médica (1:1 con el interno) | `fichas_medicas` (`idPaciente` UNIQUE); se crea con el alta y la visita la referencia en `visitas_medicas.idFichaMedica` | pacientes-service |
+| Enfermero(a) que acompaña la solicitud | `solicitudes_referencia.idEnfermero` (usuario activo con rol `enfermero`) | pacientes-service |
+| Notificación interna al personal | `avisos` (tipo `cita_asignada`, al médico general y al enfermero de la solicitud); `GET /api/avisos` | pacientes-service |
 | Log de notificaciones | `notificaciones` | notificaciones-service |
 | Bitácora de auditoría | `auditoria` | la escriben auth, pacientes, farmacia y financiero; la lee reportes |
 | Usuario del sistema | `usuarios` | auth-service |

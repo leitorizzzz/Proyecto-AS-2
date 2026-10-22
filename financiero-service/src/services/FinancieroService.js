@@ -4,6 +4,7 @@ const Donante = require('../models/Donante');
 const Donacion = require('../models/Donacion');
 const GastoOperativo = require('../models/GastoOperativo');
 const PagoFundacion = require('../models/PagoFundacion');
+const { asegurarTitularCompleto } = require('./reglasCuenta');
 
 /**
  * CAPA DE LOGICA DE NEGOCIO
@@ -13,10 +14,11 @@ const PagoFundacion = require('../models/PagoFundacion');
  * - Alerta de saldo cuando supera un umbral configurable.
  */
 class FinancieroService {
-  constructor(cuentaRepo, donanteRepo, movimientosRepo) {
+  constructor(cuentaRepo, donanteRepo, movimientosRepo, familiarRepo) {
     this.cuentaRepo = cuentaRepo;
     this.donanteRepo = donanteRepo;
     this.movimientosRepo = movimientosRepo;
+    this.familiarRepo = familiarRepo;
     this.umbralAlerta = Number(process.env.UMBRAL_ALERTA_SALDO || 1000);
   }
 
@@ -31,8 +33,9 @@ class FinancieroService {
     ]);
     const saldoTotal = this._r(saldoCargos + saldoCuotas);
     const alerta = this.generarAlertaSaldo(saldoTotal);
+    const familiar = this.familiarRepo ? await this.familiarRepo.obtenerPrincipal(idPaciente) : null;
     return { idPaciente, saldoCargos: this._r(saldoCargos), saldoCuotas: this._r(saldoCuotas),
-             saldoTotal, alerta, cargos, cuotas };
+             saldoTotal, alerta, familiar, cargos, cuotas };
   }
 
   async generarCargo({ idPaciente, concepto, monto }) {
@@ -41,8 +44,12 @@ class FinancieroService {
       throw Object.assign(new Error('concepto es requerido'), { status: 400 });
     if (monto == null || Number(monto) <= 0)
       throw Object.assign(new Error('monto debe ser mayor a 0'), { status: 400 });
+    // Caso 20: la cuenta es del familiar responsable; debe estar completo.
+    const titular = asegurarTitularCompleto(
+      this.familiarRepo ? await this.familiarRepo.obtenerPrincipal(Number(idPaciente)) : null, idPaciente);
 
     return this.cuentaRepo.guardarCargo(new CargoServicio({
+      idFamiliar: titular.id,
       idPaciente: Number(idPaciente),
       concepto: String(concepto).trim(),
       monto: Number(monto),
@@ -89,6 +96,8 @@ class FinancieroService {
       throw Object.assign(new Error('idPaciente, mes y anio son requeridos'), { status: 400 });
     if (Number(mes) < 1 || Number(mes) > 12)
       throw Object.assign(new Error('mes debe estar entre 1 y 12'), { status: 400 });
+    asegurarTitularCompleto(
+      this.familiarRepo ? await this.familiarRepo.obtenerPrincipal(Number(idPaciente)) : null, idPaciente);
 
     // Crear cuota si no existe (idempotente para el (idPaciente,mes,anio))
     let cuota = await this.cuentaRepo.obtenerCuota(Number(idPaciente), Number(mes), Number(anio));

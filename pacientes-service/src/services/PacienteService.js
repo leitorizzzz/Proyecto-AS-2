@@ -1,4 +1,5 @@
 const Paciente = require('../models/Paciente');
+const { asegurarFamiliarCompleto } = require('./reglasFamiliar');
 
 const GENEROS_VALIDOS = ['M', 'F', 'Otro'];
 const DPI_REGEX = /^\d{13}$/; // DPI de Guatemala: 13 digitos
@@ -8,13 +9,27 @@ const DPI_REGEX = /^\d{13}$/; // DPI de Guatemala: 13 digitos
  * Validaciones y reglas del dominio de pacientes.
  */
 class PacienteService {
-  constructor(pacienteRepository) {
+  constructor(pacienteRepository, familiarRepository) {
     this.repo = pacienteRepository;
+    this.familiarRepo = familiarRepository;
   }
 
   /** Por defecto solo activos. El controlador decide quien puede ver inactivos. */
-  listar({ incluirInactivos = false } = {}) {
-    return this.repo.obtenerTodos({ incluirInactivos });
+  async listar({ incluirInactivos = false } = {}) {
+    const pacientes = await this.repo.obtenerTodos({ incluirInactivos });
+    if (!this.familiarRepo) return pacientes;
+    const familiares = await this.familiarRepo.principalesDe(pacientes.map(p => p.id));
+    return pacientes.map(p => ({ ...p, familiar: familiares.find(f => f.idPaciente === p.id) || null }));
+  }
+
+  /** Paciente con su familiar responsable principal y su ficha medica. */
+  async obtenerDetalle(id) {
+    const paciente = await this.obtener(id);
+    const [familiar, ficha] = await Promise.all([
+      this.familiarRepo ? this.familiarRepo.obtenerPrincipal(id) : null,
+      this.repo.obtenerFicha ? this.repo.obtenerFicha(id) : null
+    ]);
+    return { ...paciente, familiar, ficha };
   }
 
   async obtener(id) {
@@ -50,12 +65,25 @@ class PacienteService {
         : 'Ya existe un paciente con ese DPI');
     }
 
-    const paciente = new Paciente(datos);
-    return this.repo.guardar(paciente);
+    // Caso 5: el alta exige el familiar responsable con datos completos
+    // (caso 20); su correo es el que recibe los avisos de solicitudes.
+    const familiar = asegurarFamiliarCompleto(datos.familiar);
+    const paciente = new Paciente({ ...datos, familiarEmail: familiar.email });
+    const creado = await this.repo.guardarConFamiliar(paciente, familiar);
+    return this.obtenerDetalle(creado.id);
+  }
+
+  /** Alta o correccion del familiar responsable principal (datos completos). */
+  async actualizarFamiliar(id, datos) {
+    await this.obtener(id);
+    const familiar = asegurarFamiliarCompleto(datos);
+    await this.familiarRepo.guardarPrincipal(id, familiar);
+    await this.repo.actualizarFamiliarEmail(id, familiar.email);
+    return this.obtenerDetalle(id);
   }
 
   async actualizar(id, datos) {
-    await this.obtener(id);
+    const actual = await this.obtener(id);
     this._validar(datos);
 
     const conMismoDpi = await this.repo.obtenerPorDpi(datos.dpi);
@@ -63,7 +91,10 @@ class PacienteService {
       throw new Error('Ya existe otro paciente con ese DPI');
     }
 
-    const paciente = new Paciente({ ...datos, id });
+    // El correo de avisos sale del familiar responsable (PUT /:id/familiar);
+    // si la edicion no lo trae, se conserva.
+    const paciente = new Paciente({ ...datos, id,
+      familiarEmail: datos.familiarEmail !== undefined ? datos.familiarEmail : actual.familiarEmail });
     return this.repo.actualizar(id, paciente);
   }
 

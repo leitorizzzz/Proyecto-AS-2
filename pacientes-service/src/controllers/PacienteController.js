@@ -32,7 +32,7 @@ class PacienteController {
 
   obtener = async (req, res) => {
     try {
-      const paciente = await this.service.obtener(Number(req.params.id));
+      const paciente = await this.service.obtenerDetalle(Number(req.params.id));
       res.json(paciente);
     } catch (error) {
       res.status(404).json({ error: error.message });
@@ -41,11 +41,11 @@ class PacienteController {
 
   crear = async (req, res) => {
     try {
-      const nuevo = await this.service.registrar(req.body);
+      const nuevo = await this.service.registrar(req.body || {});
       await this._auditar(req, 'crear', 'paciente', nuevo.id, `${nuevo.nombres} ${nuevo.apellidos}`, null, nuevo);
       res.status(201).json(nuevo);
     } catch (error) {
-      res.status(400).json({ error: error.message });
+      res.status(error.status || 400).json({ error: error.message, ...(error.camposFaltantes ? { camposFaltantes: error.camposFaltantes } : {}) });
     }
   };
 
@@ -57,6 +57,19 @@ class PacienteController {
       res.json(actualizado);
     } catch (error) {
       res.status(400).json({ error: error.message });
+    }
+  };
+
+  /** PUT /api/pacientes/:id/familiar: familiar responsable principal. */
+  actualizarFamiliar = async (req, res) => {
+    try {
+      const antes = await this.service.obtenerDetalle(Number(req.params.id));
+      const p = await this.service.actualizarFamiliar(Number(req.params.id), req.body || {});
+      await this._auditar(req, 'modificar', 'familiar', p.familiar.id,
+        `familiar de ${p.nombres} ${p.apellidos}`, antes.familiar, p.familiar);
+      res.json(p);
+    } catch (error) {
+      res.status(error.status || 400).json({ error: error.message, ...(error.camposFaltantes ? { camposFaltantes: error.camposFaltantes } : {}) });
     }
   };
 

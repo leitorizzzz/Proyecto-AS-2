@@ -19,7 +19,8 @@ class VisitaMedica {
     estado,
     fechaCompletada,
     costoLaboratorio,
-    costoFarmacia
+    costoFarmacia,
+    idFichaMedica
   }) {
     this.id = id || null;
     this.idSolicitudReferencia = idSolicitudReferencia;
@@ -32,6 +33,7 @@ class VisitaMedica {
     this.fechaCompletada = fechaCompletada || null;
     this.costoLaboratorio = Number(costoLaboratorio || 0);
     this.costoFarmacia = Number(costoFarmacia || 0);
+    this.idFichaMedica = idFichaMedica ?? null;   // caso 13
     this.examenes = [];         // se llena desde el service al leer
     this.prescripciones = [];   // se llena desde el service al leer
   }

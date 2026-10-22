@@ -2,6 +2,7 @@ const VisitaMedica = require('../models/VisitaMedica');
 const SolicitudReferencia = require('../models/SolicitudReferencia');
 const CargoVisita = require('../models/CargoVisita');
 const { asegurarPacienteActivo } = require('./reglasPaciente');
+const { asegurarFamiliarCompleto } = require('./reglasFamiliar');
 
 /**
  * CAPA DE LOGICA DE NEGOCIO
@@ -54,9 +55,12 @@ class VisitaMedicaService {
       );
     }
 
+    // Caso 13: la visita queda vinculada a la ficha medica (1:1 con el paciente).
+    const ficha = await this.pacienteRepo.asegurarFicha(solicitud.idPaciente);
     const visita = new VisitaMedica({
       idSolicitudReferencia: solicitud.id,
       idPaciente: solicitud.idPaciente,
+      idFichaMedica: ficha ? ficha.id : null,
       idMedicoEspecialista,
       estado: VisitaMedica.ESTADOS.EN_ATENCION
     });
@@ -161,7 +165,18 @@ class VisitaMedicaService {
    * Falla cerrado: sin tarifa o con un examen sin precio no se cierra la
    * visita (no se cobra en cero en silencio).
    */
-  construirCargoVisita({ visita, tarifa, examenes = [], dispensaciones = [], familiar = null }) {
+  construirCargoVisita({ visita, tarifa, examenes = [], dispensaciones = [], familiar = null, exigirFamiliar = true }) {
+    // Caso 20: el cargo va a la cuenta del familiar responsable, que debe
+    // tener datos completos. Sin el, la visita no se cierra.
+    if (exigirFamiliar) {
+      if (!familiar) {
+        throw Object.assign(
+          new Error('El paciente no tiene familiar responsable registrado: registrelo antes de cerrar la visita'),
+          { status: 409 }
+        );
+      }
+      asegurarFamiliarCompleto(familiar, 'no se puede generar el cargo de la visita');
+    }
     if (!tarifa || !(Number(tarifa.precioBase) > 0)) {
       throw Object.assign(
         new Error("No hay tarifa de consulta configurada ('consulta_especialista'); no se puede generar el cargo de la visita"),

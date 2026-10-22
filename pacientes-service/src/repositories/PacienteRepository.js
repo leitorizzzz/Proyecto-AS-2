@@ -1,5 +1,7 @@
 const { sql, getPool } = require('./database');
 const Paciente = require('../models/Paciente');
+const FichaMedica = require('../models/FichaMedica');
+const FamiliarRepository = require('./FamiliarRepository');
 
 /**
  * CAPA DE ACCESO A DATOS (Patron Repositorio)
@@ -44,6 +46,70 @@ class PacienteRepository {
       .input('dpi', sql.NVarChar(20), dpi)
       .query('SELECT * FROM pacientes WHERE dpi = @dpi');
     return result.recordset[0] ? new Paciente(result.recordset[0]) : null;
+  }
+
+  /**
+   * Alta del interno (caso 5) en UNA transaccion: paciente + familiar
+   * responsable principal + ficha medica 1:1. Si algo falla, no queda nada.
+   */
+  async guardarConFamiliar(paciente, familiar) {
+    const pool = await getPool();
+    const tx = new sql.Transaction(pool);
+    await tx.begin();
+    try {
+      const id = (await this._bind(new sql.Request(tx), paciente).query(`
+        INSERT INTO pacientes
+          (nombres, apellidos, fechaNacimiento, genero, dpi,
+           direccion, telefono, contactoEmergencia, familiarEmail, padecimientos)
+        OUTPUT INSERTED.id
+        VALUES
+          (@nombres, @apellidos, @fechaNacimiento, @genero, @dpi,
+           @direccion, @telefono, @contactoEmergencia, @familiarEmail, @padecimientos)
+      `)).recordset[0].id;
+      await new FamiliarRepository().guardarPrincipal(id, familiar, tx);
+      await new sql.Request(tx)
+        .input('idPaciente', sql.Int, id)
+        .input('antecedentes', sql.NVarChar(sql.MAX), paciente.padecimientos || null)
+        .query('INSERT INTO fichas_medicas (idPaciente, antecedentes) VALUES (@idPaciente, @antecedentes)');
+      await tx.commit();
+      return this.obtenerPorId(id);
+    } catch (err) {
+      await tx.rollback().catch(() => {});
+      throw err;
+    }
+  }
+
+  async actualizarFamiliarEmail(id, email) {
+    const pool = await getPool();
+    await pool.request().input('id', sql.Int, id).input('email', sql.NVarChar(200), email)
+      .query('UPDATE pacientes SET familiarEmail = @email WHERE id = @id');
+  }
+
+  async obtenerFicha(idPaciente) {
+    const pool = await getPool();
+    const r = await pool.request().input('idPaciente', sql.Int, idPaciente)
+      .query('SELECT * FROM fichas_medicas WHERE idPaciente = @idPaciente');
+    return r.recordset[0] ? new FichaMedica(r.recordset[0]) : null;
+  }
+
+  /**
+   * Devuelve la ficha del paciente y la crea si no existe (pacientes dados de
+   * alta antes de que hubiera fichas). El UNIQUE garantiza que sea 1:1
+   * aunque dos peticiones lleguen a la vez.
+   */
+  async asegurarFicha(idPaciente) {
+    const existente = await this.obtenerFicha(idPaciente);
+    if (existente) return existente;
+    const pool = await getPool();
+    try {
+      await pool.request().input('idPaciente', sql.Int, idPaciente).query(`
+        INSERT INTO fichas_medicas (idPaciente, antecedentes)
+        SELECT id, padecimientos FROM pacientes WHERE id = @idPaciente
+      `);
+    } catch (err) {
+      if (err.number !== 2627 && err.number !== 2601) throw err;
+    }
+    return this.obtenerFicha(idPaciente);
   }
 
   async guardar(paciente) {

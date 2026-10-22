@@ -36,7 +36,9 @@ function crearRepoMock(visita) {
       const cargo = calcularCargo({
         visita,
         tarifa: { codigo: 'consulta_especialista', descripcion: 'Consulta', precioBase: 150 },
-        examenes: [], dispensaciones: []
+        examenes: [], dispensaciones: [],
+        familiar: { id: 1, nombres: 'Ana', apellidos: 'G', dpi: '1234567890123', parentesco: 'hija',
+                    telefono: '55551234', email: 'a@example.com', direccion: 'Mazatenango' }
       });
       cargo.id = 77;
       return { visita: { ...visita, estado: VisitaMedica.ESTADOS.COMPLETADA }, cargo };
