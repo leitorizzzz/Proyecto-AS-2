@@ -1,4 +1,4 @@
-const bcrypt = require('bcryptjs');
+const HashPool = require('./hashPool');
 const jwt = require('jsonwebtoken');
 const Usuario = require('../models/Usuario');
 
@@ -22,8 +22,10 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * login (verificacion + emision de JWT) y validacion de tokens.
  */
 class AuthService {
-  constructor(usuarioRepository) {
+  constructor(usuarioRepository, hasher = AuthService.hasherCompartido()) {
     this.usuarioRepo = usuarioRepository;
+    // bcrypt en hilos de trabajo (caso 25); mismo algoritmo y costo.
+    this.hasher = hasher;
     this.jwtSecret = process.env.JWT_SECRET;
     this.jwtExpiresIn = process.env.JWT_EXPIRES_IN || '8h';
     if (!this.jwtSecret) {
@@ -42,7 +44,7 @@ class AuthService {
     const existente = await this.usuarioRepo.obtenerPorEmail(email);
     if (existente) throw new Error('Ya existe un usuario con ese email');
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await this.hasher.hash(password, 10);
     const usuario = new Usuario({ nombre, email, passwordHash, rol });
     const creado = await this.usuarioRepo.guardar(usuario);
     return creado.toPublic();
@@ -54,7 +56,7 @@ class AuthService {
     const usuario = await this.usuarioRepo.obtenerPorEmail(email);
     if (!usuario) throw new Error('Credenciales invalidas');
 
-    const ok = await bcrypt.compare(password, usuario.passwordHash);
+    const ok = await this.hasher.compare(password, usuario.passwordHash);
     if (!ok) throw new Error('Credenciales invalidas');
     // Se valida despues de la password para no revelar que la cuenta existe.
     if (usuario.activo === false) {
@@ -115,5 +117,10 @@ class AuthService {
     return usuario.toPublic();
   }
 }
+
+AuthService.hasherCompartido = () => {
+  if (!AuthService._pool) AuthService._pool = new HashPool();
+  return AuthService._pool;
+};
 
 module.exports = AuthService;

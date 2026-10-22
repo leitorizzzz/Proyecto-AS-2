@@ -8,6 +8,7 @@
     "test": "jest --runInBand",
     "test:ci": "jest --runInBand --silent --json --outputFile=docs/jest-report.json",
     "test:e2e": "node scripts/e2e-smoke.js",
+    "test:carga": "node scripts/carga.js",
     "seed:demo": "node scripts/seed-demo.js"
   },
   "devDependencies": {
