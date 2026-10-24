@@ -54,6 +54,8 @@ const solicitudController = new SolicitudController(solicitudService, auditoriaS
 const visitaController = new VisitaMedicaController(visitaService, auditoriaService);
 
 const app = express();
+// Caso 24: req.ip = IP real del cliente cuando llega por el nginx del frontend.
+app.set('trust proxy', require('./middleware/confianzaProxy')());
 app.use(cors());
 app.use(express.json());
 

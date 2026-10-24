@@ -33,8 +33,8 @@ describe('AuditoriaService (escritor)', () => {
     expect(JSON.parse(r.datosNuevosJson())).toEqual({ activo: false });
   });
 
-  test('contextoDe toma la IP de X-Forwarded-For (primera) y quita el prefijo ::ffff:', () => {
-    expect(AuditoriaService.contextoDe({ usuario, headers: { 'x-forwarded-for': '200.1.2.3, 10.0.0.1' } }, 'farmacia'))
+  test('contextoDe usa req.ip (ya resuelto por trust proxy), no X-Forwarded-For crudo; quita ::ffff:', () => {
+    expect(AuditoriaService.contextoDe({ usuario, ip: '200.1.2.3', headers: { 'x-forwarded-for': '6.6.6.6' } }, 'farmacia'))
       .toEqual({ usuario, ip: '200.1.2.3', modulo: 'farmacia' });
     expect(AuditoriaService.contextoDe({ usuario, headers: {}, socket: { remoteAddress: '::ffff:172.18.0.1' } }, 'visitas').ip)
       .toBe('172.18.0.1');
@@ -85,7 +85,7 @@ describe('PacienteController registra auditoria', () => {
     };
     const auditoria = { registrar: jest.fn(async () => ({})) };
     const res = resMock();
-    const req = { params: { id: '12' }, usuario, headers: { 'x-forwarded-for': '190.5.5.5' } };
+    const req = { params: { id: '12' }, usuario, ip: '190.5.5.5', headers: {} };
     await new PacienteController(service, auditoria).desactivar(req, res);
     expect(res.body).toMatchObject({ id: 12, activo: false });
     expect(auditoria.registrar).toHaveBeenCalledWith(

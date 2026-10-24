@@ -193,8 +193,15 @@ También sirve **`GET /api/auditoria`** (solo admin, solo lectura):
 - Tabla compartida `auditoria` (id, usuario = email del JWT, idUsuario,
   accion, entidad, idEntidad, detalle, fecha UTC, y desde el caso 24
   `ip`, `modulo`, `datosAnteriores`/`datosNuevos` en JSON sin
-  password/hash/token). Con Docker Desktop la IP que se ve es la del
-  gateway de Docker (172.18.0.1). La crean auth,
+  password/hash/token). **IP real (23 oct)**: el navegador llama a los
+  servicios por el nginx del frontend (`/svc/<servicio>/...`), que envía
+  `X-Real-IP` y `X-Forwarded-For`; auth, pacientes, farmacia y financiero
+  tienen `trust proxy` solo para ese nginx (`middleware/confianzaProxy.js`,
+  `TRUST_PROXY_HOST=frontend`) y `contextoDe` usa `req.ip`. Un
+  `X-Forwarded-For` mandado directo al puerto se ignora. En el servidor
+  Debian el nginx recibe la IP real del navegador (Tailscale o LAN), así
+  que esa es la que queda auditada; en Docker Desktop (Windows) todo el
+  tráfico del host llega como el gateway 172.18.0.1. La crean auth,
   pacientes, farmacia y financiero al arrancar (DDL que tolera la carrera,
   errores 2714/1913) y la escriben desde sus **controladores** con
   `AuditoriaService` — copia idéntica de `RegistroAuditoria` +

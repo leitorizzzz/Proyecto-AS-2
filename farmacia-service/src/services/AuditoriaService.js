@@ -16,10 +16,12 @@ class AuditoriaService {
   /**
    * Contexto de la peticion para la auditoria: usuario del JWT, IP del
    * cliente y modulo del sistema. Funcion pura sobre el objeto request.
+   * La IP es req.ip: Express ya aplico 'trust proxy' (middleware/
+   * confianzaProxy.js), asi que detras del nginx es la IP real del cliente
+   * y un X-Forwarded-For enviado directo al puerto no se toma en cuenta.
    */
   static contextoDe(req, modulo) {
-    const reenviada = String(req?.headers?.['x-forwarded-for'] || '').split(',')[0].trim();
-    const ip = (reenviada || req?.ip || req?.socket?.remoteAddress || '').replace(/^::ffff:/, '') || null;
+    const ip = String(req?.ip || req?.socket?.remoteAddress || '').replace(/^::ffff:/, '') || null;
     return { usuario: req?.usuario || null, ip, modulo };
   }
 

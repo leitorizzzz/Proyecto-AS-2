@@ -10,20 +10,16 @@
  * ============================================================ */
 
 /* ---------- Configuracion de endpoints ----------
-   Los microservicios estan en el mismo host que sirve este HTML.
-   Cuando el frontend corre en 8090 dentro de docker-compose y el
-   navegador ve localhost:8090, cada servicio se alcanza en su
-   puerto publicado. En prod (Debian) el HOST es el mismo. */
+   La pagina llama a los microservicios por el nginx que la sirve
+   (/svc/<servicio>/..., mismo origen). Asi nginx reenvia la IP real del
+   navegador y la auditoria la registra (caso 24). Solo si la pagina se
+   abre fuera de nginx (file://) se usan los puertos publicados. */
 const HOST = window.location.hostname || 'localhost';
-const API = {
-  auth:            `http://${HOST}:3000`,
-  farmacia:        `http://${HOST}:3001`,
-  pacientes:       `http://${HOST}:3002`,
-  laboratorio:     `http://${HOST}:3003`,
-  financiero:      `http://${HOST}:3004`,
-  reportes:        `http://${HOST}:3005`,
-  notificaciones:  `http://${HOST}:3006`
-};
+const POR_NGINX = window.location.protocol.startsWith('http');
+const PUERTOS = { auth: 3000, farmacia: 3001, pacientes: 3002, laboratorio: 3003,
+                  financiero: 3004, reportes: 3005, notificaciones: 3006 };
+const API = Object.fromEntries(Object.entries(PUERTOS).map(([svc, puerto]) =>
+  [svc, POR_NGINX ? `${window.location.origin}/svc/${svc}` : `http://${HOST}:${puerto}`]));
 
 /* ---------- Estado global (minimo) ---------- */
 const state = {

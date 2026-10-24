@@ -45,6 +45,8 @@ const PUERTOS = {
 const API = Object.fromEntries(
   Object.entries(PUERTOS).map(([k, v]) => [k, `http://${BASE_HOST}:${v}`])
 );
+// Mismos servicios a traves del nginx del frontend (como los usa el navegador).
+const NGINX = `http://${BASE_HOST}:${process.env.PUERTO_FRONTEND || 8090}/svc`;
 const ADMIN = {
   email: process.env.ADMIN_EMAIL || 'admin@asilo.gt',
   password: process.env.ADMIN_PASSWORD || 'Admin12345'
@@ -677,6 +679,36 @@ function familiarE2E(dpi) {
     const cre = filas.find(f => f.accion === 'crear');
     if (cre.datosAnteriores !== null || cre.datosNuevos?.id !== pacB.id) throw new Error('crear sin datosNuevos');
     ok(`${acciones}; ip=${des.ip} modulo=${des.modulo} activo true -> false`);
+  } catch (e) { falla(e.message); }
+
+  // Caso 24: por el nginx la auditoria guarda la IP del cliente tal como la
+  // ve nginx (la misma que ve el servicio en una llamada directa), nunca la
+  // del contenedor de nginx ni un X-Forwarded-For inventado.
+  paso('caso 24: por el nginx se audita la IP del cliente; X-Forwarded-For inventado se ignora');
+  try {
+    const falsa = '203.0.113.66';
+    const modificar = async (base, telefono) => {
+      const r = await fetch(`${base}/api/pacientes/${pacB.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}`, 'X-Forwarded-For': falsa },
+        body: JSON.stringify({ ...pacB, telefono })
+      });
+      if (r.status !== 200) throw new Error(`PUT por ${base} -> ${r.status} ${await r.text()}`);
+    };
+    await modificar(`${NGINX}/pacientes`, '55550101');
+    await modificar(API.pacientes, '55550102');
+    const desde = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const qs = `desde=${encodeURIComponent(desde)}&entidad=paciente&idEntidad=${pacB.id}`;
+    const filas = (await req('GET', `${NGINX}/reportes/api/auditoria?${qs}`, { token: adminToken, esperarStatus: 200 })).data
+      .filter(f => f.accion === 'modificar');
+    const porNginx = filas.find(f => f.datosNuevos?.telefono === '55550101');
+    const directo = filas.find(f => f.datosNuevos?.telefono === '55550102');
+    if (!porNginx || !directo) throw new Error('no encontre las dos modificaciones en la auditoria');
+    if (porNginx.ip === falsa || directo.ip === falsa) throw new Error('se registro la IP inventada');
+    if (!porNginx.ip || porNginx.ip !== directo.ip) {
+      throw new Error(`ip por nginx=${porNginx.ip} directa=${directo.ip}: se esta guardando la IP del proxy`);
+    }
+    ok(`por nginx y directo: ip=${porNginx.ip} (la del cliente); ${falsa} ignorada`);
   } catch (e) { falla(e.message); }
 
   paso('auditoria: dispensacion, visita y solicitud registradas; RBAC y validacion');

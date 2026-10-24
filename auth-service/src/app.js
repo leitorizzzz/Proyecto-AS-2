@@ -18,6 +18,8 @@ const auditoriaService = new AuditoriaService(new AuditoriaRepository());
 const authController = new AuthController(authService, auditoriaService);
 
 const app = express();
+// Caso 24: req.ip = IP real del cliente cuando llega por el nginx del frontend.
+app.set('trust proxy', require('./middleware/confianzaProxy')());
 app.use(cors());
 app.use(express.json());
 
