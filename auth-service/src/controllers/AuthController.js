@@ -63,7 +63,7 @@ class AuthController {
       await this._auditar(req, 'crear', 'usuario', usuario.id, `${usuario.email} (${usuario.rol})`, null, usuario);
       res.status(201).json(usuario);
     } catch (error) {
-      res.status(400).json({ error: error.message });
+      res.status(error.status || 400).json({ error: error.message });
     }
   };
 
@@ -106,6 +106,16 @@ class AuthController {
       const u = await this.service.reactivarUsuario(Number(req.params.id));
       await this._auditar(req, 'reactivar', 'usuario', u.id, u.email, antes, u);
       res.json(u);
+    } catch (error) {
+      res.status(error.status || 500).json({ error: error.message });
+    }
+  };
+
+  cambiarPassword = async (req, res) => {
+    try {
+      const usuario = await this.service.cambiarPassword(req.usuario.sub, req.body || {});
+      await this._auditar(req, 'modificar', 'usuario', usuario.id, 'contrasena cambiada por el propio usuario');
+      res.json({ mensaje: 'Contraseña actualizada.' });
     } catch (error) {
       res.status(error.status || 500).json({ error: error.message });
     }

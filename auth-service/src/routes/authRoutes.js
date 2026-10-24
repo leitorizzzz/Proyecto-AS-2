@@ -15,6 +15,8 @@ function crearRutasAuth(authController) {
   router.post('/recuperar', authController.recuperar);
   router.post('/restablecer', authController.restablecer);
   router.get('/me', autenticar, authController.me);
+  // Cambio de contrasena del propio usuario (misma regla que alta y restablecer).
+  router.post('/cambiar-password', autenticar, authController.cambiarPassword);
 
   // Directorio de personal (sin passwordHash). Lo usan coordinacion, para
   // elegir el especialista al asignar una cita, y el medico general, para

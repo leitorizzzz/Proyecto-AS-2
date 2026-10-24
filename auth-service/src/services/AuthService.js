@@ -113,6 +113,24 @@ class AuthService {
     return (await this.usuarioRepo.cambiarActivo(usuario.id, true)).toPublic();
   }
 
+  /**
+   * Cambio de contrasena por el propio usuario (con sesion): exige la
+   * actual y la nueva cumple la misma regla que el alta (reglasPassword.js).
+   */
+  async cambiarPassword(idUsuario, { passwordActual, passwordNueva } = {}) {
+    const usuario = await this.usuarioRepo.obtenerPorId(Number(idUsuario));
+    if (!usuario || usuario.activo === false) throw Object.assign(new Error('Usuario no encontrado'), { status: 404 });
+    if (!passwordActual || !await this.hasher.compare(String(passwordActual), usuario.passwordHash)) {
+      throw Object.assign(new Error('La contraseña actual no es correcta.'), { status: 400 });
+    }
+    validarPassword(passwordNueva);
+    if (passwordNueva === passwordActual) {
+      throw Object.assign(new Error('La contraseña nueva debe ser distinta de la actual.'), { status: 400 });
+    }
+    await this.usuarioRepo.actualizarPassword(usuario.id, await this.hasher.hash(passwordNueva, 10));
+    return usuario.toPublic();
+  }
+
   async obtenerPerfil(idUsuario) {
     const usuario = await this.usuarioRepo.obtenerPorId(idUsuario);
     if (!usuario) throw new Error('Usuario no encontrado');

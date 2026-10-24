@@ -70,11 +70,11 @@
     <form class="login-card hidden" id="formRestablecer">
       <div class="eyebrow">Acceso del personal</div>
       <h2>Nueva contraseña</h2>
-      <p class="sub">Escriba su nueva contraseña (mínimo 6 caracteres).</p>
+      <p class="sub">Escriba su nueva contraseña: mínimo 8 caracteres, con al menos una letra y un número.</p>
       <label for="resPassword">Nueva contraseña</label>
-      <input type="password" id="resPassword" required minlength="6" autocomplete="new-password">
+      <input type="password" id="resPassword" required minlength="8" autocomplete="new-password">
       <label for="resPassword2">Repita la contraseña</label>
-      <input type="password" id="resPassword2" required minlength="6" autocomplete="new-password">
+      <input type="password" id="resPassword2" required minlength="8" autocomplete="new-password">
       <button type="submit" class="btn wide" id="btnRestablecer">Guardar contraseña</button>
       <div id="msgRestablecer" role="status" aria-live="polite"></div>
       <p class="olvide"><button type="button" class="btn-link" data-volver-login>Volver a iniciar sesión</button></p>
@@ -880,11 +880,11 @@
         </div>
         <div class="card">
           <h3>Nueva cuenta</h3>
-          <p class="hint">La contraseña inicial la comunica administración; mínimo 6 caracteres.</p>
+          <p class="hint">La contraseña inicial la comunica administración; mínimo 8 caracteres, con al menos una letra y un número.</p>
           <form id="formUsuario">
             <label for="uNombre">Nombre</label><input id="uNombre" required>
             <label for="uEmail">Correo</label><input id="uEmail" type="email" required placeholder="nombre@asilo.gt">
-            <label for="uPassword">Contraseña inicial</label><input id="uPassword" type="password" minlength="6" required autocomplete="new-password">
+            <label for="uPassword">Contraseña inicial</label><input id="uPassword" type="password" minlength="8" required autocomplete="new-password">
             <label for="uRol">Rol</label>
             <select id="uRol" required>
               <option value="enfermero">Enfermería</option>

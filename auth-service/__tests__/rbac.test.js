@@ -22,6 +22,7 @@ function app() {
     desactivarUsuario: (_r, res) => res.json({}),
     reactivarUsuario: (_r, res) => res.json({}),
     recuperar: (_r, res) => res.json({ mensaje: 'm' }),
+    cambiarPassword: (_r, res) => res.json({ mensaje: 'm' }),
     restablecer: (_r, res) => res.json({ mensaje: 'm' })
   };
   const a = express();
@@ -31,6 +32,12 @@ function app() {
 }
 
 describe('RBAC auth-service', () => {
+  test('cambiar-password exige sesion (401 sin token, 200 con token)', async () => {
+    const srv0 = app();
+    expect((await request(srv0).post('/api/auth/cambiar-password').send({})).status).toBe(401);
+    expect((await request(srv0).post('/api/auth/cambiar-password').set('Authorization', `Bearer ${tokenConRol('farmacia')}`).send({})).status).toBe(200);
+  });
+
   test('recuperar y restablecer no exigen sesion (RF-42)', async () => {
     const srv0 = app();
     expect((await request(srv0).post('/api/auth/recuperar').send({ email: 'a@b.gt' })).status).toBe(200);

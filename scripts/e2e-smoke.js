@@ -1050,6 +1050,32 @@ function familiarE2E(dpi) {
     ok(`7 reportes ${hoy}..${hoy} con registros propios; ${ayer}..${ayer} sin ellos`);
   } catch (e) { falla(e.message); }
 
+  // RF-42: regla de contrasena del Analisis (8+, letra y numero) en el alta
+  // y en el cambio; el restablecimiento lo cubre el paso siguiente.
+  paso('RF-42: contrasena de 8+ con letra y numero en alta y cambio; mensajes claros');
+  try {
+    const email = `e2e.clave.${TS}@asilo.gt`;
+    const alta = p => req('POST', `${API.auth}/api/auth/register`, {
+      body: { nombre: 'E2E Clave', email, password: p, rol: 'enfermero' }, token: adminToken });
+    for (const [p, msg] of [['Abc1234', /al menos 8 caracteres/], ['abcdefgh', /al menos un número/], ['12345678', /al menos una letra/]]) {
+      const r = await alta(p);
+      if (r.status !== 400 || !msg.test(r.data?.error)) throw new Error(`alta con "${p}" -> ${r.status} ${JSON.stringify(r.data)}`);
+    }
+    const creada = await alta('Clave2026');
+    if (creada.status !== 201) throw new Error(`alta valida -> ${creada.status}`);
+    const tk = await login(email, 'Clave2026');
+    const cambiar = body => req('POST', `${NGINX}/auth/api/auth/cambiar-password`, { body, token: tk });
+    const debil = await cambiar({ passwordActual: 'Clave2026', passwordNueva: 'nueva' });
+    if (debil.status !== 400 || !/al menos 8 caracteres/.test(debil.data?.error)) throw new Error(`cambio debil -> ${JSON.stringify(debil.data)}`);
+    const malaActual = await cambiar({ passwordActual: 'Otra2026x', passwordNueva: 'Nueva2026' });
+    if (malaActual.status !== 400) throw new Error(`actual incorrecta -> ${malaActual.status}`);
+    await req('POST', `${NGINX}/auth/api/auth/cambiar-password`, { body: { passwordActual: 'Clave2026', passwordNueva: 'Nueva2026' }, token: tk, esperarStatus: 200 });
+    await req('POST', `${NGINX}/auth/api/auth/cambiar-password`, { body: {}, esperarStatus: 401 });
+    await login(email, 'Nueva2026');
+    await req('PATCH', `${API.auth}/api/auth/usuarios/${creada.data.id}/desactivar`, { token: adminToken, esperarStatus: 200 });
+    ok(`3 altas debiles 400 con mensaje; cambio debil 400, con la actual mala 400, valido 200; login con la nueva`);
+  } catch (e) { falla(e.message); }
+
   // RF-42 / UC-10.4: recuperacion de contrasena sobre una cuenta propia.
   paso('RF-42: recuperar contrasena (misma respuesta exista o no), enlace de un uso y login con la nueva');
   try {

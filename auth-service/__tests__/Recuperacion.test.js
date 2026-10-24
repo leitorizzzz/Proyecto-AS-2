@@ -103,9 +103,9 @@ describe('Recuperacion de contrasena (RF-42)', () => {
     const { svc, hasher, notif } = nuevo();
     await svc.solicitar('ana@asilo.gt');
     await expect(svc.restablecer({ token: tokenDelEnlace(notif), password: '123' }))
-      .rejects.toMatchObject({ status: 400, message: expect.stringMatching(/al menos 6/) });
+      .rejects.toMatchObject({ status: 400, message: expect.stringMatching(/al menos 8 caracteres/) });
     await expect(new AuthService({ obtenerPorEmail: async () => null }, hasher).registrar(
-      { nombre: 'X', email: 'x@asilo.gt', password: '123', rol: 'enfermero' })).rejects.toThrow(/al menos 6/);
+      { nombre: 'X', email: 'x@asilo.gt', password: '123', rol: 'enfermero' })).rejects.toThrow(/al menos 8 caracteres/);
     await expect(svc.restablecer({ token: 'A'.repeat(43), password: 'Nueva1234' })).rejects.toMatchObject({ status: 400 });
     await expect(svc.restablecer({ token: "' OR 1=1 --", password: 'Nueva1234' })).rejects.toMatchObject({ status: 400 });
     expect(hasher.hash).not.toHaveBeenCalled();

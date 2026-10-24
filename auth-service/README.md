@@ -35,6 +35,7 @@ scripts/
 | GET    | `/api/auth/usuarios[?rol=a,b][&incluirInactivos=true]` | JWT | admin, coordinador_fundacion | Directorio sin `passwordHash`, solo cuentas activas, filtrable por uno o varios roles; rol desconocido → 400; `incluirInactivos` solo admin. Lo usa el dialogo "Asignar cita" para elegir especialista |
 | PATCH  | `/api/auth/usuarios/:id/desactivar` | JWT | admin | Desactiva la cuenta (no la propia → 409). Su login responde 403 "Cuenta desactivada" |
 | PATCH  | `/api/auth/usuarios/:id/reactivar` | JWT | admin | Reactiva la cuenta |
+| POST   | `/api/auth/cambiar-password` | JWT | — | `{ passwordActual, passwordNueva }` del propio usuario. Actual incorrecta, nueva que no cumple la regla o igual a la actual → 400 |
 | POST   | `/api/auth/recuperar`      | —    | —        | RF-42. `{ email }` → siempre el mismo 200, exista o no la cuenta. Si existe y está activa: token nuevo (vence en 30 min) y correo con el enlace por notificaciones-service. Correo mal formado → 400 |
 | POST   | `/api/auth/restablecer`    | —    | —        | RF-42. `{ token, password }` → 200 y cambia la contraseña; token falso, usado o vencido → 400; contraseña que no cumple la regla del alta → 400 |
 
@@ -42,6 +43,14 @@ Columna `usuarios.activo` (BIT, default 1). Un JWT emitido antes de
 desactivar la cuenta sigue siendo valido hasta su `exp`: los demas
 servicios solo verifican la firma. El alta y la (des)activacion de
 cuentas se registran en la tabla `auditoria`.
+
+### Regla de contraseña (Análisis, RF-42)
+
+`services/reglasPassword.js`, la única regla para el alta, el cambio y el
+restablecimiento: mínimo 8 caracteres, al menos una letra y al menos un
+número (máximo 72 bytes, el límite de bcrypt). Si no cumple, 400 con un
+mensaje que dice todo lo que falta, por ejemplo *La contraseña debe tener
+al menos 8 caracteres y al menos un número.*
 
 ### Recuperación de contraseña (RF-42, UC-10.4)
 

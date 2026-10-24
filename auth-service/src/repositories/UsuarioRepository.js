@@ -53,6 +53,14 @@ class UsuarioRepository {
     return this.obtenerPorId(id);
   }
 
+  async actualizarPassword(id, passwordHash) {
+    const pool = await getPool();
+    await pool.request()
+      .input('id', sql.Int, id)
+      .input('passwordHash', sql.NVarChar(255), passwordHash)
+      .query('UPDATE usuarios SET passwordHash = @passwordHash WHERE id = @id');
+  }
+
   async guardar(usuario) {
     const pool = await getPool();
     const result = await pool.request()

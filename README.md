@@ -107,8 +107,8 @@ Documentado en [scripts/README.md](scripts/README.md).
 
 HTTP sin HTTPS, sesiones que siguen válidas hasta 8 h tras desactivar
 una cuenta, Brevo real no verificado, comunicación mixta entre servicios
-(BD compartida + HTTP), usuario `sa` para todos los servicios, contraseñas
-de solo 6 caracteres, sin rate-limit y otras: lista completa y honesta en
+(BD compartida + HTTP), usuario `sa` para todos los servicios, sin
+rate-limit y otras: lista completa y honesta en
 [CLAUDE.md](CLAUDE.md#desviaciones-respecto-al-análisis).
 
 ## Pruebas

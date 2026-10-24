@@ -49,6 +49,12 @@ directorio sin `passwordHash` (solo cuentas activas); lo usa el diálogo
 emitido sigue válido hasta su `exp` en los demás servicios.
 **`JWT_EXPIRES_IN` solo aplica aquí** (es quien firma); los demás servicios
 solo verifican con `JWT_SECRET` y respetan el `exp` embebido en el token.
+**Contraseñas (Análisis, RF-42)**: una sola regla en
+`services/reglasPassword.js` — mínimo 8 caracteres, al menos una letra y
+un número (máx. 72 bytes, límite de bcrypt) — usada en el alta, en
+`POST /api/auth/cambiar-password` (propio usuario, exige la actual; solo
+API, sin pantalla) y en el restablecimiento. El mensaje dice en español
+todo lo que falta. Los seeds (Admin12345, Demo1234, E2eDemo1234) cumplen.
 `GET /api/auth/usuarios` también lo usa `medico_general` (elige al
 enfermero de la solicitud). **bcrypt corre en hilos de trabajo**
 (`services/hashPool.js` + `hashWorker.js`, `HASH_HILOS`): mismo algoritmo
@@ -62,7 +68,7 @@ sigue en segundo plano) y `POST /api/auth/restablecer` {token, password}.
 en `RECUPERACION_MINUTOS`=30, un solo uso con UPDATE condicional en la
 misma transacción que cambia la contraseña; pedir otro invalida los
 anteriores). La nueva contraseña usa la misma regla que el alta
-(`services/reglasPassword.js`: hoy solo mínimo 6). El correo sale por
+(`services/reglasPassword.js`: mínimo 8 caracteres, al menos una letra y un número). El correo sale por
 notificaciones-service (`POST /api/notificaciones/recuperacion`, solo JWT
 de servicio rol `sistema` firmado por auth, 1 min) con el enlace
 `RECUPERACION_URL_BASE/#restablecer=<token>`; la API de notificaciones
@@ -427,36 +433,33 @@ conocidos y aceptados para la entrega académica.
 5. **Base de datos única y usuario `sa`.** Los 7 servicios se conectan a
    SQL Server con la cuenta `sa`; no hay un usuario por servicio con
    permisos mínimos.
-6. **Contraseñas débiles permitidas.** La regla de alta y de
-   restablecimiento es solo "mínimo 6 caracteres" (sin mayúsculas,
-   números ni símbolos obligatorios).
-7. **Sin límite de intentos.** Ni el login ni `/recuperar` tienen
+6. **Sin límite de intentos.** Ni el login ni `/recuperar` tienen
    rate-limit ni bloqueo por intentos fallidos.
-8. **Token en `localStorage`.** El frontend guarda el JWT ahí (expuesto
+7. **Token en `localStorage`.** El frontend guarda el JWT ahí (expuesto
    a un XSS); no usa cookie `HttpOnly`.
-9. **Puertos de los servicios expuestos.** Además del nginx, 3000-3006 y
+8. **Puertos de los servicios expuestos.** Además del nginx, 3000-3006 y
    1433 (SQL Server) están publicados en el host y `cors()` acepta
    cualquier origen. Un `X-Forwarded-For` enviado directo a un puerto ya
    no se audita (solo se confía en el nginx), pero los puertos siguen
    abiertos.
-10. **Nombres distintos al plan del SQA** (tabla en
-    `docs/EQUIVALENCIAS.md`): `pacientes` en vez de internos, `activo = 0`
-    en vez de `estado = 'inactivo'`, estados `fallida`/`fallida_definitiva`
-    en vez de "error", etc. El comportamiento es el pedido.
-11. **Auditoría parcial.** Laboratorio (resultados y precios) y
+9. **Nombres distintos al plan del SQA** (tabla en
+   `docs/EQUIVALENCIAS.md`): `pacientes` en vez de internos, `activo = 0`
+   en vez de `estado = 'inactivo'`, estados `fallida`/`fallida_definitiva`
+   en vez de "error", etc. El comportamiento es el pedido.
+10. **Auditoría parcial.** Laboratorio (resultados y precios) y
     notificaciones no registran auditoría. El log de notificaciones lo
     puede leer cualquier usuario autenticado (salvo el cuerpo de los
     correos de recuperación, que se oculta).
-12. **Reportes**: los gastos operativos no aparecen en ninguno de los 7
+11. **Reportes**: los gastos operativos no aparecen en ninguno de los 7
     reportes; no hay paginación.
-13. **Frontend sin pruebas automatizadas**; en esta ronda la UI nueva
+12. **Frontend sin pruebas automatizadas**; en esta ronda la UI nueva
     (diálogo de egreso, recuperación de contraseña) no se pudo revisar en
     el navegador (la extensión de Chrome no estaba conectada): solo se
     verificaron sus llamadas a la API.
-14. **Entrega impresa incompleta**: el manual tiene 30 marcadores
+13. **Entrega impresa incompleta**: el manual tiene 30 marcadores
     `[CAPTURA: ...]` sin imagen y los diagramas `.mmd` no están
     renderizados a PNG.
-15. **Dependencias sin lockfile** en laboratorio, financiero, reportes y
+14. **Dependencias sin lockfile** en laboratorio, financiero, reportes y
     notificaciones (el build resuelve versiones nuevas; aviso
     `EBADENGINE` con Node 20).
 

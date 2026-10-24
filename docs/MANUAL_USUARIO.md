@@ -117,7 +117,8 @@ botón. Si la cuenta fue desactivada por administración, el mensaje es
    **Crear nueva contraseña**. El enlace vence en **30 minutos** y sirve
    **una sola vez**; si se pide otro, el anterior deja de funcionar.
 4. Al abrir el enlace aparece **Nueva contraseña**: escribirla dos veces
-   (mínimo 6 caracteres) y presionar **Guardar contraseña**. Vuelve la
+   (mínimo 8 caracteres, con al menos una letra y un número) y presionar
+   **Guardar contraseña**. Vuelve la
    pantalla de inicio con el aviso *Contraseña actualizada*.
 5. Si el enlace ya se usó o venció, el sistema lo indica: pedir uno nuevo.
 
@@ -541,7 +542,7 @@ recalculan si se edita una celda.
   **Reactivar**. La cuenta propia dice *su cuenta*: un administrador no
   puede desactivarse a sí mismo.
 - **Nueva cuenta**: **Nombre**, **Correo**, **Contraseña inicial**
-  (mínimo 6 caracteres) y **Rol**; botón **Crear cuenta**.
+  (mínimo 8 caracteres, con al menos una letra y un número) y **Rol**; botón **Crear cuenta**.
 
 Una persona que ya tenía la sesión abierta cuando se desactivó su
 cuenta puede seguir trabajando hasta que la sesión venza (8 horas) o

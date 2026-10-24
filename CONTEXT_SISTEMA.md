@@ -175,6 +175,7 @@ indica.
 | Acción | Roles permitidos |
 |---|---|
 | `POST /api/auth/register` | `admin` |
+| `POST /api/auth/cambiar-password` (propio usuario; contraseña de 8+ con letra y número, misma regla que alta y restablecimiento) | cualquier autenticado |
 | `POST /api/auth/recuperar`, `POST /api/auth/restablecer` (RF-42, recuperación de contraseña) | sin sesión |
 | `POST /api/notificaciones/recuperacion` | solo el JWT de servicio de auth-service (rol `sistema`, no asignable a usuarios) |
 | `GET /api/auth/usuarios[?rol=]` (directorio, sin passwordHash; solo activos) | `admin`, `coordinador_fundacion`, `medico_general` |
