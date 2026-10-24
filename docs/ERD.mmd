@@ -29,6 +29,17 @@ erDiagram
         NVARCHAR padecimientos
         DATETIME2 fechaIngreso
         BIT activo "borrado logico, default 1"
+        DATETIME2 fechaEgreso "caso 6"
+        NVARCHAR motivoEgreso "caso 6, obligatorio al egresar"
+    }
+
+    tokens_recuperacion {
+        INT id PK
+        INT idUsuario FK
+        CHAR tokenHash UK "SHA-256; el token en claro nunca se guarda"
+        DATETIME2 expira "30 minutos"
+        DATETIME2 usado "un solo uso"
+        DATETIME2 fechaCreacion
     }
 
     familiares {
@@ -303,3 +314,4 @@ erDiagram
     usuarios        ||--o{ solicitudes_referencia : "crea / asigna"
     usuarios        ||--o{ visitas_medicas        : "atiende"
     usuarios        ||--o{ auditoria              : "realiza"
+    usuarios        ||--o{ tokens_recuperacion    : "recupera contrasena"

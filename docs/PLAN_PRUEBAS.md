@@ -23,8 +23,8 @@ las pruebas corran en un clon limpio sin instalar cada servicio.
 ./scripts/run-all-tests.ps1        # PowerShell
 npm run test:todo
 ```
-Ultima ejecucion (21 oct 2026, sobre un stack recien creado con `docker compose down -v` +
-`scripts/bootstrap.ps1`): **242 casos en 33 archivos, 242 OK, 0 fallas**.
+Ultima ejecucion (23 oct 2026, sobre un stack recien creado con `docker compose down -v` +
+`scripts/bootstrap.ps1`): **266 casos en 36 archivos, 266 OK, 0 fallas**.
 
 **(2) Integracion end-to-end**: requieren el stack docker-compose
 arriba. Recorren el flujo completo de un paciente, con usuarios reales
@@ -33,13 +33,16 @@ y JWT, contra las APIs HTTP. Un paso por linea con [ OK ] / [FALLA].
 npm run test:e2e                         # localhost
 BASE_HOST=100.96.172.77 npm run test:e2e  # servidor Debian
 ```
-Ultima ejecucion (21 oct 2026, stack local recien creado): **58 pasos, 58 OK**.
+Ultima ejecucion (23 oct 2026, stack local recien creado): **60 pasos, 60 OK**.
+El paso de RF-42 lee el enlace de recuperacion de la tabla `notificaciones`
+con `docker exec` (la API no lo expone a proposito); contra otro host solo
+verifica la parte de API.
 
 **(3) Carga** (caso 25): `npm run test:carga` (`USUARIOS=20..50`, `VUELTAS`,
 `LIMITE_MS`). Cada usuario virtual hace login, lista pacientes, crea y
 lista solicitudes; reporta p50/p95/max por operacion y falla si una
-peticion supera 3 s. Ultima ejecucion: 50 usuarios x 3 vueltas, 600
-peticiones, max 942 ms, p95 687 ms, 0 errores. Antes del arreglo (bcrypt en
+peticion supera 3 s. Ultima ejecucion (23 oct, stack recien creado): 50 usuarios x 3 vueltas,
+600 peticiones, max 1281 ms, p95 821 ms, 0 errores. Antes del arreglo (bcrypt en
 el hilo principal) el login llegaba a 7,1 s con 30 usuarios.
 
 **Regla de las pruebas de integracion:** el e2e solo crea, modifica,
@@ -65,12 +68,12 @@ cada caso:
 | 3 401 sin BD | rbac.test.js (repositorios simulados) | — |
 | 4 JWT en varios servicios | — | todo el smoke usa el mismo token en los 7 servicios |
 | 5 Interno + familiar + ficha 1:1 | FamiliarFicha.test.js | caso 5 (2 pasos) |
-| 6 Egreso logico | PacienteActivo.test.js | pacientes: DELETE /:id desactiva un paciente propio |
+| 6 Egreso con fecha y motivo | Egreso.test.js, PacienteActivo.test.js | pacientes: DELETE /:id desactiva un paciente propio |
 | 7 Solicitud con enfermero | SolicitudService.test.js | caso 7 |
 | 8 No-MG no crea | rbacPacientes.test.js | caso 7 (enfermero y especialista 403) |
 | 9 RN-02 con la activa | SolicitudService.test.js | RN-02: segunda solicitud activa... -> 409 |
 | 10 Brevo: enviada + ID | NotificacionesService.test.js | notificaciones: existe una para este paciente |
-| 11 Caida de Brevo | NotificacionesService.test.js | — (verificado a mano en el bloque 1) |
+| 11 Caida de Brevo | NotificacionesService.test.js | — (verificado en vivo el 23 oct con override temporal; ver CSV) |
 | 12 Aviso interno al medico | SolicitudService.test.js | caso 12 |
 | 13 Visita vinculada a la ficha | VisitaMedicaService.test.js | caso 13 |
 | 14 Visita INCOMPLETA | VisitaIncompleta.test.js | caso 14 |
@@ -83,8 +86,9 @@ cada caso:
 | 21 Alertas naranja/roja | AlertasCobro.test.js | caso 21 |
 | 22 PDF/Excel con formulas | ReportesExport.test.js | caso 22, reportes en PDF y Excel |
 | 23 SQL injection | ReportesExport.test.js | caso 23 |
-| 24 Auditoria completa | Auditoria.test.js | auditoria (2 pasos) |
+| 24 Auditoria completa (IP real) | Auditoria.test.js, IpCliente.test.js | auditoria (2 pasos), caso 24 |
 | 25 Rendimiento < 3 s | HashPool.test.js | `npm run test:carga` |
+| RF-42 Recuperacion de contrasena | Recuperacion.test.js, rbac.test.js (auth), NotificacionesService.test.js | RF-42 |
 
 Rango de reportes (bloque 3): ReportesRango.test.js y el paso "reportes:
 rango hoy-a-hoy...". Los casos nuevos de esta ronda no tienen ID propio
@@ -288,12 +292,15 @@ verificar el mapeo abriendo cada archivo (ver "Mapa a archivos").
 | AU-xx | [auth-service/__tests__/AuthService.test.js](../auth-service/__tests__/AuthService.test.js) | 7 |
 | CU-xx | [auth-service/__tests__/CuentasActivas.test.js](../auth-service/__tests__/CuentasActivas.test.js) | 7 |
 | SQA 25 | [auth-service/__tests__/HashPool.test.js](../auth-service/__tests__/HashPool.test.js) | 4 |
-| RBA-xx | [auth-service/__tests__/rbac.test.js](../auth-service/__tests__/rbac.test.js) | 6 |
-| NO-xx | [notificaciones-service/__tests__/NotificacionesService.test.js](../notificaciones-service/__tests__/NotificacionesService.test.js) | 8 |
+| RBA-xx | [auth-service/__tests__/rbac.test.js](../auth-service/__tests__/rbac.test.js) | 7 |
+| RF-42 | [auth-service/__tests__/Recuperacion.test.js](../auth-service/__tests__/Recuperacion.test.js) | 9 |
+| NO-xx | [notificaciones-service/__tests__/NotificacionesService.test.js](../notificaciones-service/__tests__/NotificacionesService.test.js) | 10 |
+| SQA 24 | [pacientes-service/__tests__/IpCliente.test.js](../pacientes-service/__tests__/IpCliente.test.js) | 6 |
+| SQA 6 | [pacientes-service/__tests__/Egreso.test.js](../pacientes-service/__tests__/Egreso.test.js) | 6 |
 | AR-xx | [reportes-service/__tests__/AuditoriaConsulta.test.js](../reportes-service/__tests__/AuditoriaConsulta.test.js) | 10 |
 | SQA 22/23 | [reportes-service/__tests__/ReportesExport.test.js](../reportes-service/__tests__/ReportesExport.test.js) | 11 |
 | Bloque 3 | [reportes-service/__tests__/ReportesRango.test.js](../reportes-service/__tests__/ReportesRango.test.js) | 8 |
-| | **Total** | **242** |
+| | **Total** | **266** |
 
 ## Lo que todavia NO esta automatizado
 
@@ -363,25 +370,27 @@ es el que aparece entre corchetes en la salida).
 | E2E-37 | cuenta desactivada: login 403, admin no se desactiva a si mismo (409), reactivada vuelve a entrar |
 | E2E-38 | donante propio desactivado: donacion 409; reactivado: 201 |
 | E2E-39 | auditoria: el paciente B tiene crear, desactivar y reactivar con usuario, IP, modulo y JSON |
-| E2E-40 | auditoria: dispensacion, visita y solicitud registradas; RBAC y validacion |
-| E2E-41 | caso 19: el cierre genero un cargo desglosado con descuento en la cuenta |
-| E2E-42 | caso 19: reintentar el cierre -> 409 y sigue habiendo un solo cargo de la visita |
-| E2E-43 | caso 18: tras entregar 1 de 5 la prescripcion queda parcial y la visita acumula el costo |
-| E2E-44 | caso 18: entregar mas de lo que falta (5 de 4) -> 409 sin tocar el stock |
-| E2E-45 | caso 14: cerrar la visita B sin diagnostico ni observaciones -> 400, campos faltantes e incompleta |
-| E2E-46 | caso 18/19: cerrar la visita B cobra lo entregado hasta ese momento |
-| E2E-47 | caso 20: abonos al cargo de la visita B nunca dejan saldo negativo |
-| E2E-48 | caso 18: completar la entrega despues del cierre -> dispensada y cargo complementario |
-| E2E-49 | caso 5: alta sin familiar o con familiar incompleto -> 400 con los campos que faltan |
-| E2E-50 | caso 5: el paciente E2E tiene familiar responsable completo y ficha medica 1:1 |
-| E2E-51 | caso 13: la visita quedo en_atencion vinculada a la ficha del paciente |
-| E2E-52 | caso 7: la solicitud lleva al enfermero; sin el o con un no-enfermero -> 400; enfermero y especialista no crean (403) |
-| E2E-53 | caso 12: asignar cita dejo aviso interno al medico general y al enfermero; marcar leido |
-| E2E-54 | caso 21: cuota con 5 dias de mora -> naranja, con 40 dias -> roja; pagada sale del panel |
-| E2E-55 | caso 23: inyeccion SQL en login, pacientes, laboratorio y reportes -> texto literal o 400/401 |
-| E2E-56 | caso 22: el Excel de costos por paciente tiene formulas SUM en los totales |
-| E2E-57 | reportes: rango hoy-a-hoy incluye lo registrado hoy en los 7 reportes; ayer-a-ayer no |
-| E2E-58 | limpieza: desactivar el medicamento propio del smoke |
+| E2E-40 | caso 24: por el nginx se audita la IP del cliente; X-Forwarded-For inventado se ignora |
+| E2E-41 | auditoria: dispensacion, visita y solicitud registradas; RBAC y validacion |
+| E2E-42 | caso 19: el cierre genero un cargo desglosado con descuento en la cuenta |
+| E2E-43 | caso 19: reintentar el cierre -> 409 y sigue habiendo un solo cargo de la visita |
+| E2E-44 | caso 18: tras entregar 1 de 5 la prescripcion queda parcial y la visita acumula el costo |
+| E2E-45 | caso 18: entregar mas de lo que falta (5 de 4) -> 409 sin tocar el stock |
+| E2E-46 | caso 14: cerrar la visita B sin diagnostico ni observaciones -> 400, campos faltantes e incompleta |
+| E2E-47 | caso 18/19: cerrar la visita B cobra lo entregado hasta ese momento |
+| E2E-48 | caso 20: abonos al cargo de la visita B nunca dejan saldo negativo |
+| E2E-49 | caso 18: completar la entrega despues del cierre -> dispensada y cargo complementario |
+| E2E-50 | caso 5: alta sin familiar o con familiar incompleto -> 400 con los campos que faltan |
+| E2E-51 | caso 5: el paciente E2E tiene familiar responsable completo y ficha medica 1:1 |
+| E2E-52 | caso 13: la visita quedo en_atencion vinculada a la ficha del paciente |
+| E2E-53 | caso 7: la solicitud lleva al enfermero; sin el o con un no-enfermero -> 400; enfermero y especialista no crean (403) |
+| E2E-54 | caso 12: asignar cita dejo aviso interno al medico general y al enfermero; marcar leido |
+| E2E-55 | caso 21: cuota con 5 dias de mora -> naranja, con 40 dias -> roja; pagada sale del panel |
+| E2E-56 | caso 23: inyeccion SQL en login, pacientes, laboratorio y reportes -> texto literal o 400/401 |
+| E2E-57 | caso 22: el Excel de costos por paciente tiene formulas SUM en los totales |
+| E2E-58 | reportes: rango hoy-a-hoy incluye lo registrado hoy en los 7 reportes; ayer-a-ayer no |
+| E2E-59 | RF-42: recuperar contrasena (misma respuesta exista o no), enlace de un uso y login con la nueva |
+| E2E-60 | limpieza: desactivar el medicamento propio del smoke |
 
 Registros que el smoke deja en la base, todos marcados como de prueba:
 pacientes "E2E Smoke" / "E2E Inactivable" / "E2E Descartable"
@@ -393,5 +402,6 @@ pacientes "E2E Caso 15" / "E2E Alerta naranja" / "E2E Alerta roja" y el
 del caso 23 (nombre con texto SQL), con sus familiares "Familiar E2E
 Responsable", solicitudes, visitas, cargos, cuotas y avisos, y sus
 registros de auditoria. La prueba de carga deja pacientes "Carga <ts> #n"
-desactivados y sus solicitudes canceladas. Para una base de demo limpia:
+desactivados (egreso "Fin de la prueba de carga") y sus solicitudes canceladas.
+El paso RF-42 deja la cuenta "e2e.recupera.<ts>" desactivada. Para una base de demo limpia:
 `docker compose down -v` + `scripts/bootstrap.ps1` (sin correr el e2e).

@@ -93,7 +93,7 @@ Documentado en [scripts/README.md](scripts/README.md).
 
 | Servicio | URL |
 |---|---|
-| Frontend (nginx) | http://localhost:8090 |
+| Frontend (nginx) | http://localhost:8090 (también proxy: `/svc/<servicio>/` → cada API, con la IP real del cliente) |
 | auth-service | http://localhost:3000 |
 | farmacia-service | http://localhost:3001 |
 | pacientes-service | http://localhost:3002 |
@@ -102,6 +102,14 @@ Documentado en [scripts/README.md](scripts/README.md).
 | reportes-service | http://localhost:3005 |
 | notificaciones-service | http://localhost:3006 |
 | SQL Server (host) | 1433 |
+
+## Desviaciones respecto al Análisis
+
+HTTP sin HTTPS, sesiones que siguen válidas hasta 8 h tras desactivar
+una cuenta, Brevo real no verificado, comunicación mixta entre servicios
+(BD compartida + HTTP), usuario `sa` para todos los servicios, contraseñas
+de solo 6 caracteres, sin rate-limit y otras: lista completa y honesta en
+[CLAUDE.md](CLAUDE.md#desviaciones-respecto-al-análisis).
 
 ## Pruebas
 

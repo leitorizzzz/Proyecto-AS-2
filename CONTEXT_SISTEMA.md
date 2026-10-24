@@ -175,6 +175,8 @@ indica.
 | Acción | Roles permitidos |
 |---|---|
 | `POST /api/auth/register` | `admin` |
+| `POST /api/auth/recuperar`, `POST /api/auth/restablecer` (RF-42, recuperación de contraseña) | sin sesión |
+| `POST /api/notificaciones/recuperacion` | solo el JWT de servicio de auth-service (rol `sistema`, no asignable a usuarios) |
 | `GET /api/auth/usuarios[?rol=]` (directorio, sin passwordHash; solo activos) | `admin`, `coordinador_fundacion`, `medico_general` |
 | `PUT /api/pacientes/:id/familiar` | `enfermero`, `admin` |
 | `GET /api/avisos`, `PATCH /api/avisos/:id/leido` | cualquier autenticado, solo sus propios avisos |
@@ -182,7 +184,7 @@ indica.
 | `GET /api/financiero/alertas` | `admin`, `coordinador_fundacion`, `fundacion` |
 | `PATCH /api/auth/usuarios/:id/{desactivar,reactivar}` | `admin` (no puede desactivarse a si mismo) |
 | `POST`, `PUT /api/pacientes[/:id]` | `enfermero`, `admin` |
-| `DELETE /api/pacientes/:id` (borrado logico: desactiva), `PATCH /api/pacientes/:id/reactivar` | `admin` |
+| `DELETE /api/pacientes/:id` (egreso: borrado lógico con `motivoEgreso` obligatorio y `fechaEgreso`), `PATCH /api/pacientes/:id/reactivar` | `admin` |
 | `POST /api/solicitudes` | `medico_general` |
 | `PATCH /api/solicitudes/:id/asignar-cita` | `coordinador_fundacion`, `admin` |
 | `POST /api/solicitudes/:id/convertir-a-visita` | `medico_especialista` |
@@ -231,8 +233,13 @@ reactivar.
 Tabla compartida `auditoria` (id, usuario = email del JWT, idUsuario,
 accion, entidad, idEntidad, detalle, fecha UTC, `ip`, `modulo`,
 `datosAnteriores` y `datosNuevos` en JSON — caso 24; nunca guarda
-password, hash ni token). La IP sale de `x-forwarded-for` o del socket;
-detrás de Docker Desktop es la del gateway (172.18.0.1). La crean al arrancar
+password, hash ni token). La IP es `req.ip`: el navegador llega por el
+nginx del frontend (`/svc/<servicio>/`), que envía `X-Forwarded-For` y
+`X-Real-IP`, y los cuatro servicios que auditan solo confían en ese nginx
+(`trust proxy`, `middleware/confianzaProxy.js`). Así se guarda la IP del
+cliente y un `X-Forwarded-For` mandado directo a un puerto se ignora. En
+Docker Desktop el cliente del host aparece como 172.18.0.1; en el Debian es
+la IP real del navegador. La crean al arrancar
 auth, pacientes, farmacia y financiero (DDL idempotente que tolera la
 carrera entre servicios) y la escriben desde sus controladores con
 `AuditoriaService` (copia idéntica en los cuatro, como
@@ -240,8 +247,8 @@ carrera entre servicios) y la escriben desde sus controladores con
 
 | Servicio | Entidad | Acciones |
 |---|---|---|
-| auth | usuario | crear, desactivar, reactivar |
-| pacientes | paciente | crear, modificar, desactivar, reactivar |
+| auth | usuario | crear, desactivar, reactivar; modificar (recuperación de contraseña solicitada y contraseña restablecida) |
+| pacientes | paciente | crear, modificar, desactivar (egreso, con fecha y motivo), reactivar |
 | pacientes | solicitud | crear, modificar (asignar cita), cancelar |
 | pacientes | visita / examen / prescripcion | crear (iniciar visita, pedir examen, prescribir), modificar (notas, completar) |
 | farmacia | medicamento / dispensacion | crear, modificar, desactivar, reactivar / crear |
@@ -293,7 +300,7 @@ microservicios:
 
 | Canal | Cuándo se usa | Ejemplos reales |
 |---|---|---|
-| **HTTP + JWT** | Para efectos secundarios sin estado compartido: avisos, integraciones externas, operaciones idempotentes que puede ser retry-friendly. | `pacientes-service` → `POST /api/notificaciones/solicitud` (fire-and-forget al crear solicitud). `notificaciones-service` → Brevo. |
+| **HTTP + JWT** | Para efectos secundarios sin estado compartido: avisos, integraciones externas, operaciones idempotentes que puede ser retry-friendly. | `pacientes-service` → `POST /api/notificaciones/solicitud` (fire-and-forget al crear solicitud). `auth-service` → `POST /api/notificaciones/recuperacion` (JWT de servicio rol `sistema`, 1 min). `notificaciones-service` → Brevo. |
 | **Lectura / escritura directa de la BD compartida** | Cuando el servicio B necesita leer y marcar un recurso que es parte del **agregado transaccional** de A, y una llamada HTTP solo introduciría coupling, latencia y modos de falla sin aportar nada. | `farmacia-service` lee y marca `visita_prescripciones` (RN-06, despacho parcial) y suma `visitas_medicas.costoFarmacia`. `laboratorio-service` lee y marca `visita_examenes`. `pacientes-service` escribe `cargos_servicio`/`cargos_detalle` al cerrar la visita (misma transacción) y lee `tarifas_servicio` y `examenes_precios`. `financiero-service` lee `familiares` (titular) y `pacientes` (alertas). `reportes-service` lee todas las tablas de dominio. |
 
 Justificación de usar la BD como canal de integración en lugar de más
@@ -396,8 +403,11 @@ Cada servicio tiene la **misma estructura interna de 4 capas**:
       y equivalencias de nombres en [docs/EQUIVALENCIAS.md](docs/EQUIVALENCIAS.md).
 - [x] Alertas de cobro naranja / roja (saldo y cuotas vencidas) en el panel.
 - [x] Prueba de carga versionada (`npm run test:carga`, < 3 s con 50 usuarios).
-- [ ] Probar Brevo real (casos 10 y 11 solo en simulación).
-- [ ] Egreso con fecha y motivo (hoy solo `activo = 0`).
+- [ ] Probar Brevo real (caso 10 solo en simulación; caso 11 verificado en vivo con la URL inalcanzable).
+- [x] Egreso con fecha y motivo (caso 6).
+- [x] IP real del cliente en la auditoría vía nginx (caso 24).
+- [x] Recuperación de contraseña (RF-42, UC-10.4).
+- Desviaciones respecto al Análisis: ver la sección del mismo nombre en `CLAUDE.md`.
 
 ### Endpoints internos (para referencia rápida)
 
@@ -410,7 +420,7 @@ Cada servicio tiene la **misma estructura interna de 4 capas**:
 | financiero-service | 3004 | `/api/financiero/*` |
 | reportes-service | 3005 | `/api/reportes/*`, `/api/auditoria` |
 | notificaciones-service | 3006 | `/api/notificaciones/*` |
-| frontend (nginx) | 8090 | HTML estático |
+| frontend (nginx) | 8090 | HTML estático y proxy `/svc/<servicio>/` hacia los 7 servicios |
 
 ### Tablas nuevas agregadas en esta ronda
 
@@ -429,6 +439,8 @@ Cada servicio tiene la **misma estructura interna de 4 capas**:
   `dispensaciones`, `solicitudes_referencia`, `notificaciones` y
   `auditoria` (detalle en [docs/ERD.mmd](docs/ERD.mmd)). Todas con DDL
   idempotente; verificado arrancando desde una BD vacía.
+- Ronda de cierre (23 oct 2026): `tokens_recuperacion` (auth; solo el
+  hash SHA-256 del token) y `pacientes.fechaEgreso`/`motivoEgreso`.
 
 ### Infraestructura
 - [x] Docker Desktop funcionando en la máquina de desarrollo (WSL2).

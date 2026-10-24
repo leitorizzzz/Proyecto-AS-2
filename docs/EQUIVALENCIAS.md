@@ -71,3 +71,12 @@ minúsculas con guion bajo.
 |---|---|
 | Costo con descuento registrado al ordenar | `visita_examenes.precioBase`, `descuento`, `costo` (se congelan al `POST /api/visitas/:id/examenes` con el precio de `examenes_precios` y RN-09). Tipo sin precio → 409 |
 | Costo consultado por laboratorio | `GET /api/laboratorio/examenes/:id/costo` devuelve el registrado (`registradoAlOrdenar: true`); solo las órdenes antiguas (NULL) usan el catálogo actual |
+
+## Ronda de cierre (23 oct 2026)
+
+| Plan / Análisis | Código |
+|---|---|
+| Egreso (caso 6): estado inactivo con fecha y motivo | `pacientes.activo = 0` + `fechaEgreso` + `motivoEgreso` (DELETE /api/pacientes/:id con `motivoEgreso` obligatorio) |
+| IP del cliente en la auditoría (caso 24) | `auditoria.ip` = `req.ip` tras el nginx del frontend (`X-Forwarded-For`, `trust proxy` solo para `frontend`) |
+| Log de notificaciones con estado "error" (caso 11) | `notificaciones.estado = 'fallida'` (reintentable) / `'fallida_definitiva'` + `mensajeError` |
+| Recuperación de contraseña (RF-42, UC-10.4) | `POST /api/auth/recuperar` y `/restablecer`; tabla `tokens_recuperacion` (hash SHA-256, 30 min, un uso); correo `notificaciones.tipoEvento = 'recuperacion_password'` |

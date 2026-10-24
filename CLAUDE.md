@@ -83,6 +83,11 @@ mantiene sus propias 4 capas dentro del mismo servicio:
   Regla **paciente activo** en `services/reglasPaciente.js`: a un
   desactivado no se le crean solicitudes, citas, visitas, exámenes ni
   prescripciones → 409.
+  **Egreso (caso 6)**: el DELETE exige `motivoEgreso` (3 a 300
+  caracteres; sin él → 400) y acepta `fechaEgreso` (YYYY-MM-DD, por
+  defecto hoy en Guatemala; no futura ni anterior al ingreso). Guarda
+  `pacientes.fechaEgreso`/`motivoEgreso`; reactivar los limpia (el valor
+  anterior queda en la auditoría).
   **Familiar responsable y ficha (caso 5)**: el alta exige `familiar`
   completo (nombres, apellidos, dpi 13 dígitos, parentesco, telefono,
   email, direccion; `services/reglasFamiliar.js`) → 400 con
@@ -239,6 +244,11 @@ o el servicio caen, la solicitud se crea igual y el reintento lo hace el
 job interno. `POST /api/notificaciones/:id/reintentar` fuerza un reintento
 manual (solo admin). Cada enviada guarda `idMensajeProveedor` (caso 10):
 el `messageId` de Brevo, o `sim-<uuid>` en simulación.
+`POST /api/notificaciones/recuperacion` (solo JWT de servicio rol
+`sistema`, lo firma auth-service) manda el correo de recuperación de
+contraseña; el log de la API nunca devuelve su cuerpo. Caso 11 verificado
+en vivo el 23 oct: con Brevo inalcanzable la solicitud se crea (201) y
+la notificación queda `fallida` → reintentos → `fallida_definitiva`.
 
 ### `frontend/` — ✅ funcional, puerto 8090
 HTML/CSS/JS plano servido por nginx. Un solo `index.html` + `styles.css`
@@ -280,7 +290,12 @@ Plex Sans — no reintroducir esos colores.
   Controles ≥ 44px, foco visible. Bajo 960px el sidebar pasa arriba.
 - `nginx.conf` sirve `index.html` con `no-store` y `*.css`/`*.js` con
   `no-cache` (no llevan hash en el nombre; sin eso un redeploy
-  mezclaba HTML nuevo con CSS/JS viejos).
+  mezclaba HTML nuevo con CSS/JS viejos). Además es el **proxy** hacia
+  los 7 servicios: `/svc/<servicio>/...` (resolver de Docker, envía
+  `X-Real-IP`/`X-Forwarded-For`). `API` en `app.js` usa ese camino; los
+  puertos 3000-3006 siguen publicados (los usan el e2e y la carga).
+- **Login**: "¿Olvidaste tu contraseña?" (formulario *Recuperar
+  contraseña*) y *Nueva contraseña* al abrir el enlace `#restablecer=`.
 
 Bootstrap 5 fue evaluado y descartado: el CSS propio es más corto y
 permite aplicar la skill sin pelear con defaults.
@@ -326,18 +341,20 @@ operativos (exámenes, medicamentos) → últimos 30 días; análisis
 
 ### Pruebas automatizadas — ✅
 Suite jest+supertest a nivel raíz. Comando: `npm run test:todo` o
-`scripts/run-all-tests.sh|.ps1`. Última ejecución (21 oct 2026, stack
-recién creado con `down -v` + `bootstrap.ps1`): **242/242** en 33
+`scripts/run-all-tests.sh|.ps1`. Última ejecución (23 oct 2026, stack
+recién creado con `down -v` + `bootstrap.ps1`): **266/266** en 36
 archivos. `express`, `jsonwebtoken`, `bcryptjs`, `exceljs` y `pdfkit` son
 devDependencies de la raíz para que las pruebas no dependan de los
 `node_modules` de cada servicio.
-E2E (`npm run test:e2e`, stack arriba): **58/58**. **Regla: el e2e solo
+E2E (`npm run test:e2e`, stack arriba): **60/60**. El paso de RF-42 lee
+el enlace de recuperación de la tabla `notificaciones` con `docker exec`
+(la API no lo expone); fuera de localhost solo verifica la parte de API. **Regla: el e2e solo
 toca registros que crea** (pacientes "E2E …", medicamento "E2E
 medicamento <ts>", precio "E2E examen (no usar)", donantes y cuentas
 "e2e.*"); los datos existentes solo se leen.
 Carga (`npm run test:carga`, `USUARIOS=20..50`): login, listar pacientes,
-crear y listar solicitudes; falla si una petición supera 3 s. Última: 50
-usuarios, 600 peticiones, máx. 942 ms, p95 687 ms.
+crear y listar solicitudes; falla si una petición supera 3 s. Última (23
+oct, desde cero): 50 usuarios, 600 peticiones, máx. 1281 ms, p95 821 ms.
 Resultado del plan oficial del SQA (25 casos):
 [`docs/RESULTADOS_PLAN_SQA.csv`](docs/RESULTADOS_PLAN_SQA.csv); nombres
 del plan ↔ código en [`docs/EQUIVALENCIAS.md`](docs/EQUIVALENCIAS.md).
@@ -378,11 +395,70 @@ en [`scripts/README.md`](scripts/README.md).
    `EBADENGINE`, dependencias de mssql piden Node 22 y la imagen es
    Node 20).
 8. Brevo real nunca probado (procedimiento en
-   `notificaciones-service/README.md`); casos 10 y 11 solo verificados en
-   simulación / con la URL inalcanzable.
-9. Caso 6: el egreso es `activo = 0`; no guarda fecha ni motivo de egreso.
-10. Caso 24: detrás de Docker Desktop la IP auditada es la del gateway;
-    en el Debian conviene confirmar que llega la IP real del cliente.
+   `notificaciones-service/README.md`); el caso 10 solo en simulación y el
+   11 con la URL inalcanzable.
+9. Caso 24 en el Debian: confirmar con un acceso real por Tailscale/LAN
+   que la auditoría muestra la IP del navegador (en Docker Desktop todo
+   llega como 172.18.0.1).
+10. Ver "Desviaciones respecto al Análisis" (abajo).
+
+## Desviaciones respecto al Análisis
+
+Lo que el prototipo hace distinto de lo especificado o de lo que pediría
+un despliegue real. Ninguna rompe una regla de negocio; son límites
+conocidos y aceptados para la entrega académica.
+
+1. **HTTP sin HTTPS.** nginx escucha en el 8090 en claro y los servicios
+   en 3000-3006 también. Credenciales, JWT y enlaces de recuperación
+   viajan sin cifrar en la red (Tailscale cifra el túnel, la LAN no).
+2. **Sesiones vigentes tras desactivar una cuenta.** El JWT dura 8 h y
+   los servicios solo verifican la firma: una sesión abierta sigue
+   funcionando hasta su `exp` aunque la cuenta se desactive (el login
+   nuevo sí se bloquea). Faltaría lista de revocación o tokens cortos.
+3. **Brevo real no verificado.** Todo correo se probó en
+   `MODO_SIMULACION` (ID `sim-...`); la caída se probó con una URL
+   inalcanzable. El envío y la entrega reales no se ejecutaron.
+4. **Comunicación entre servicios mixta**, no solo HTTP: varios servicios
+   leen y escriben tablas de otros en la BD compartida (farmacia ↔
+   prescripciones y visitas, laboratorio ↔ exámenes, pacientes escribe
+   cargos al cerrar la visita, financiero lee familiares y pacientes,
+   reportes lee todo). HTTP + JWT solo para notificaciones. Ver
+   `CONTEXT_SISTEMA.md` §4.1.
+5. **Base de datos única y usuario `sa`.** Los 7 servicios se conectan a
+   SQL Server con la cuenta `sa`; no hay un usuario por servicio con
+   permisos mínimos.
+6. **Contraseñas débiles permitidas.** La regla de alta y de
+   restablecimiento es solo "mínimo 6 caracteres" (sin mayúsculas,
+   números ni símbolos obligatorios).
+7. **Sin límite de intentos.** Ni el login ni `/recuperar` tienen
+   rate-limit ni bloqueo por intentos fallidos.
+8. **Token en `localStorage`.** El frontend guarda el JWT ahí (expuesto
+   a un XSS); no usa cookie `HttpOnly`.
+9. **Puertos de los servicios expuestos.** Además del nginx, 3000-3006 y
+   1433 (SQL Server) están publicados en el host y `cors()` acepta
+   cualquier origen. Un `X-Forwarded-For` enviado directo a un puerto ya
+   no se audita (solo se confía en el nginx), pero los puertos siguen
+   abiertos.
+10. **Nombres distintos al plan del SQA** (tabla en
+    `docs/EQUIVALENCIAS.md`): `pacientes` en vez de internos, `activo = 0`
+    en vez de `estado = 'inactivo'`, estados `fallida`/`fallida_definitiva`
+    en vez de "error", etc. El comportamiento es el pedido.
+11. **Auditoría parcial.** Laboratorio (resultados y precios) y
+    notificaciones no registran auditoría. El log de notificaciones lo
+    puede leer cualquier usuario autenticado (salvo el cuerpo de los
+    correos de recuperación, que se oculta).
+12. **Reportes**: los gastos operativos no aparecen en ninguno de los 7
+    reportes; no hay paginación.
+13. **Frontend sin pruebas automatizadas**; en esta ronda la UI nueva
+    (diálogo de egreso, recuperación de contraseña) no se pudo revisar en
+    el navegador (la extensión de Chrome no estaba conectada): solo se
+    verificaron sus llamadas a la API.
+14. **Entrega impresa incompleta**: el manual tiene 30 marcadores
+    `[CAPTURA: ...]` sin imagen y los diagramas `.mmd` no están
+    renderizados a PNG.
+15. **Dependencias sin lockfile** en laboratorio, financiero, reportes y
+    notificaciones (el build resuelve versiones nuevas; aviso
+    `EBADENGINE` con Node 20).
 
 ## Reglas de negocio críticas (no romper al tocar código existente)
 
