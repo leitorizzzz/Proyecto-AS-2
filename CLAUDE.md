@@ -356,20 +356,20 @@ operativos (exámenes, medicamentos) → últimos 30 días; análisis
 
 ### Pruebas automatizadas — ✅
 Suite jest+supertest a nivel raíz. Comando: `npm run test:todo` o
-`scripts/run-all-tests.sh|.ps1`. Última ejecución (23 oct 2026, stack
-recién creado con `down -v` + `bootstrap.ps1`): **266/266** en 36
+`scripts/run-all-tests.sh|.ps1`. Última ejecución (24 oct 2026, stack
+recién creado con `down -v` + `bootstrap.ps1`): **293/293** en 38
 archivos. `express`, `jsonwebtoken`, `bcryptjs`, `exceljs` y `pdfkit` son
 devDependencies de la raíz para que las pruebas no dependan de los
 `node_modules` de cada servicio.
-E2E (`npm run test:e2e`, stack arriba): **60/60**. El paso de RF-42 lee
+E2E (`npm run test:e2e`, stack arriba): **62/62**. El paso de RF-42 lee
 el enlace de recuperación de la tabla `notificaciones` con `docker exec`
 (la API no lo expone); fuera de localhost solo verifica la parte de API. **Regla: el e2e solo
 toca registros que crea** (pacientes "E2E …", medicamento "E2E
 medicamento <ts>", precio "E2E examen (no usar)", donantes y cuentas
 "e2e.*"); los datos existentes solo se leen.
 Carga (`npm run test:carga`, `USUARIOS=20..50`): login, listar pacientes,
-crear y listar solicitudes; falla si una petición supera 3 s. Última (23
-oct, desde cero): 50 usuarios, 600 peticiones, máx. 1281 ms, p95 821 ms.
+crear y listar solicitudes; falla si una petición supera 3 s. Última (24
+oct, desde cero): 50 usuarios, 600 peticiones, máx. 899 ms, p95 608 ms.
 Resultado del plan oficial del SQA (25 casos):
 [`docs/RESULTADOS_PLAN_SQA.csv`](docs/RESULTADOS_PLAN_SQA.csv); nombres
 del plan ↔ código en [`docs/EQUIVALENCIAS.md`](docs/EQUIVALENCIAS.md).

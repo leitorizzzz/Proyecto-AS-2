@@ -23,8 +23,8 @@ las pruebas corran en un clon limpio sin instalar cada servicio.
 ./scripts/run-all-tests.ps1        # PowerShell
 npm run test:todo
 ```
-Ultima ejecucion (23 oct 2026, sobre un stack recien creado con `docker compose down -v` +
-`scripts/bootstrap.ps1`): **266 casos en 36 archivos, 266 OK, 0 fallas**.
+Ultima ejecucion (24 oct 2026, sobre un stack recien creado con `docker compose down -v` +
+`scripts/bootstrap.ps1`): **293 casos en 38 archivos, 293 OK, 0 fallas**.
 
 **(2) Integracion end-to-end**: requieren el stack docker-compose
 arriba. Recorren el flujo completo de un paciente, con usuarios reales
@@ -33,7 +33,7 @@ y JWT, contra las APIs HTTP. Un paso por linea con [ OK ] / [FALLA].
 npm run test:e2e                         # localhost
 BASE_HOST=100.96.172.77 npm run test:e2e  # servidor Debian
 ```
-Ultima ejecucion (23 oct 2026, stack local recien creado): **60 pasos, 60 OK**.
+Ultima ejecucion (24 oct 2026, stack local recien creado): **62 pasos, 62 OK**.
 El paso de RF-42 lee el enlace de recuperacion de la tabla `notificaciones`
 con `docker exec` (la API no lo expone a proposito); contra otro host solo
 verifica la parte de API.
@@ -41,8 +41,8 @@ verifica la parte de API.
 **(3) Carga** (caso 25): `npm run test:carga` (`USUARIOS=20..50`, `VUELTAS`,
 `LIMITE_MS`). Cada usuario virtual hace login, lista pacientes, crea y
 lista solicitudes; reporta p50/p95/max por operacion y falla si una
-peticion supera 3 s. Ultima ejecucion (23 oct, stack recien creado): 50 usuarios x 3 vueltas,
-600 peticiones, max 1281 ms, p95 821 ms, 0 errores. Antes del arreglo (bcrypt en
+peticion supera 3 s. Ultima ejecucion (24 oct, stack recien creado): 50 usuarios x 3 vueltas,
+600 peticiones, max 899 ms, p95 608 ms, 0 errores. Antes del arreglo (bcrypt en
 el hilo principal) el login llegaba a 7,1 s con 30 usuarios.
 
 **Regla de las pruebas de integracion:** el e2e solo crea, modifica,
