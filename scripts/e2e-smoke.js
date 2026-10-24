@@ -978,7 +978,9 @@ function familiarE2E(dpi) {
   try {
     for (const email of ["admin@asilo.gt' OR '1'='1", "' OR 1=1 --", "admin@asilo.gt'; DROP TABLE usuarios;--"]) {
       const r = await req('POST', `${API.auth}/api/auth/login`, { body: { email, password: "x' OR '1'='1" } });
-      if (r.status !== 401 && r.status !== 400) throw new Error(`login con ${email} -> ${r.status}`);
+      // 429 tambien es rechazo: al repetir el smoke en menos de 15 min el
+      // limite de intentos bloquea estos mismos correos.
+      if (![400, 401, 429].includes(r.status)) throw new Error(`login con ${email} -> ${r.status}`);
     }
     const malicioso = "Robert'); DROP TABLE pacientes;--";
     const pac = (await req('POST', `${API.pacientes}/api/pacientes`, {
@@ -1076,6 +1078,37 @@ function familiarE2E(dpi) {
     ok(`3 altas debiles 400 con mensaje; cambio debil 400, con la actual mala 400, valido 200; login con la nueva`);
   } catch (e) { falla(e.message); }
 
+  // Limite de intentos: 5 fallos por IP real + usuario en 15 min (login y
+  // /recuperar). Correos unicos por corrida; nada queda en la base.
+  paso('limite: 5 fallos de login por IP + usuario y la sexta -> 429; /recuperar igual; X-Forwarded-For inventado no lo evita');
+  try {
+    const email = `e2e.limite.${TS}@asilo.gt`;
+    const intentar = (base, extra = {}) => fetch(`${base}/api/auth/login`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...extra },
+      body: JSON.stringify({ email, password: 'Incorrecta1' }) });
+    for (let i = 1; i <= 5; i++) {
+      const r = await intentar(`${NGINX}/auth`);
+      if (r.status !== 401) throw new Error(`fallo ${i} -> ${r.status}`);
+    }
+    const sexto = await intentar(`${NGINX}/auth`);
+    const cuerpo = await sexto.json();
+    if (sexto.status !== 429 || !/Demasiados intentos/.test(cuerpo.error) || !sexto.headers.get('retry-after')) {
+      throw new Error(`sexto -> ${sexto.status} ${JSON.stringify(cuerpo)}`);
+    }
+    // Cambiar X-Forwarded-For no da otra IP: nginx agrega la real y el servicio solo confia en el.
+    const disfrazado = await intentar(`${NGINX}/auth`, { 'X-Forwarded-For': '203.0.113.99' });
+    if (disfrazado.status !== 429) throw new Error(`con X-Forwarded-For inventado -> ${disfrazado.status}`);
+    // Otro usuario desde la misma IP sigue pudiendo entrar.
+    await login('e2e.medicogeneral@asilo.gt', 'E2eDemo1234');
+    const correoRec = `e2e.limite.rec.${TS}@asilo.gt`;
+    for (let i = 1; i <= 5; i++) {
+      await req('POST', `${NGINX}/auth/api/auth/recuperar`, { body: { email: correoRec }, esperarStatus: 200 });
+    }
+    const rec = await req('POST', `${NGINX}/auth/api/auth/recuperar`, { body: { email: correoRec } });
+    if (rec.status !== 429) throw new Error(`recuperar sexta -> ${rec.status}`);
+    ok(`login: 5 x 401 y 429 (Retry-After ${sexto.headers.get('retry-after')} s), tambien con XFF inventado; recuperar: 5 x 200 y 429`);
+  } catch (e) { falla(e.message); }
+
   // RF-42 / UC-10.4: recuperacion de contrasena sobre una cuenta propia.
   paso('RF-42: recuperar contrasena (misma respuesta exista o no), enlace de un uso y login con la nueva');
   try {
@@ -1089,7 +1122,8 @@ function familiarE2E(dpi) {
     let notif;
     for (let i = 0; i < 20 && !notif; i++) {
       const log = (await req('GET', `${API.notificaciones}/api/notificaciones?limit=50`, { token: adminToken, esperarStatus: 200 })).data;
-      notif = log.find(n => n.destinatarioEmail === cuenta.email && n.tipoEvento === 'recuperacion_password');
+      // Se espera a que deje de estar pendiente (el envio corre despues de insertar).
+      notif = log.find(n => n.destinatarioEmail === cuenta.email && n.tipoEvento === 'recuperacion_password' && n.estado !== 'pendiente');
       if (!notif) await new Promise(r => setTimeout(r, 250));
     }
     if (!notif || notif.estado !== 'enviada' || !notif.idMensajeProveedor) throw new Error(`log: ${JSON.stringify(notif)}`);

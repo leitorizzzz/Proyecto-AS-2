@@ -1,16 +1,27 @@
 const AuditoriaService = require('../services/AuditoriaService');
 const RecuperacionService = require('../services/RecuperacionService');
+const LimitadorIntentos = require('../services/LimitadorIntentos');
 
 /**
  * CAPA DE PRESENTACION (API REST)
  * Traduce peticiones HTTP en llamadas a la capa de logica de negocio.
  */
 class AuthController {
-  constructor(authService, auditoriaService, recuperacionService = null) {
+  constructor(authService, auditoriaService, recuperacionService = null, limitador = new LimitadorIntentos()) {
     this.service = authService;
     this.auditoria = auditoriaService;
     this.recuperacion = recuperacionService;
+    this.limitador = limitador;
   }
+
+  /** 429 con Retry-After si la clave (accion, IP real, usuario) esta bloqueada. */
+  _bloqueado = (res, clave) => {
+    const b = this.limitador.bloqueo(clave);
+    if (!b) return false;
+    res.set('Retry-After', String(b.segundos));
+    res.status(429).json({ error: LimitadorIntentos.mensaje(b.segundos), reintentarEnSegundos: b.segundos });
+    return true;
+  };
 
   /** Auditoria de acciones sin sesion: el "usuario" es la cuenta afectada. */
   _auditarCuenta = (req, usuario, detalle) =>
@@ -28,6 +39,11 @@ class AuthController {
     let email;
     try { email = RecuperacionService.validarEmail(req.body?.email); }
     catch (error) { return res.status(400).json({ error: error.message }); }
+    // Cada solicitud cuenta como intento (exista o no la cuenta, para no
+    // revelarlo): la sexta en 15 minutos desde la misma IP y correo -> 429.
+    const clave = LimitadorIntentos.clave('recuperar', req.ip, email);
+    if (this._bloqueado(res, clave)) return;
+    this.limitador.registrarFallo(clave);
     res.json({ mensaje: 'Si el correo pertenece a una cuenta activa, en unos minutos recibira un enlace para crear una nueva contrasena. El enlace vence en 30 minutos.' });
     try {
       const r = await this.recuperacion.solicitar(email);
@@ -68,12 +84,19 @@ class AuthController {
   };
 
   login = async (req, res) => {
+    // Limite: 5 fallos por IP real + correo en 15 minutos -> 429 (tambien con
+    // la contrasena correcta, hasta que venza la ventana).
+    const clave = LimitadorIntentos.clave('login', req.ip, req.body?.email);
+    if (this._bloqueado(res, clave)) return;
     try {
       const resultado = await this.service.login(req.body);
+      this.limitador.reiniciar(clave);
       res.json(resultado);
     } catch (error) {
       // 401 credenciales invalidas; 403 cuenta desactivada
-      res.status(error.status || 401).json({ error: error.message });
+      const status = error.status || 401;
+      if (status === 401) this.limitador.registrarFallo(clave);
+      res.status(status).json({ error: error.message });
     }
   };
 

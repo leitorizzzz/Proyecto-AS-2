@@ -104,7 +104,10 @@ pero solo consultan.
 [CAPTURA: pantalla de inicio de sesión con los campos Correo y Contraseña y el botón Entrar]
 
 Si los datos no son correctos aparece un mensaje **Error —** bajo el
-botón. Si la cuenta fue desactivada por administración, el mensaje es
+botón. Tras **5 intentos fallidos** con el mismo correo en 15 minutos, el
+sistema responde *Demasiados intentos. Por seguridad, espere N minutos
+antes de volver a intentarlo* (lo mismo al pedir más de 5 enlaces de
+recuperación seguidos). Si la cuenta fue desactivada por administración, el mensaje es
 *Cuenta desactivada. Pida a administración que la reactive.*
 
 **¿Olvidó su contraseña?**

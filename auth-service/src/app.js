@@ -13,6 +13,7 @@ const crearRutasAuth = require('./routes/authRoutes');
 const TokenRecuperacionRepository = require('./repositories/TokenRecuperacionRepository');
 const RecuperacionService = require('./services/RecuperacionService');
 const NotificacionesClient = require('./services/NotificacionesClient');
+const LimitadorIntentos = require('./services/LimitadorIntentos');
 
 // --- Ensamblado de capas ---
 const usuarioRepository = new UsuarioRepository();
@@ -20,7 +21,7 @@ const authService = new AuthService(usuarioRepository);
 const auditoriaService = new AuditoriaService(new AuditoriaRepository());
 const recuperacionService = new RecuperacionService(usuarioRepository, new TokenRecuperacionRepository(),
   AuthService.hasherCompartido(), new NotificacionesClient());
-const authController = new AuthController(authService, auditoriaService, recuperacionService);
+const authController = new AuthController(authService, auditoriaService, recuperacionService, new LimitadorIntentos());
 
 const app = express();
 // Caso 24: req.ip = IP real del cliente cuando llega por el nginx del frontend.

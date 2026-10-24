@@ -177,6 +177,7 @@ indica.
 | `POST /api/auth/register` | `admin` |
 | `POST /api/auth/cambiar-password` (propio usuario; contraseña de 8+ con letra y número, misma regla que alta y restablecimiento) | cualquier autenticado |
 | `POST /api/auth/recuperar`, `POST /api/auth/restablecer` (RF-42, recuperación de contraseña) | sin sesión |
+| Límite en `POST /api/auth/login` y `/recuperar` | 5 intentos fallidos por IP real + correo en 15 min → 429 (`LimitadorIntentos`, en memoria) |
 | `POST /api/notificaciones/recuperacion` | solo el JWT de servicio de auth-service (rol `sistema`, no asignable a usuarios) |
 | `GET /api/auth/usuarios[?rol=]` (directorio, sin passwordHash; solo activos) | `admin`, `coordinador_fundacion`, `medico_general` |
 | `PUT /api/pacientes/:id/familiar` | `enfermero`, `admin` |

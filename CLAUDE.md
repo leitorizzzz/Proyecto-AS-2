@@ -55,6 +55,15 @@ un número (máx. 72 bytes, límite de bcrypt) — usada en el alta, en
 `POST /api/auth/cambiar-password` (propio usuario, exige la actual; solo
 API, sin pantalla) y en el restablecimiento. El mensaje dice en español
 todo lo que falta. Los seeds (Admin12345, Demo1234, E2eDemo1234) cumplen.
+**Límite de intentos**: `services/LimitadorIntentos.js`, en memoria (sin
+dependencias). Máximo 5 intentos fallidos por IP real (`req.ip`, trust
+proxy) + correo en 15 minutos (`LIMITE_INTENTOS`, `LIMITE_VENTANA_MIN`):
+en el login cuentan los 401; en `/recuperar` cuenta cada solicitud (no se
+puede distinguir sin revelar si la cuenta existe). El sexto → **429**
+*"Demasiados intentos. Por seguridad, espere N minutos…"* con
+`Retry-After`, sin consultar credenciales. Un login correcto reinicia el
+contador. Se pierde al reiniciar auth-service y no se comparte entre
+réplicas (hay una).
 `GET /api/auth/usuarios` también lo usa `medico_general` (elige al
 enfermero de la solicitud). **bcrypt corre en hilos de trabajo**
 (`services/hashPool.js` + `hashWorker.js`, `HASH_HILOS`): mismo algoritmo
@@ -433,33 +442,31 @@ conocidos y aceptados para la entrega académica.
 5. **Base de datos única y usuario `sa`.** Los 7 servicios se conectan a
    SQL Server con la cuenta `sa`; no hay un usuario por servicio con
    permisos mínimos.
-6. **Sin límite de intentos.** Ni el login ni `/recuperar` tienen
-   rate-limit ni bloqueo por intentos fallidos.
-7. **Token en `localStorage`.** El frontend guarda el JWT ahí (expuesto
+6. **Token en `localStorage`.** El frontend guarda el JWT ahí (expuesto
    a un XSS); no usa cookie `HttpOnly`.
-8. **Puertos de los servicios expuestos.** Además del nginx, 3000-3006 y
+7. **Puertos de los servicios expuestos.** Además del nginx, 3000-3006 y
    1433 (SQL Server) están publicados en el host y `cors()` acepta
    cualquier origen. Un `X-Forwarded-For` enviado directo a un puerto ya
    no se audita (solo se confía en el nginx), pero los puertos siguen
    abiertos.
-9. **Nombres distintos al plan del SQA** (tabla en
+8. **Nombres distintos al plan del SQA** (tabla en
    `docs/EQUIVALENCIAS.md`): `pacientes` en vez de internos, `activo = 0`
    en vez de `estado = 'inactivo'`, estados `fallida`/`fallida_definitiva`
    en vez de "error", etc. El comportamiento es el pedido.
-10. **Auditoría parcial.** Laboratorio (resultados y precios) y
-    notificaciones no registran auditoría. El log de notificaciones lo
-    puede leer cualquier usuario autenticado (salvo el cuerpo de los
-    correos de recuperación, que se oculta).
-11. **Reportes**: los gastos operativos no aparecen en ninguno de los 7
+9. **Auditoría parcial.** Laboratorio (resultados y precios) y
+   notificaciones no registran auditoría. El log de notificaciones lo
+   puede leer cualquier usuario autenticado (salvo el cuerpo de los
+   correos de recuperación, que se oculta).
+10. **Reportes**: los gastos operativos no aparecen en ninguno de los 7
     reportes; no hay paginación.
-12. **Frontend sin pruebas automatizadas**; en esta ronda la UI nueva
+11. **Frontend sin pruebas automatizadas**; en esta ronda la UI nueva
     (diálogo de egreso, recuperación de contraseña) no se pudo revisar en
     el navegador (la extensión de Chrome no estaba conectada): solo se
     verificaron sus llamadas a la API.
-13. **Entrega impresa incompleta**: el manual tiene 30 marcadores
+12. **Entrega impresa incompleta**: el manual tiene 30 marcadores
     `[CAPTURA: ...]` sin imagen y los diagramas `.mmd` no están
     renderizados a PNG.
-14. **Dependencias sin lockfile** en laboratorio, financiero, reportes y
+13. **Dependencias sin lockfile** en laboratorio, financiero, reportes y
     notificaciones (el build resuelve versiones nuevas; aviso
     `EBADENGINE` con Node 20).
 

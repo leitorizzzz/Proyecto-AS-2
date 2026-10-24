@@ -76,8 +76,16 @@ al menos 8 caracteres y al menos un número.*
    recuperacion", con la IP del cliente. Nunca se audita la contraseña ni
    el token.
 
-Sin límite de solicitudes por correo o por IP (ver "Desviaciones" en
-`CLAUDE.md`).
+### Límite de intentos
+
+`services/LimitadorIntentos.js` (en memoria, ventana fija): como máximo 5
+intentos fallidos por IP real + correo en 15 minutos. En `/login` cuentan
+las respuestas 401; en `/recuperar` cuenta cada solicitud. El sexto
+responde **429** con `Retry-After` y *"Demasiados intentos. Por seguridad,
+espere N minutos antes de volver a intentarlo."*. La IP es `req.ip`, así
+que detrás del nginx es la del cliente y un `X-Forwarded-For` inventado no
+sirve para esquivarlo. Un login correcto reinicia el contador; reiniciar
+el servicio borra todos.
 
 ### Roles validos (10)
 
@@ -130,6 +138,8 @@ Copiar `.env.example` a `.env`.
 | `RECUPERACION_MINUTOS`    | 30                   | Vigencia del enlace de recuperacion               |
 | `TRUST_PROXY_HOST`        | frontend             | Proxy de confianza para `req.ip` (caso 24)         |
 | `HASH_HILOS`              | nucleos - 1 (1..8)   | Hilos para bcrypt (caso 25)                        |
+| `LIMITE_INTENTOS`         | 5                    | Intentos fallidos permitidos por IP + correo      |
+| `LIMITE_VENTANA_MIN`      | 15                   | Ventana del límite de intentos (minutos)          |
 
 ## Correr localmente
 

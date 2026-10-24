@@ -88,7 +88,9 @@ cada caso:
 | 23 SQL injection | ReportesExport.test.js | caso 23 |
 | 24 Auditoria completa (IP real) | Auditoria.test.js, IpCliente.test.js | auditoria (2 pasos), caso 24 |
 | 25 Rendimiento < 3 s | HashPool.test.js | `npm run test:carga` |
-| RF-42 Recuperacion de contrasena | Recuperacion.test.js, rbac.test.js (auth), NotificacionesService.test.js | RF-42 |
+| RF-42 Recuperacion de contrasena | Recuperacion.test.js, rbac.test.js (auth), NotificacionesService.test.js | RF-42 (recuperar) |
+| RF-42 Regla de contrasena (8+, letra y numero) | PasswordRegla.test.js | RF-42 (contrasena de 8+) |
+| Limite de intentos (5 por IP + usuario en 15 min) | LimitadorIntentos.test.js | limite |
 
 Rango de reportes (bloque 3): ReportesRango.test.js y el paso "reportes:
 rango hoy-a-hoy...". Los casos nuevos de esta ronda no tienen ID propio
@@ -292,7 +294,9 @@ verificar el mapeo abriendo cada archivo (ver "Mapa a archivos").
 | AU-xx | [auth-service/__tests__/AuthService.test.js](../auth-service/__tests__/AuthService.test.js) | 7 |
 | CU-xx | [auth-service/__tests__/CuentasActivas.test.js](../auth-service/__tests__/CuentasActivas.test.js) | 7 |
 | SQA 25 | [auth-service/__tests__/HashPool.test.js](../auth-service/__tests__/HashPool.test.js) | 4 |
-| RBA-xx | [auth-service/__tests__/rbac.test.js](../auth-service/__tests__/rbac.test.js) | 7 |
+| RBA-xx | [auth-service/__tests__/rbac.test.js](../auth-service/__tests__/rbac.test.js) | 8 |
+| RF-42 regla | [auth-service/__tests__/PasswordRegla.test.js](../auth-service/__tests__/PasswordRegla.test.js) | 21 |
+| Límite | [auth-service/__tests__/LimitadorIntentos.test.js](../auth-service/__tests__/LimitadorIntentos.test.js) | 7 |
 | RF-42 | [auth-service/__tests__/Recuperacion.test.js](../auth-service/__tests__/Recuperacion.test.js) | 9 |
 | NO-xx | [notificaciones-service/__tests__/NotificacionesService.test.js](../notificaciones-service/__tests__/NotificacionesService.test.js) | 10 |
 | SQA 24 | [pacientes-service/__tests__/IpCliente.test.js](../pacientes-service/__tests__/IpCliente.test.js) | 6 |
@@ -300,7 +304,7 @@ verificar el mapeo abriendo cada archivo (ver "Mapa a archivos").
 | AR-xx | [reportes-service/__tests__/AuditoriaConsulta.test.js](../reportes-service/__tests__/AuditoriaConsulta.test.js) | 10 |
 | SQA 22/23 | [reportes-service/__tests__/ReportesExport.test.js](../reportes-service/__tests__/ReportesExport.test.js) | 11 |
 | Bloque 3 | [reportes-service/__tests__/ReportesRango.test.js](../reportes-service/__tests__/ReportesRango.test.js) | 8 |
-| | **Total** | **266** |
+| | **Total** | **293** |
 
 ## Lo que todavia NO esta automatizado
 
@@ -389,8 +393,10 @@ es el que aparece entre corchetes en la salida).
 | E2E-56 | caso 23: inyeccion SQL en login, pacientes, laboratorio y reportes -> texto literal o 400/401 |
 | E2E-57 | caso 22: el Excel de costos por paciente tiene formulas SUM en los totales |
 | E2E-58 | reportes: rango hoy-a-hoy incluye lo registrado hoy en los 7 reportes; ayer-a-ayer no |
-| E2E-59 | RF-42: recuperar contrasena (misma respuesta exista o no), enlace de un uso y login con la nueva |
-| E2E-60 | limpieza: desactivar el medicamento propio del smoke |
+| E2E-59 | RF-42: contrasena de 8+ con letra y numero en alta y cambio; mensajes claros |
+| E2E-60 | limite: 5 fallos de login por IP + usuario y la sexta -> 429; /recuperar igual; X-Forwarded-For inventado no lo evita |
+| E2E-61 | RF-42: recuperar contrasena (misma respuesta exista o no), enlace de un uso y login con la nueva |
+| E2E-62 | limpieza: desactivar el medicamento propio del smoke |
 
 Registros que el smoke deja en la base, todos marcados como de prueba:
 pacientes "E2E Smoke" / "E2E Inactivable" / "E2E Descartable"
@@ -403,5 +409,5 @@ del caso 23 (nombre con texto SQL), con sus familiares "Familiar E2E
 Responsable", solicitudes, visitas, cargos, cuotas y avisos, y sus
 registros de auditoria. La prueba de carga deja pacientes "Carga <ts> #n"
 desactivados (egreso "Fin de la prueba de carga") y sus solicitudes canceladas.
-El paso RF-42 deja la cuenta "e2e.recupera.<ts>" desactivada. Para una base de demo limpia:
+Los pasos RF-42 dejan las cuentas "e2e.recupera.<ts>" y "e2e.clave.<ts>" desactivadas; el paso del limite no escribe en la base (solo en la memoria de auth-service). Para una base de demo limpia:
 `docker compose down -v` + `scripts/bootstrap.ps1` (sin correr el e2e).
