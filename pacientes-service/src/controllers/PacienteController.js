@@ -77,8 +77,9 @@ class PacienteController {
   desactivar = async (req, res) => {
     try {
       const antes = await this.service.obtener(Number(req.params.id));
-      const p = await this.service.desactivar(Number(req.params.id));
-      await this._auditar(req, 'desactivar', 'paciente', p.id, `${p.nombres} ${p.apellidos}`, antes, p);
+      const p = await this.service.desactivar(Number(req.params.id), req.body || {});
+      await this._auditar(req, 'desactivar', 'paciente', p.id,
+        `egreso de ${p.nombres} ${p.apellidos}: ${p.motivoEgreso}`, antes, p);
       res.json(p);
     } catch (error) {
       res.status(error.status || 404).json({ error: error.message });

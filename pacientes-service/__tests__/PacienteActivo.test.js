@@ -83,10 +83,11 @@ describe('PacienteService — borrado logico', () => {
     return { svc: new PacienteService(repo), repo };
   };
 
-  test('desactivar paciente activo -> cambiarActivo(id, false)', async () => {
+  test('desactivar paciente activo -> cambiarActivo(id, false) con el egreso', async () => {
     const { svc, repo } = nuevo({ id: 4, activo: true });
-    const r = await svc.desactivar(4);
-    expect(repo.cambiarActivo).toHaveBeenCalledWith(4, false);
+    const r = await svc.desactivar(4, { motivoEgreso: 'Traslado con su familia' });
+    expect(repo.cambiarActivo).toHaveBeenCalledWith(4, false,
+      { fechaEgreso: expect.any(Date), motivoEgreso: 'Traslado con su familia' });
     expect(r.activo).toBe(false);
   });
 

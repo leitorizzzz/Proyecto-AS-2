@@ -721,7 +721,8 @@ async function cargarPacientes() {
         <td class="num">${esc(p.dpi)}</td>
         <td>${fechaCorta(p.fechaNacimiento)}</td>
         <td>${fechaCorta(p.fechaIngreso)}</td>
-        <td>${chipActivo(p.activo)}</td>
+        <td>${chipActivo(p.activo)}${p.activo === false && p.fechaEgreso
+          ? `<div class="tiny">Egreso ${fechaCorta(p.fechaEgreso)}: ${esc(p.motivoEgreso || '')}</div>` : ''}</td>
         <td class="col-acciones">${accionesPaciente(p, puedeEditar, puedeDesactivar)}</td>
       </tr>`).join('');
     $('#tbodyPacientes').innerHTML = rows;
@@ -798,6 +799,29 @@ async function cambiarActivoPaciente(id, reactivar) {
   const p = (state.pacientes || []).find(x => x.id === id);
   if (!p) return;
   const nombre = `${p.nombres} ${p.apellidos}`;
+  // Caso 6: el egreso pide motivo (obligatorio) y fecha.
+  if (!reactivar) {
+    const ok_ = await abrirDialogo({
+      eyebrow: 'Egreso del paciente',
+      titulo: nombre,
+      cuerpo: `
+        <p>El paciente dejará de aparecer en los listados y no podrá recibir solicitudes, visitas ni dispensaciones. Su historial se conserva y se puede reactivar.</p>
+        <label for="dlgFechaEgreso">Fecha de egreso</label>
+        <input type="date" id="dlgFechaEgreso" name="fechaEgreso" required value="${fechaLocalISO(new Date())}" max="${fechaLocalISO(new Date())}">
+        <label for="dlgMotivoEgreso">Motivo del egreso</label>
+        <input id="dlgMotivoEgreso" name="motivoEgreso" required minlength="3" maxlength="300" placeholder="Traslado con su familia, fallecimiento, ...">`,
+      textoConfirmar: 'Registrar egreso',
+      textoCancelar: 'Volver',
+      peligro: true,
+      alEnviar: v => api(API.pacientes, `/api/pacientes/${id}`, {
+        method: 'DELETE', body: { motivoEgreso: v.motivoEgreso, fechaEgreso: v.fechaEgreso }
+      })
+    });
+    if (!ok_) return;
+    ok($('#msgPaciente'), `Egreso de ${nombre} registrado.`);
+    cargarPacientes();
+    return;
+  }
   const ok_ = await confirmar(nombre, reactivar
     ? 'El paciente volverá a aparecer en los listados y podrá recibir solicitudes, visitas y dispensaciones.'
     : 'El paciente dejará de aparecer en los listados y no podrá recibir solicitudes, visitas ni dispensaciones. Su historial se conserva y se puede reactivar.',

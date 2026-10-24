@@ -149,12 +149,20 @@ class PacienteRepository {
   }
 
   /** Borrado logico: no hay DELETE fisico de pacientes. */
-  async cambiarActivo(id, activo) {
+  /**
+   * Caso 6: el egreso guarda fecha y motivo junto con activo = 0; reactivar
+   * (reingreso) los limpia. El valor anterior queda en la auditoria.
+   */
+  async cambiarActivo(id, activo, { fechaEgreso = null, motivoEgreso = null } = {}) {
     const pool = await getPool();
     await pool.request()
       .input('id', sql.Int, id)
       .input('activo', sql.Bit, activo ? 1 : 0)
-      .query('UPDATE pacientes SET activo = @activo WHERE id = @id');
+      .input('fechaEgreso', sql.DateTime2, activo ? null : fechaEgreso)
+      .input('motivoEgreso', sql.NVarChar(300), activo ? null : motivoEgreso)
+      .query(`UPDATE pacientes
+              SET activo = @activo, fechaEgreso = @fechaEgreso, motivoEgreso = @motivoEgreso
+              WHERE id = @id`);
     return this.obtenerPorId(id);
   }
 }

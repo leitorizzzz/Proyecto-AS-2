@@ -212,6 +212,14 @@ async function inicializarEsquema() {
       CHECK (cantidadEntregada >= 0 AND (cantidadPrescrita IS NULL
              OR (cantidadPrescrita > 0 AND cantidadEntregada <= cantidadPrescrita)));
   `);
+  // --- Caso 6: egreso = baja logica con fecha y motivo -----------------
+  for (const [col, tipo] of [['fechaEgreso', 'DATETIME2 NULL'], ['motivoEgreso', 'NVARCHAR(300) NULL']]) {
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('pacientes') AND name = '${col}')
+      ALTER TABLE pacientes ADD ${col} ${tipo};
+    `);
+  }
+
   // --- Caso 15: costo del examen registrado al ordenarlo (RN-09) ---------
   // Se congela el precio del catalogo y el descuento vigentes al pedirlo;
   // cambiar el catalogo despues no altera lo ya ordenado. Las ordenes

@@ -128,7 +128,9 @@ function percentil(valores, p) {
   // Limpieza: solo lo creado por esta corrida.
   const mgToken = await login(MG);
   for (const id of solicitudes) await req('PATCH', `${API.pacientes}/api/solicitudes/${id}/cancelar`, { token: mgToken });
-  for (const id of pacientes) await req('DELETE', `${API.pacientes}/api/pacientes/${id}`, { token: adminToken });
+  for (const id of pacientes) {
+    await req('DELETE', `${API.pacientes}/api/pacientes/${id}`, { token: adminToken, body: { motivoEgreso: 'Fin de la prueba de carga' } });
+  }
   console.log(`Limpieza: ${solicitudes.length} solicitudes canceladas y ${pacientes.length} pacientes de carga desactivados.`);
 
   const maximo = Math.max(...todos);

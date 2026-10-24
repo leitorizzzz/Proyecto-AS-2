@@ -17,7 +17,9 @@ class Paciente {
     familiarEmail,
     padecimientos,
     fechaIngreso,
-    activo
+    activo,
+    fechaEgreso,
+    motivoEgreso
   }) {
     this.id = id || null;
     this.nombres = nombres;
@@ -34,6 +36,9 @@ class Paciente {
     // Borrado logico: un paciente desactivado conserva su historial pero
     // no puede recibir solicitudes, visitas ni dispensaciones.
     this.activo = activo === undefined || activo === null ? true : Boolean(activo);
+    // Caso 6: egreso (baja logica) con su fecha y motivo; null si esta activo.
+    this.fechaEgreso = fechaEgreso || null;
+    this.motivoEgreso = motivoEgreso || null;
   }
 
   nombreCompleto() {

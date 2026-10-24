@@ -333,13 +333,21 @@ function familiarE2E(dpi) {
       },
       token: adminToken, esperarStatus: 201
     });
-    const r = await req('DELETE', `${API.pacientes}/api/pacientes/${creado.data.id}`, { token: adminToken, esperarStatus: 200 });
+    // Caso 6: sin motivo -> 400; con motivo y fecha quedan guardados.
+    await req('DELETE', `${API.pacientes}/api/pacientes/${creado.data.id}`, { token: adminToken, esperarStatus: 400 });
+    const hoyGt = new Date(Date.now() - 6 * 3600e3).toISOString().slice(0, 10);
+    const r = await req('DELETE', `${API.pacientes}/api/pacientes/${creado.data.id}`, {
+      body: { motivoEgreso: 'Traslado con su familia (e2e)', fechaEgreso: hoyGt }, token: adminToken, esperarStatus: 200 });
     if (r.data.activo !== false) throw new Error('DELETE no dejo activo=false');
+    if (r.data.motivoEgreso !== 'Traslado con su familia (e2e)' || String(r.data.fechaEgreso).slice(0, 10) !== hoyGt) {
+      throw new Error(`egreso: ${r.data.fechaEgreso} / ${r.data.motivoEgreso}`);
+    }
     const check = await req('GET', `${API.pacientes}/api/pacientes/${creado.data.id}`, { token: adminToken, esperarStatus: 200 });
     if (check.data.activo !== false) throw new Error('el registro no se conserva desactivado');
     const lista = (await req('GET', `${API.pacientes}/api/pacientes`, { token: adminToken, esperarStatus: 200 })).data;
     if (lista.some(p => p.id === creado.data.id)) throw new Error('el listado por defecto muestra al desactivado');
-    ok(`id=${creado.data.id} desactivado, conservado y fuera del listado`);
+    if (check.data.motivoEgreso !== 'Traslado con su familia (e2e)') throw new Error('la ficha no muestra el motivo de egreso');
+    ok(`id=${creado.data.id} egreso ${hoyGt} con motivo; sin motivo 400; conservado y fuera del listado`);
   } catch (e) { falla(e.message); }
 
   // 17..19 - los 7 reportes en JSON, PDF y Excel
@@ -441,7 +449,7 @@ function familiarE2E(dpi) {
 
   paso('paciente activo: desactivado no recibe solicitudes (409); reactivado si');
   try {
-    await req('DELETE', `${API.pacientes}/api/pacientes/${pacienteId}`, { token: adminToken, esperarStatus: 200 });
+    await req('DELETE', `${API.pacientes}/api/pacientes/${pacienteId}`, { token: adminToken, esperarStatus: 200, body: { motivoEgreso: 'Prueba e2e de paciente activo' } });
     const r = await req('POST', `${API.pacientes}/api/solicitudes`, {
       body: { idPaciente: pacienteId, especialidad: 'inactivo-e2e', motivo: 'paciente desactivado', idEnfermero: idEnf },
       token: mgToken, esperarStatus: 409
@@ -592,7 +600,7 @@ function familiarE2E(dpi) {
 
   paso('paciente desactivado: no recibe examenes ni dispensaciones (409); listados lo ocultan');
   try {
-    await req('DELETE', `${API.pacientes}/api/pacientes/${pacB.id}`, { token: adminToken, esperarStatus: 200 });
+    await req('DELETE', `${API.pacientes}/api/pacientes/${pacB.id}`, { token: adminToken, esperarStatus: 200, body: { motivoEgreso: 'Prueba e2e de borrado logico' } });
     await req('POST', `${API.pacientes}/api/visitas/${visitaB.id}/examenes`, {
       body: { tipo: 'Uroanalisis' }, token: meToken, esperarStatus: 409
     });
@@ -673,7 +681,7 @@ function familiarE2E(dpi) {
     // Caso 24: IP, modulo y datos anteriores / nuevos en JSON
     const des = filas.find(f => f.accion === 'desactivar');
     if (!des.ip || des.modulo !== 'pacientes') throw new Error(`ip=${des.ip} modulo=${des.modulo}`);
-    if (des.datosAnteriores?.activo !== true || des.datosNuevos?.activo !== false) {
+    if (des.datosAnteriores?.activo !== true || des.datosNuevos?.activo !== false || des.datosNuevos?.motivoEgreso !== 'Prueba e2e de borrado logico') {
       throw new Error(`antes=${JSON.stringify(des.datosAnteriores)} despues=${JSON.stringify(des.datosNuevos)}`);
     }
     const cre = filas.find(f => f.accion === 'crear');

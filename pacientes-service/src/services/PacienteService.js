@@ -102,12 +102,37 @@ class PacienteService {
    * visitas, dispensaciones y cuenta; el paciente deja de aparecer en los
    * listados y no puede recibir nuevas atenciones.
    */
-  async desactivar(id) {
+  /**
+   * Caso 6: egreso del interno (baja logica). Exige motivoEgreso (3 a 300
+   * caracteres); fechaEgreso es opcional (YYYY-MM-DD, por defecto ahora),
+   * no puede ser futura ni anterior al ingreso.
+   */
+  async desactivar(id, { motivoEgreso, fechaEgreso } = {}) {
     const paciente = await this.obtener(id);
     if (paciente.activo === false) {
       throw Object.assign(new Error('El paciente ya esta desactivado'), { status: 409 });
     }
-    return this.repo.cambiarActivo(id, false);
+    const motivo = String(motivoEgreso ?? '').trim();
+    if (motivo.length < 3 || motivo.length > 300) {
+      throw Object.assign(new Error('motivoEgreso es requerido (3 a 300 caracteres)'), { status: 400 });
+    }
+    // Por defecto hoy (dia de Guatemala, UTC-6), a mediodia.
+    const hoyGt = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    let fecha = new Date(`${hoyGt}T18:00:00Z`);
+    if (fechaEgreso != null && fechaEgreso !== '') {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(fechaEgreso)) || isNaN(Date.parse(`${fechaEgreso}T12:00:00Z`))) {
+        throw Object.assign(new Error('fechaEgreso debe tener formato YYYY-MM-DD'), { status: 400 });
+      }
+      // Mediodia de Guatemala (18:00 UTC): la fecha no cambia al mostrarla en UTC-6.
+      fecha = new Date(`${fechaEgreso}T18:00:00Z`);
+      if (fecha.getTime() > Date.now() + 24 * 60 * 60 * 1000) {
+        throw Object.assign(new Error('fechaEgreso no puede ser futura'), { status: 400 });
+      }
+      if (paciente.fechaIngreso && fecha < new Date(String(paciente.fechaIngreso).slice(0, 10))) {
+        throw Object.assign(new Error('fechaEgreso no puede ser anterior al ingreso'), { status: 400 });
+      }
+    }
+    return this.repo.cambiarActivo(id, false, { fechaEgreso: fecha, motivoEgreso: motivo });
   }
 
   async reactivar(id) {

@@ -81,16 +81,16 @@ describe('PacienteController registra auditoria', () => {
   test('desactivar paciente -> auditoria con IP, modulo y estado anterior / nuevo', async () => {
     const service = {
       obtener: jest.fn(async id => ({ id, nombres: 'Rosa', apellidos: 'Gomez', activo: true })),
-      desactivar: jest.fn(async id => ({ id, nombres: 'Rosa', apellidos: 'Gomez', activo: false }))
+      desactivar: jest.fn(async id => ({ id, nombres: 'Rosa', apellidos: 'Gomez', activo: false, motivoEgreso: 'Traslado' }))
     };
     const auditoria = { registrar: jest.fn(async () => ({})) };
     const res = resMock();
-    const req = { params: { id: '12' }, usuario, ip: '190.5.5.5', headers: {} };
+    const req = { params: { id: '12' }, usuario, ip: '190.5.5.5', headers: {}, body: { motivoEgreso: 'Traslado' } };
     await new PacienteController(service, auditoria).desactivar(req, res);
     expect(res.body).toMatchObject({ id: 12, activo: false });
     expect(auditoria.registrar).toHaveBeenCalledWith(
       { usuario, ip: '190.5.5.5', modulo: 'pacientes' },
-      'desactivar', 'paciente', 12, 'Rosa Gomez',
+      'desactivar', 'paciente', 12, 'egreso de Rosa Gomez: Traslado',
       { antes: expect.objectContaining({ activo: true }), despues: expect.objectContaining({ activo: false }) });
   });
 
