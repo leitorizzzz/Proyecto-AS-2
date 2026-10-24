@@ -10,6 +10,10 @@ function crearRutasAuth(authController) {
   router.post('/register', autenticar, autorizarRoles('admin'), authController.register);
 
   router.post('/login', authController.login);
+
+  // Recuperacion de contrasena (RF-42, UC-10.4): sin sesion.
+  router.post('/recuperar', authController.recuperar);
+  router.post('/restablecer', authController.restablecer);
   router.get('/me', autenticar, authController.me);
 
   // Directorio de personal (sin passwordHash). Lo usan coordinacion, para

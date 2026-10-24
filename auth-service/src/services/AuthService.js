@@ -1,4 +1,5 @@
 const HashPool = require('./hashPool');
+const { validarPassword } = require('./reglasPassword');
 const jwt = require('jsonwebtoken');
 const Usuario = require('../models/Usuario');
 
@@ -36,7 +37,8 @@ class AuthService {
   async registrar({ nombre, email, password, rol }) {
     if (!nombre || nombre.trim() === '') throw new Error('El nombre es requerido');
     if (!email || !EMAIL_REGEX.test(email)) throw new Error('El email no es valido');
-    if (!password || password.length < 6) throw new Error('La password debe tener al menos 6 caracteres');
+    // Misma regla que el restablecimiento por recuperacion (reglasPassword.js).
+    validarPassword(password);
     if (!ROLES_VALIDOS.includes(rol)) {
       throw new Error(`Rol invalido. Debe ser uno de: ${ROLES_VALIDOS.join(', ')}`);
     }

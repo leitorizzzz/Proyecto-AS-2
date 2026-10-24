@@ -67,6 +67,9 @@ services:
     environment:
       PORT: 3000
       TRUST_PROXY_HOST: frontend   # trust proxy: solo el nginx del frontend (caso 24)
+      NOTIFICACIONES_URL: http://notificaciones-service:3006
+      RECUPERACION_URL_BASE: ${RECUPERACION_URL_BASE:-http://localhost:8090}
+      RECUPERACION_MINUTOS: 30
       DB_SERVER: sqlserver
       DB_PORT: 1433
       DB_NAME: AsiloCabezaAlgodon

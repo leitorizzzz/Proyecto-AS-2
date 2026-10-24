@@ -83,6 +83,23 @@ async function req(method, url, { body, token, esperarStatus } = {}) {
   return { status: r.status, data };
 }
 
+/**
+ * Lee de la tabla notificaciones el enlace de recuperacion enviado a un
+ * correo. La API lo oculta a proposito (RF-42); solo se puede en el stack
+ * local, con docker. Devuelve null si no hay docker a mano.
+ */
+function enlaceRecuperacionLocal(email) {
+  if (!['localhost', '127.0.0.1'].includes(BASE_HOST)) return null;
+  const { execFileSync } = require('child_process');
+  const consulta = `SET NOCOUNT ON; SELECT TOP 1 cuerpo FROM notificaciones WHERE destinatarioEmail = '${email.replace(/'/g, "''")}' AND tipoEvento = 'recuperacion_password' ORDER BY id DESC`;
+  try {
+    const salida = execFileSync('docker', ['exec', 'asilo-sqlserver', 'sh', '-c',
+      'SQLCMD=$(ls /opt/mssql-tools*/bin/sqlcmd | head -1); $SQLCMD -C -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -d AsiloCabezaAlgodon -y 0 -Q "$0"', consulta],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    return (salida.match(/#restablecer=([A-Za-z0-9_-]{43})/) || [])[1] || null;
+  } catch { return null; }
+}
+
 async function login(email, password) {
   const r = await req('POST', `${API.auth}/api/auth/login`, {
     body: { email, password }, esperarStatus: 200
@@ -1031,6 +1048,47 @@ function familiarE2E(dpi) {
     }
     if ((await rep('examenes', ayer, ayer)).some(esperado.examenes)) throw new Error('ayer-a-ayer incluye un examen de hoy');
     ok(`7 reportes ${hoy}..${hoy} con registros propios; ${ayer}..${ayer} sin ellos`);
+  } catch (e) { falla(e.message); }
+
+  // RF-42 / UC-10.4: recuperacion de contrasena sobre una cuenta propia.
+  paso('RF-42: recuperar contrasena (misma respuesta exista o no), enlace de un uso y login con la nueva');
+  try {
+    const cuenta = { nombre: 'E2E Recuperacion', email: `e2e.recupera.${TS}@asilo.gt`, password: 'E2eDemo1234', rol: 'enfermero' };
+    await asegurarUsuario(adminToken, cuenta);
+    const pedir = email => req('POST', `${NGINX}/auth/api/auth/recuperar`, { body: { email }, esperarStatus: 200 });
+    const [real, falsa] = [await pedir(cuenta.email), await pedir(`no.existe.${TS}@asilo.gt`)];
+    if (JSON.stringify(real.data) !== JSON.stringify(falsa.data)) throw new Error('la respuesta revela si el correo existe');
+    await req('POST', `${API.auth}/api/auth/recuperar`, { body: { email: 'no-es-correo' }, esperarStatus: 400 });
+    // El correo sale en segundo plano: se espera a que aparezca en el log.
+    let notif;
+    for (let i = 0; i < 20 && !notif; i++) {
+      const log = (await req('GET', `${API.notificaciones}/api/notificaciones?limit=50`, { token: adminToken, esperarStatus: 200 })).data;
+      notif = log.find(n => n.destinatarioEmail === cuenta.email && n.tipoEvento === 'recuperacion_password');
+      if (!notif) await new Promise(r => setTimeout(r, 250));
+    }
+    if (!notif || notif.estado !== 'enviada' || !notif.idMensajeProveedor) throw new Error(`log: ${JSON.stringify(notif)}`);
+    if (/restablecer=/.test(JSON.stringify(notif))) throw new Error('el log de la API expone el enlace');
+    await req('POST', `${API.auth}/api/auth/restablecer`, { body: { token: 'A'.repeat(43), password: 'Nueva12345' }, esperarStatus: 400 });
+    const token = enlaceRecuperacionLocal(cuenta.email);
+    let detalle = 'sin docker local: flujo completo cubierto solo por la prueba unitaria';
+    if (token) {
+      await req('POST', `${NGINX}/auth/api/auth/restablecer`, { body: { token, password: '123' }, esperarStatus: 400 });
+      await req('POST', `${NGINX}/auth/api/auth/restablecer`, { body: { token, password: 'Nueva12345' }, esperarStatus: 200 });
+      await req('POST', `${API.auth}/api/auth/restablecer`, { body: { token, password: 'Otra12345' }, esperarStatus: 400 });
+      await req('POST', `${API.auth}/api/auth/login`, { body: { email: cuenta.email, password: cuenta.password }, esperarStatus: 401 });
+      await login(cuenta.email, 'Nueva12345');
+      detalle = 'enlace usado una vez; la contrasena vieja ya no entra y la nueva si';
+    }
+    // Auditoria: solicitud (y cambio) registrados para esa cuenta.
+    const yo = (await req('GET', `${API.auth}/api/auth/usuarios?incluirInactivos=true`, { token: adminToken, esperarStatus: 200 })).data
+      .find(u => u.email === cuenta.email);
+    const desde = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const aud = (await req('GET', `${API.reportes}/api/auditoria?desde=${encodeURIComponent(desde)}&entidad=usuario&idEntidad=${yo.id}`,
+      { token: adminToken, esperarStatus: 200 })).data.map(a => a.detalle).join(' | ');
+    if (!/recuperacion de contrasena solicitada/.test(aud) || (token && !/contrasena restablecida/.test(aud))) throw new Error(`auditoria: ${aud}`);
+    // La cuenta de prueba no queda activa.
+    await req('PATCH', `${API.auth}/api/auth/usuarios/${yo.id}/desactivar`, { token: adminToken, esperarStatus: 200 });
+    ok(`respuesta identica; notificacion #${notif.id} ${notif.idMensajeProveedor}; ${detalle}`);
   } catch (e) { falla(e.message); }
 
   paso('limpieza: desactivar el medicamento propio del smoke');

@@ -20,7 +20,9 @@ function app() {
     me: (_r, res) => res.json({ id: 1 }),
     listarUsuarios: (_r, res) => res.json([]),
     desactivarUsuario: (_r, res) => res.json({}),
-    reactivarUsuario: (_r, res) => res.json({})
+    reactivarUsuario: (_r, res) => res.json({}),
+    recuperar: (_r, res) => res.json({ mensaje: 'm' }),
+    restablecer: (_r, res) => res.json({ mensaje: 'm' })
   };
   const a = express();
   a.use(express.json());
@@ -29,6 +31,12 @@ function app() {
 }
 
 describe('RBAC auth-service', () => {
+  test('recuperar y restablecer no exigen sesion (RF-42)', async () => {
+    const srv0 = app();
+    expect((await request(srv0).post('/api/auth/recuperar').send({ email: 'a@b.gt' })).status).toBe(200);
+    expect((await request(srv0).post('/api/auth/restablecer').send({})).status).toBe(200);
+  });
+
   const srv = app();
   const get = rol => request(srv).get('/api/auth/usuarios').set('Authorization', `Bearer ${tokenConRol(rol)}`);
 

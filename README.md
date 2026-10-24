@@ -23,6 +23,11 @@ reportes.
   autenticado salvo las órdenes de laboratorio. Tabla completa en
   [CONTEXT_SISTEMA.md §3.3](CONTEXT_SISTEMA.md).
 - Dominio en español, estructura técnica en inglés.
+- **Recuperación de contraseña** (RF-42): "¿Olvidaste tu contraseña?" en
+  el login → `POST /api/auth/recuperar` (misma respuesta exista o no el
+  correo) → enlace por correo de un solo uso, válido 30 min, guardado solo
+  como hash → `POST /api/auth/restablecer`. Detalle en
+  [auth-service/README.md](auth-service/README.md).
 - Comunicación entre servicios **mixta** (ver
   [CONTEXT_SISTEMA.md §4.1](CONTEXT_SISTEMA.md)): HTTP + JWT para
   efectos secundarios (pacientes → notificaciones; notificaciones →

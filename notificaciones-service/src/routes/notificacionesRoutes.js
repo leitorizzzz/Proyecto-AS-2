@@ -8,6 +8,8 @@ function crearRutasNotificaciones(ctrl) {
 
   // Endpoint invocado por pacientes-service cuando se crea una solicitud
   router.post('/solicitud', ctrl.enviarSolicitud);
+  // RF-42: solo auth-service (JWT de servicio con rol 'sistema').
+  router.post('/recuperacion', autorizarRoles('sistema'), ctrl.enviarRecuperacion);
 
   // Listado + ver + reintentar manual (admin)
   router.get('/', ctrl.log);

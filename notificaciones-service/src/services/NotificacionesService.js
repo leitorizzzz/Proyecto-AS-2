@@ -43,6 +43,39 @@ class NotificacionesService {
     });
   }
 
+  /**
+   * RF-42: correo con el enlace de recuperacion de contrasena. El cuerpo
+   * (que lleva el token) queda en la tabla para los reintentos, pero nunca
+   * se devuelve por la API (ver _publica).
+   */
+  async enviarCorreoRecuperacion({ email, nombre, enlace, minutos = 30 } = {}) {
+    if (!email || !enlace) {
+      throw Object.assign(new Error('email y enlace son requeridos'), { status: 400 });
+    }
+    const n = await this._crearYEnviar({
+      idPaciente: null,
+      tipoEvento: Notificacion.EVENTOS.RECUPERACION_PASSWORD,
+      destinatarioEmail: email,
+      asunto: 'Recuperacion de contrasena - Asilo Cabeza de Algodon',
+      cuerpo: this._plantillaRecuperacion({ nombre, enlace, minutos })
+    });
+    return this._publica(n);
+  }
+
+  /** Oculta el cuerpo de los correos con enlaces de un solo uso. */
+  _publica(n) {
+    if (!n || n.tipoEvento !== Notificacion.EVENTOS.RECUPERACION_PASSWORD) return n;
+    return { ...n, cuerpo: '[oculto: contiene un enlace de recuperacion de un solo uso]' };
+  }
+
+  _plantillaRecuperacion({ nombre, enlace, minutos }) {
+    const esc = s => String(s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    return `<p>Hola ${esc(nombre)}:</p>
+<p>Se pidio crear una nueva contrasena para su cuenta del Sistema del Asilo Cabeza de Algodon.</p>
+<p><a href="${esc(enlace)}">Crear nueva contrasena</a></p>
+<p>El enlace vence en ${Number(minutos)} minutos y sirve una sola vez. Si usted no lo pidio, ignore este correo: su contrasena no cambia.</p>`;
+  }
+
   async _crearYEnviar(datos) {
     const notif = await this.repo.guardar(new Notificacion({
       ...datos,
@@ -135,14 +168,14 @@ class NotificacionesService {
     if (notif.estado === Notificacion.ESTADOS.FALLIDA_DEFINITIVA) {
       notif.intentos = 0;
     }
-    return this.intentarEnvio(notif);
+    return this._publica(await this.intentarEnvio(notif));
   }
 
-  logNotificaciones(filtros) {
-    return this.repo.listar(filtros);
+  async logNotificaciones(filtros) {
+    return (await this.repo.listar(filtros)).map(n => this._publica(n));
   }
 
-  obtenerPorId(id) { return this.repo.obtenerPorId(id); }
+  async obtenerPorId(id) { return this._publica(await this.repo.obtenerPorId(id)); }
 
   _plantillaSolicitud({ pacienteNombre, especialidad, motivo }) {
     return `<!doctype html>

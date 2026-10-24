@@ -1,14 +1,54 @@
 const AuditoriaService = require('../services/AuditoriaService');
+const RecuperacionService = require('../services/RecuperacionService');
 
 /**
  * CAPA DE PRESENTACION (API REST)
  * Traduce peticiones HTTP en llamadas a la capa de logica de negocio.
  */
 class AuthController {
-  constructor(authService, auditoriaService) {
+  constructor(authService, auditoriaService, recuperacionService = null) {
     this.service = authService;
     this.auditoria = auditoriaService;
+    this.recuperacion = recuperacionService;
   }
+
+  /** Auditoria de acciones sin sesion: el "usuario" es la cuenta afectada. */
+  _auditarCuenta = (req, usuario, detalle) =>
+    this.auditoria
+      ? this.auditoria.registrar({ ...AuditoriaService.contextoDe(req, 'usuarios'), usuario: { sub: usuario.id, email: usuario.email } },
+          'modificar', 'usuario', usuario.id, detalle)
+      : null;
+
+  /**
+   * RF-42: siempre la misma respuesta, exista o no el correo. El trabajo
+   * (token, correo, auditoria) sigue despues de responder, asi el tiempo de
+   * respuesta tampoco revela si la cuenta existe.
+   */
+  recuperar = async (req, res) => {
+    let email;
+    try { email = RecuperacionService.validarEmail(req.body?.email); }
+    catch (error) { return res.status(400).json({ error: error.message }); }
+    res.json({ mensaje: 'Si el correo pertenece a una cuenta activa, en unos minutos recibira un enlace para crear una nueva contrasena. El enlace vence en 30 minutos.' });
+    try {
+      const r = await this.recuperacion.solicitar(email);
+      if (r.enviado) {
+        await this._auditarCuenta(req, r.usuario,
+          `recuperacion de contrasena solicitada (notificacion #${r.idNotificacion ?? '-'}, vence ${r.expira.toISOString()})`);
+      }
+    } catch (error) {
+      console.warn(`[recuperacion] no se completo la solicitud: ${error.message}`);
+    }
+  };
+
+  restablecer = async (req, res) => {
+    try {
+      const usuario = await this.recuperacion.restablecer(req.body || {});
+      await this._auditarCuenta(req, usuario, 'contrasena restablecida con enlace de recuperacion');
+      res.json({ mensaje: 'Contrasena actualizada. Ya puede iniciar sesion.' });
+    } catch (error) {
+      res.status(error.status || 500).json({ error: error.message });
+    }
+  };
 
   /** Registra en auditoria (usuario, IP, modulo, antes/despues); nunca falla. */
   _auditar = (req, accion, entidad, idEntidad, detalle, antes = null, despues = null) =>

@@ -272,8 +272,10 @@ function puedeAccion(nombre) {
  * ============================================================ */
 
 document.addEventListener('DOMContentLoaded', () => {
+  // RF-42: el enlace del correo trae el token en el fragmento (#restablecer=...).
+  const tokenRestablecer = (window.location.hash.match(/^#restablecer=([A-Za-z0-9_-]+)$/) || [])[1];
   // Rehidratacion de sesion
-  const saved = localStorage.getItem('asilo.token');
+  const saved = tokenRestablecer ? null : localStorage.getItem('asilo.token');
   if (saved) {
     state.token = saved;
     state.usuario = decodificarJWT(saved);
@@ -289,6 +291,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   $('#formLogin').addEventListener('submit', onLogin);
+  $('#btnOlvide').addEventListener('click', () => mostrarFormAcceso('recuperar'));
+  $$('[data-volver-login]').forEach(b => b.addEventListener('click', () => mostrarFormAcceso('login')));
+  $('#formRecuperar').addEventListener('submit', onRecuperar);
+  $('#formRestablecer').addEventListener('submit', e => onRestablecer(e, state.tokenRestablecer));
+  if (tokenRestablecer) {
+    state.tokenRestablecer = tokenRestablecer;
+    // Se quita el token de la barra de direcciones y del historial.
+    history.replaceState(null, '', window.location.pathname);
+    mostrarFormAcceso('restablecer');
+  }
   $('#btnSalir').addEventListener('click', onLogout);
   $$('.tab').forEach(b => b.addEventListener('click', () => cambiarTab(b.dataset.tab)));
 
@@ -401,6 +413,43 @@ async function onLogin(e) {
   } finally {
     btn.disabled = false;
   }
+}
+
+/* RF-42: recuperacion de contrasena desde la pantalla de acceso. */
+function mostrarFormAcceso(cual) {
+  $('#formLogin').classList.toggle('hidden', cual !== 'login');
+  $('#formRecuperar').classList.toggle('hidden', cual !== 'recuperar');
+  $('#formRestablecer').classList.toggle('hidden', cual !== 'restablecer');
+  const foco = { login: '#email', recuperar: '#recEmail', restablecer: '#resPassword' }[cual];
+  if (cual === 'recuperar' && $('#email').value) $('#recEmail').value = $('#email').value;
+  $(foco).focus();
+}
+
+async function onRecuperar(e) {
+  e.preventDefault();
+  const msg = $('#msgRecuperar'); limpiar(msg);
+  const btn = $('#btnRecuperar'); btn.disabled = true;
+  try {
+    const r = await api(API.auth, '/api/auth/recuperar', { method: 'POST', body: { email: $('#recEmail').value.trim() } });
+    ok(msg, r.mensaje);
+  } catch (err) { error(msg, err.message); }
+  finally { btn.disabled = false; }
+}
+
+async function onRestablecer(e, token) {
+  e.preventDefault();
+  const msg = $('#msgRestablecer'); limpiar(msg);
+  const password = $('#resPassword').value;
+  if (password !== $('#resPassword2').value) return error(msg, 'Las dos contraseñas no coinciden.');
+  const btn = $('#btnRestablecer'); btn.disabled = true;
+  try {
+    const r = await api(API.auth, '/api/auth/restablecer', { method: 'POST', body: { token, password } });
+    state.tokenRestablecer = null;
+    e.target.reset();
+    mostrarFormAcceso('login');
+    ok($('#msgLogin'), r.mensaje);
+  } catch (err) { error(msg, err.message); }
+  finally { btn.disabled = false; }
 }
 
 function onLogout() {

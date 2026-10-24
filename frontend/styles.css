@@ -741,6 +741,7 @@ ul.cambios code { font-family: var(--font-mono); font-size: var(--fs-tiny); }
   color: var(--text-soft); font-size: var(--fs-meta);
   margin-bottom: 20px;
 }
+.login-card p.olvide { margin-top: 16px; text-align: center; }
 
 /* ============ VISITA ============ */
 .visita-panel {

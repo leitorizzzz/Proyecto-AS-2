@@ -45,7 +45,8 @@ Notificacion.ESTADOS = Object.freeze({
 Notificacion.EVENTOS = Object.freeze({
   SOLICITUD_CREADA: 'solicitud_creada',
   CITA_ASIGNADA: 'cita_asignada',
-  VISITA_COMPLETADA: 'visita_completada'
+  VISITA_COMPLETADA: 'visita_completada',
+  RECUPERACION_PASSWORD: 'recuperacion_password'
 });
 
 module.exports = Notificacion;

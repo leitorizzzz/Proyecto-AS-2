@@ -104,3 +104,39 @@ describe('NotificacionesService', () => {
     await expect(svc.reintentarManual(1)).rejects.toMatchObject({ status: 409 });
   });
 });
+
+describe('Correo de recuperacion de contrasena (RF-42)', () => {
+  test('queda en el log (simulacion) y la API nunca devuelve el enlace', async () => {
+    process.env.MODO_SIMULACION = 'true';
+    const guardadas = [];
+    const repo = {
+      guardar: jest.fn(async n => { const g = { ...n, id: 9, intentos: 0 }; guardadas.push(g); return g; }),
+      marcarEnviada: jest.fn(async () => {}),
+      listar: jest.fn(async () => guardadas),
+      obtenerPorId: jest.fn(async () => guardadas[0])
+    };
+    const svc = new NotificacionesService(repo);
+    const r = await svc.enviarCorreoRecuperacion({ email: 'ana@asilo.gt', nombre: 'Ana', enlace: 'http://x/#restablecer=SECRETO', minutos: 30 });
+    expect(r).toMatchObject({ estado: 'enviada', tipoEvento: 'recuperacion_password', idMensajeProveedor: expect.stringMatching(/^sim-/) });
+    expect(guardadas[0].cuerpo).toContain('SECRETO');          // queda para los reintentos
+    expect(JSON.stringify(r)).not.toContain('SECRETO');
+    expect(JSON.stringify(await svc.logNotificaciones({}))).not.toContain('SECRETO');
+    expect(JSON.stringify(await svc.obtenerPorId(9))).not.toContain('SECRETO');
+    await expect(svc.enviarCorreoRecuperacion({ email: 'ana@asilo.gt' })).rejects.toMatchObject({ status: 400 });
+  });
+
+  test('POST /recuperacion solo con el JWT de servicio (rol sistema)', async () => {
+    process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
+    const express = require('express');
+    const request = require('supertest');
+    const jwt = require('jsonwebtoken');
+    const crearRutas = require('../src/routes/notificacionesRoutes');
+    const ok = (_r, res) => res.status(201).json({});
+    const a = express(); a.use(express.json());
+    a.use('/api/notificaciones', crearRutas({ enviarSolicitud: ok, enviarRecuperacion: ok, log: ok, obtener: ok, reintentar: ok }));
+    const tk = rol => `Bearer ${jwt.sign({ sub: 1, email: 'x', rol }, process.env.JWT_SECRET)}`;
+    expect((await request(a).post('/api/notificaciones/recuperacion').set('Authorization', tk('sistema')).send({})).status).toBe(201);
+    expect((await request(a).post('/api/notificaciones/recuperacion').set('Authorization', tk('admin')).send({})).status).toBe(403);
+    expect((await request(a).post('/api/notificaciones/recuperacion').send({})).status).toBe(401);
+  });
+});

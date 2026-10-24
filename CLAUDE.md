@@ -54,6 +54,21 @@ enfermero de la solicitud). **bcrypt corre en hilos de trabajo**
 (`services/hashPool.js` + `hashWorker.js`, `HASH_HILOS`): mismo algoritmo
 y costo 10, pero los logins simultáneos ya no se atienden en fila (caso 25:
 login máx. 7,1 s → < 1 s con 50 usuarios).
+**Recuperación de contraseña (RF-42, UC-10.4)**: `POST /api/auth/recuperar`
+{email} responde siempre el mismo 200 (exista o no la cuenta; el trabajo
+sigue en segundo plano) y `POST /api/auth/restablecer` {token, password}.
+`RecuperacionService` + `TokenRecuperacionRepository` (tabla
+`tokens_recuperacion`, solo el hash SHA-256 del token de 256 bits, vence
+en `RECUPERACION_MINUTOS`=30, un solo uso con UPDATE condicional en la
+misma transacción que cambia la contraseña; pedir otro invalida los
+anteriores). La nueva contraseña usa la misma regla que el alta
+(`services/reglasPassword.js`: hoy solo mínimo 6). El correo sale por
+notificaciones-service (`POST /api/notificaciones/recuperacion`, solo JWT
+de servicio rol `sistema` firmado por auth, 1 min) con el enlace
+`RECUPERACION_URL_BASE/#restablecer=<token>`; la API de notificaciones
+nunca devuelve ese cuerpo. Se audita la solicitud y el cambio. En el
+login, "¿Olvidaste tu contraseña?" abre el formulario; el enlace abre
+"Nueva contraseña" y borra el token de la barra de direcciones.
 
 ### `pacientes-service/` — ✅ funcional, agrupa 3 dominios
 **Importante:** Solicitudes y Visita Médica NO son microservicios aparte —
@@ -344,7 +359,7 @@ en [`scripts/README.md`](scripts/README.md).
 
 ## Pendiente de implementar
 
-1. Insertar las capturas reales en `docs/MANUAL_USUARIO.md` (29
+1. Insertar las capturas reales en `docs/MANUAL_USUARIO.md` (30
    marcadores `[CAPTURA: ...]`).
 2. Renderizar los `.mmd` a PNG con mermaid-cli para la entrega impresa
    (hoy sólo quedan como fuente .mmd).

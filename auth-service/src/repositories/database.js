@@ -55,6 +55,21 @@ async function inicializarEsquema() {
     )
     ALTER TABLE usuarios ADD activo BIT NOT NULL CONSTRAINT DF_usuarios_activo DEFAULT 1;
   `);
+  // Recuperacion de contrasena (RF-42): solo el hash SHA-256 del token.
+  await pool.request().query(`
+    IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'tokens_recuperacion')
+    CREATE TABLE tokens_recuperacion (
+      id INT IDENTITY(1,1) PRIMARY KEY,
+      idUsuario INT NOT NULL,
+      tokenHash CHAR(64) NOT NULL,
+      expira DATETIME2 NOT NULL,
+      usado DATETIME2 NULL,
+      fechaCreacion DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+      CONSTRAINT FK_tokens_recuperacion_usuario FOREIGN KEY (idUsuario) REFERENCES usuarios(id),
+      CONSTRAINT UQ_tokens_recuperacion_hash UNIQUE (tokenHash)
+    );
+  `);
+
   // Tabla compartida de auditoria (idempotente; ver AuditoriaRepository).
   // require diferido: AuditoriaRepository depende de este modulo.
   await require('./AuditoriaRepository').crearTablaAuditoria(pool);

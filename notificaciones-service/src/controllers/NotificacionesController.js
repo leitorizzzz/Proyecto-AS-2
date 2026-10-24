@@ -13,6 +13,13 @@ class NotificacionesController {
     } catch (error) { this._fallo(res, error); }
   };
 
+  enviarRecuperacion = async (req, res) => {
+    try {
+      const notif = await this.service.enviarCorreoRecuperacion(req.body);
+      res.status(201).json(notif);
+    } catch (error) { this._fallo(res, error); }
+  };
+
   log = async (req, res) => {
     try {
       const limit = req.query.limit ? Number(req.query.limit) : 50;

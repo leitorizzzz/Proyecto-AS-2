@@ -35,11 +35,40 @@ scripts/
 | GET    | `/api/auth/usuarios[?rol=a,b][&incluirInactivos=true]` | JWT | admin, coordinador_fundacion | Directorio sin `passwordHash`, solo cuentas activas, filtrable por uno o varios roles; rol desconocido → 400; `incluirInactivos` solo admin. Lo usa el dialogo "Asignar cita" para elegir especialista |
 | PATCH  | `/api/auth/usuarios/:id/desactivar` | JWT | admin | Desactiva la cuenta (no la propia → 409). Su login responde 403 "Cuenta desactivada" |
 | PATCH  | `/api/auth/usuarios/:id/reactivar` | JWT | admin | Reactiva la cuenta |
+| POST   | `/api/auth/recuperar`      | —    | —        | RF-42. `{ email }` → siempre el mismo 200, exista o no la cuenta. Si existe y está activa: token nuevo (vence en 30 min) y correo con el enlace por notificaciones-service. Correo mal formado → 400 |
+| POST   | `/api/auth/restablecer`    | —    | —        | RF-42. `{ token, password }` → 200 y cambia la contraseña; token falso, usado o vencido → 400; contraseña que no cumple la regla del alta → 400 |
 
 Columna `usuarios.activo` (BIT, default 1). Un JWT emitido antes de
 desactivar la cuenta sigue siendo valido hasta su `exp`: los demas
 servicios solo verifican la firma. El alta y la (des)activacion de
 cuentas se registran en la tabla `auditoria`.
+
+### Recuperación de contraseña (RF-42, UC-10.4)
+
+1. `POST /api/auth/recuperar` responde de inmediato con el mismo mensaje
+   para cualquier correo bien formado; el resto ocurre después de
+   responder, así ni el contenido ni el tiempo de respuesta revelan si la
+   cuenta existe.
+2. Si la cuenta existe y está activa: se genera un token de 32 bytes
+   aleatorios (`crypto.randomBytes`, base64url); en `tokens_recuperacion`
+   solo se guarda su **SHA-256**, con `expira` = ahora + 30 min. Los
+   tokens anteriores sin usar de esa cuenta se invalidan.
+3. El enlace `RECUPERACION_URL_BASE/#restablecer=<token>` va por
+   notificaciones-service (`POST /api/notificaciones/recuperacion`, con un
+   JWT de servicio de 1 minuto y rol `sistema`). En `MODO_SIMULACION=true`
+   queda en el log con `idMensajeProveedor = sim-...`; la API del log
+   nunca devuelve el cuerpo de estos correos.
+4. `POST /api/auth/restablecer` valida la contraseña con la misma regla
+   del alta (`reglasPassword.js`), comprueba el token y, en una
+   transacción, lo marca usado (UPDATE condicional: un solo uso aunque
+   lleguen dos peticiones) y cambia el `passwordHash`.
+5. Auditoría (`entidad = usuario`, `accion = modificar`): "recuperacion de
+   contrasena solicitada" y "contrasena restablecida con enlace de
+   recuperacion", con la IP del cliente. Nunca se audita la contraseña ni
+   el token.
+
+Sin límite de solicitudes por correo o por IP (ver "Desviaciones" en
+`CLAUDE.md`).
 
 ### Roles validos (10)
 
@@ -87,6 +116,11 @@ Copiar `.env.example` a `.env`.
 | `DB_TRUST_SERVER_CERTIFICATE` | true             | self-signed en dev                                 |
 | `JWT_SECRET`              | —                    | **Mismo valor en los 7 servicios**                |
 | `JWT_EXPIRES_IN`          | 8h                   | Duracion del token (`8h`, `1d`, `30m`...)         |
+| `NOTIFICACIONES_URL`      | —                    | URL de notificaciones-service (correo de recuperacion) |
+| `RECUPERACION_URL_BASE`   | http://localhost:8090 | Origen del frontend para armar el enlace de recuperacion |
+| `RECUPERACION_MINUTOS`    | 30                   | Vigencia del enlace de recuperacion               |
+| `TRUST_PROXY_HOST`        | frontend             | Proxy de confianza para `req.ip` (caso 24)         |
+| `HASH_HILOS`              | nucleos - 1 (1..8)   | Hilos para bcrypt (caso 25)                        |
 
 ## Correr localmente
 

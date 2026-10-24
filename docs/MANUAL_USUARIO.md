@@ -107,6 +107,25 @@ Si los datos no son correctos aparece un mensaje **Error —** bajo el
 botón. Si la cuenta fue desactivada por administración, el mensaje es
 *Cuenta desactivada. Pida a administración que la reactive.*
 
+**¿Olvidó su contraseña?**
+
+1. En la pantalla de inicio, presionar **¿Olvidaste tu contraseña?**.
+2. Escribir su **Correo** y presionar **Enviar enlace**. El sistema
+   responde siempre con el mismo mensaje, esté o no registrado el correo
+   (así nadie puede averiguar qué cuentas existen).
+3. Si la cuenta existe y está activa, llega un correo con el enlace
+   **Crear nueva contraseña**. El enlace vence en **30 minutos** y sirve
+   **una sola vez**; si se pide otro, el anterior deja de funcionar.
+4. Al abrir el enlace aparece **Nueva contraseña**: escribirla dos veces
+   (mínimo 6 caracteres) y presionar **Guardar contraseña**. Vuelve la
+   pantalla de inicio con el aviso *Contraseña actualizada*.
+5. Si el enlace ya se usó o venció, el sistema lo indica: pedir uno nuevo.
+
+Una cuenta desactivada no puede recuperar su contraseña: debe pedir a
+administración que la reactive.
+
+[CAPTURA: formularios "Recuperar contraseña" y "Nueva contraseña"]
+
 **Importante.** La sesión dura 8 horas. Pasado ese tiempo el sistema
 pide volver a iniciar sesión. Para salir antes, usar **Cerrar sesión**
 al pie del menú lateral.
