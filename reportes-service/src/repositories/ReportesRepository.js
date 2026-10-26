@@ -71,15 +71,30 @@ class ReportesRepository {
       .input('desde', sql.DateTime2, new Date(desde))
       .input('hasta', sql.DateTime2, new Date(hasta))
       .query(`
-        SELECT
-          cm.fechaPago AS fecha,
-          (p.nombres + ' ' + p.apellidos) AS paciente,
-          'Cuota ' + CAST(cm.mes AS NVARCHAR) + '/' + CAST(cm.anio AS NVARCHAR) AS concepto,
-          cm.monto AS monto
-        FROM cuotas_mensuales cm
-        INNER JOIN pacientes p ON p.id = cm.idPaciente
-        WHERE cm.estado = 'pagada' AND cm.fechaPago >= @desde AND cm.fechaPago < @hasta
-        ORDER BY cm.fechaPago DESC
+        -- Lo cobrado a las familias: cuotas pagadas y abonos a cargos de
+        -- servicio (consulta, laboratorio, farmacia). Antes los abonos no
+        -- aparecian en ningun reporte de ingresos.
+        SELECT fecha, paciente, concepto, monto FROM (
+          SELECT
+            cm.fechaPago AS fecha,
+            (p.nombres + ' ' + p.apellidos) AS paciente,
+            'Cuota ' + CAST(cm.mes AS NVARCHAR) + '/' + CAST(cm.anio AS NVARCHAR) AS concepto,
+            cm.monto AS monto
+          FROM cuotas_mensuales cm
+          INNER JOIN pacientes p ON p.id = cm.idPaciente
+          WHERE cm.estado = 'pagada' AND cm.fechaPago >= @desde AND cm.fechaPago < @hasta
+          UNION ALL
+          SELECT
+            a.fecha AS fecha,
+            (p.nombres + ' ' + p.apellidos) AS paciente,
+            'Abono a cargo #' + CAST(cs.id AS NVARCHAR) + ': ' + cs.concepto AS concepto,
+            a.monto AS monto
+          FROM abonos_cargo a
+          INNER JOIN cargos_servicio cs ON cs.id = a.idCargo
+          INNER JOIN pacientes p ON p.id = cs.idPaciente
+          WHERE a.fecha >= @desde AND a.fecha < @hasta
+        ) t
+        ORDER BY fecha DESC
       `);
     return r.recordset;
   }
@@ -122,6 +137,16 @@ class ReportesRepository {
             cm.monto AS monto
           FROM cuotas_mensuales cm INNER JOIN pacientes p ON p.id = cm.idPaciente
           WHERE cm.estado = 'pagada' AND cm.fechaPago >= @desde AND cm.fechaPago < @hasta
+          UNION ALL
+          SELECT
+            a.fecha AS fecha,
+            ('Abono a cargo #' + CAST(cs.id AS NVARCHAR) + ' - ' + p.nombres + ' ' + p.apellidos) AS concepto,
+            'abono' AS tipo,
+            a.monto AS monto
+          FROM abonos_cargo a
+          INNER JOIN cargos_servicio cs ON cs.id = a.idCargo
+          INNER JOIN pacientes p ON p.id = cs.idPaciente
+          WHERE a.fecha >= @desde AND a.fecha < @hasta
         ) t
         ORDER BY fecha DESC
       `);

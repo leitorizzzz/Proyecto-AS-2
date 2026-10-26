@@ -93,7 +93,7 @@ const ETIQUETA_VALOR = {
   oftalmologia: 'Oftalmología', traumatologia: 'Traumatología',
   dermatologia: 'Dermatología', endocrinologia: 'Endocrinología',
   texto: 'Texto', numerico: 'Numérico', archivo: 'Archivo adjunto', mixto: 'Mixto',
-  dinero: 'Dinero', bienes: 'Bienes', otro: 'Otro', cuota: 'Cuota',
+  dinero: 'Dinero', bienes: 'Bienes', otro: 'Otro', cuota: 'Cuota', abono: 'Abono', entregado: 'Entregado',
   servicios: 'Servicios', mantenimiento: 'Mantenimiento', personal: 'Personal',
   alimentacion: 'Alimentación', medicamentos: 'Medicamentos', otros: 'Otros',
   // Entidades de la auditoria
@@ -2314,6 +2314,8 @@ function pintarReporteJson(rep) {
       const v = f[c.key];
       if (c.tipo === 'moneda') return `<td class="right num">${money(v)}</td>`;
       if (c.tipo === 'fecha')  return `<td class="tiny">${fechaCorta(v)}</td>`;
+      // Tipo de entrada (dinero, cuota, abono) y estado del resultado: texto legible.
+      if (['tipo', 'estadoResultado'].includes(c.key)) return `<td>${esc(etiqueta(v))}</td>`;
       return `<td>${esc(v)}</td>`;
     }).join('')
   }</tr>`).join('') || `<tr><td colspan="${rep.columnas.length}" class="tiny">Sin datos en el rango elegido.</td></tr>`;

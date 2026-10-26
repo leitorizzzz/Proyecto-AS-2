@@ -148,7 +148,7 @@ class ReportesService {
     const filas = await this.repo.entradas(this._limites(rango));
     return new Reporte({
       tipo: Reporte.TIPOS.ENTRADAS,
-      titulo: 'Entradas de dinero (donaciones y cuotas)',
+      titulo: 'Entradas de dinero (donaciones, cuotas y abonos)',
       filtros: rango,
       columnas: [
         { key: 'fecha', label: 'Fecha', tipo: 'fecha' },

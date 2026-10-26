@@ -132,6 +132,7 @@ function familiarE2E(dpi) {
   let medE2E;   // medicamento propio: no se toca el stock del inventario real
   let cargoVisita; // cargo generado al cerrar la visita (caso 19)
   let conceptoPagoE2E; // pago a fundacion propio (rango de reportes)
+  let abonosE2E;       // { idCargo, total }: abonos del caso 20 (reportes de ingresos)
   const TS = Date.now();
 
   // 00 - preparar usuarios (el smoke no depende de seed-demo)
@@ -845,6 +846,7 @@ function familiarE2E(dpi) {
     const a2 = (await req('POST', `${API.financiero}/api/financiero/cargos/${c.id}/abonos`, {
       body: { monto: a1.saldo, concepto: 'E2E abono' }, token: adminToken, esperarStatus: 201 })).data;
     if (a2.estado !== 'pagado' || a2.saldo !== 0) throw new Error(`tras abono 2: ${a2.estado} ${a2.saldo}`);
+    abonosE2E = { idCargo: c.id, total: Math.round(c.saldo * 100) / 100 };
     await req('POST', `${API.financiero}/api/financiero/cargos/${c.id}/abonos`, { body: { monto: 1 }, token: adminToken, esperarStatus: 409 });
     await req('POST', `${API.financiero}/api/financiero/cargos/${c.id}/abonos`, { body: { monto: 1 }, token: cfToken, esperarStatus: 403 });
     const despues = (await req('GET', `${API.financiero}/api/financiero/estado-cuenta/${pacB.id}`, { token: adminToken, esperarStatus: 200 })).data;
@@ -1051,7 +1053,17 @@ function familiarE2E(dpi) {
       if (!(await rep(tipo, hoy, hoy)).some(criterio)) throw new Error(`${tipo} ${hoy}..${hoy} no incluye el registro de hoy`);
     }
     if ((await rep('examenes', ayer, ayer)).some(esperado.examenes)) throw new Error('ayer-a-ayer incluye un examen de hoy');
-    ok(`7 reportes ${hoy}..${hoy} con registros propios; ${ayer}..${ayer} sin ellos`);
+    // Los abonos a cargos son ingresos: aparecen en cobros y en entradas por su monto exacto.
+    let abonos = '';
+    if (abonosE2E) {
+      const suma = (filas, prefijo) => Math.round(filas.filter(f => f.concepto.startsWith(prefijo)).reduce((a, f) => a + Number(f.monto), 0) * 100) / 100;
+      const enCobros = suma(await rep('cobros-por-rango', hoy, hoy), `Abono a cargo #${abonosE2E.idCargo}:`);
+      const enEntradas = suma(await rep('entradas', hoy, hoy), `Abono a cargo #${abonosE2E.idCargo} -`);
+      if (enCobros !== abonosE2E.total || enEntradas !== abonosE2E.total)
+        throw new Error(`abonos del cargo ${abonosE2E.idCargo}: Q${abonosE2E.total} pagados, cobros Q${enCobros}, entradas Q${enEntradas}`);
+      abonos = `; abonos del cargo ${abonosE2E.idCargo} (Q${abonosE2E.total}) en cobros y entradas`;
+    }
+    ok(`7 reportes ${hoy}..${hoy} con registros propios; ${ayer}..${ayer} sin ellos${abonos}`);
   } catch (e) { falla(e.message); }
 
   // RF-42: regla de contrasena del Analisis (8+, letra y numero) en el alta
