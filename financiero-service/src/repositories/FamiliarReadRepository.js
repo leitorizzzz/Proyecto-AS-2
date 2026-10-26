@@ -14,6 +14,14 @@ class FamiliarReadRepository {
     `);
     return r.recordset[0] || null;
   }
+
+  /** Lectura de la tabla compartida pacientes (activos y egresados). */
+  async existePaciente(idPaciente) {
+    const pool = await getPool();
+    const r = await pool.request().input('id', sql.Int, idPaciente)
+      .query('SELECT 1 AS hay FROM pacientes WHERE id = @id');
+    return r.recordset.length > 0;
+  }
 }
 
 module.exports = FamiliarReadRepository;

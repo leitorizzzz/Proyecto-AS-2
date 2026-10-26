@@ -6,6 +6,7 @@ const GastoOperativo = require('../models/GastoOperativo');
 const PagoFundacion = require('../models/PagoFundacion');
 const { asegurarTitularCompleto } = require('./reglasCuenta');
 const alertasCobro = require('./alertasCobro');
+const V = require('./reglasValores');
 
 /**
  * CAPA DE LOGICA DE NEGOCIO
@@ -28,7 +29,11 @@ class FinancieroService {
 
   // --- Cuenta del paciente ---
 
-  async estadoCuenta(idPaciente) {
+  async estadoCuenta(id) {
+    const idPaciente = V.idValido(id, 'idPaciente');
+    if (this.familiarRepo?.existePaciente && !(await this.familiarRepo.existePaciente(idPaciente))) {
+      throw Object.assign(new Error('Paciente no encontrado'), { status: 404 });
+    }
     const [cargos, cuotas, saldoCargos, saldoCuotas] = await Promise.all([
       this.cuentaRepo.listarCargosPorPaciente(idPaciente),
       this.cuentaRepo.cuotasPorPaciente(idPaciente),
@@ -66,12 +71,9 @@ class FinancieroService {
   async emitirCuota({ idPaciente, mes, anio, monto, fechaVencimiento }) {
     if (!idPaciente || !mes || !anio)
       throw Object.assign(new Error('idPaciente, mes y anio son requeridos'), { status: 400 });
-    if (!Number.isInteger(Number(mes)) || Number(mes) < 1 || Number(mes) > 12)
-      throw Object.assign(new Error('mes debe estar entre 1 y 12'), { status: 400 });
-    if (monto == null || !(Number(monto) > 0))
-      throw Object.assign(new Error('monto debe ser mayor a 0'), { status: 400 });
-    if (fechaVencimiento && (!/^\d{4}-\d{2}-\d{2}$/.test(String(fechaVencimiento)) || isNaN(Date.parse(fechaVencimiento))))
-      throw Object.assign(new Error('fechaVencimiento debe tener formato YYYY-MM-DD'), { status: 400 });
+    V.idValido(idPaciente, 'idPaciente'); V.mesValido(mes); V.anioValido(anio);
+    monto = V.montoValido(monto);
+    if (fechaVencimiento) V.fechaValida(fechaVencimiento, 'fechaVencimiento');
     asegurarTitularCompleto(
       this.familiarRepo ? await this.familiarRepo.obtenerPrincipal(Number(idPaciente)) : null, idPaciente);
     if (await this.cuentaRepo.obtenerCuota(Number(idPaciente), Number(mes), Number(anio)))
@@ -85,10 +87,9 @@ class FinancieroService {
 
   async generarCargo({ idPaciente, concepto, monto }) {
     if (!idPaciente) throw Object.assign(new Error('idPaciente es requerido'), { status: 400 });
-    if (!concepto || String(concepto).trim() === '')
-      throw Object.assign(new Error('concepto es requerido'), { status: 400 });
-    if (monto == null || Number(monto) <= 0)
-      throw Object.assign(new Error('monto debe ser mayor a 0'), { status: 400 });
+    V.idValido(idPaciente, 'idPaciente');
+    concepto = V.textoRequerido(concepto, 'concepto', 300);
+    monto = V.montoValido(monto);
     // Caso 20: la cuenta es del familiar responsable; debe estar completo.
     const titular = asegurarTitularCompleto(
       this.familiarRepo ? await this.familiarRepo.obtenerPrincipal(Number(idPaciente)) : null, idPaciente);
@@ -113,10 +114,7 @@ class FinancieroService {
    * que lo que falta se rechaza (409), no se trunca.
    */
   async registrarAbono(idCargo, { monto, concepto } = {}, idUsuario = null) {
-    const m = Number(monto);
-    if (!Number.isFinite(m) || m <= 0 || Math.abs(Math.round(m * 100) - m * 100) > 1e-6) {
-      throw Object.assign(new Error('monto debe ser mayor a 0 y con maximo 2 decimales'), { status: 400 });
-    }
+    const m = V.montoValido(monto);
     const cargo = await this.cuentaRepo.obtenerCargo(Number(idCargo));
     if (!cargo) throw Object.assign(new Error('Cargo no encontrado'), { status: 404 });
     if (cargo.estado === CargoServicio.ESTADOS.PAGADO || cargo.saldo <= 0) {
@@ -139,8 +137,8 @@ class FinancieroService {
   async registrarPagoCuota({ idPaciente, mes, anio, monto }) {
     if (!idPaciente || !mes || !anio)
       throw Object.assign(new Error('idPaciente, mes y anio son requeridos'), { status: 400 });
-    if (Number(mes) < 1 || Number(mes) > 12)
-      throw Object.assign(new Error('mes debe estar entre 1 y 12'), { status: 400 });
+    V.idValido(idPaciente, 'idPaciente'); V.mesValido(mes); V.anioValido(anio);
+    if (monto != null && monto !== '') monto = V.montoValido(monto);
     asegurarTitularCompleto(
       this.familiarRepo ? await this.familiarRepo.obtenerPrincipal(Number(idPaciente)) : null, idPaciente);
 
@@ -173,11 +171,13 @@ class FinancieroService {
   // --- Donantes / donaciones ---
 
   async registrarDonante({ nombre, telefono, email, direccion }) {
-    if (!nombre || String(nombre).trim() === '')
-      throw Object.assign(new Error('nombre es requerido'), { status: 400 });
-    return this.donanteRepo.guardarDonante(new Donante({
-      nombre: String(nombre).trim(), telefono, email, direccion
-    }));
+    nombre = V.textoRequerido(nombre, 'nombre', 200);
+    email = V.correoOpcional(email);
+    telefono = telefono == null || String(telefono).trim() === '' ? null : String(telefono).trim();
+    if (telefono && (telefono.length > 30 || !/^[0-9+()\-\s]+$/.test(telefono)))
+      throw Object.assign(new Error('telefono solo admite números, espacios, +, - y paréntesis (máx. 30)'), { status: 400 });
+    direccion = direccion == null || String(direccion).trim() === '' ? null : String(direccion).trim().slice(0, 300);
+    return this.donanteRepo.guardarDonante(new Donante({ nombre, telefono, email, direccion }));
   }
 
   listarDonantes({ incluirInactivos = false } = {}) {
@@ -210,8 +210,10 @@ class FinancieroService {
 
   async registrarDonacion({ idDonante, monto, tipo, concepto }) {
     if (!idDonante) throw Object.assign(new Error('idDonante es requerido'), { status: 400 });
-    if (monto == null || Number(monto) <= 0)
-      throw Object.assign(new Error('monto debe ser mayor a 0'), { status: 400 });
+    V.idValido(idDonante, 'idDonante');
+    monto = V.montoValido(monto);
+    if (concepto != null && String(concepto).length > 500)
+      throw Object.assign(new Error('concepto no puede pasar de 500 caracteres'), { status: 400 });
     if (tipo && !Donacion.TIPOS.includes(tipo))
       throw Object.assign(new Error(`tipo debe ser uno de: ${Donacion.TIPOS.join(', ')}`), { status: 400 });
 
@@ -237,9 +239,8 @@ class FinancieroService {
   // --- Gastos operativos ---
 
   async registrarGasto({ concepto, monto, categoria }) {
-    if (!concepto) throw Object.assign(new Error('concepto es requerido'), { status: 400 });
-    if (monto == null || Number(monto) <= 0)
-      throw Object.assign(new Error('monto debe ser mayor a 0'), { status: 400 });
+    concepto = V.textoRequerido(concepto, 'concepto', 300);
+    monto = V.montoValido(monto);
     if (categoria && !GastoOperativo.CATEGORIAS.includes(categoria))
       throw Object.assign(
         new Error(`categoria debe ser una de: ${GastoOperativo.CATEGORIAS.join(', ')}`),
@@ -255,9 +256,8 @@ class FinancieroService {
   // --- Pagos a fundacion ---
 
   async registrarPagoFundacion({ monto, concepto }) {
-    if (!concepto) throw Object.assign(new Error('concepto es requerido'), { status: 400 });
-    if (monto == null || Number(monto) <= 0)
-      throw Object.assign(new Error('monto debe ser mayor a 0'), { status: 400 });
+    concepto = V.textoRequerido(concepto, 'concepto', 300);
+    monto = V.montoValido(monto);
     return this.movimientosRepo.guardarPagoFundacion(new PagoFundacion({
       monto: Number(monto), concepto
     }));
