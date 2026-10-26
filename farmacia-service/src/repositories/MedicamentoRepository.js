@@ -24,6 +24,18 @@ class MedicamentoRepository {
     return result.recordset[0] ? new Medicamento(result.recordset[0]) : null;
   }
 
+  /** Medicamento activo con ese nombre y presentacion (sin distinguir mayusculas). */
+  async buscarActivoPorNombre(nombre, presentacion) {
+    const pool = await getPool();
+    const result = await pool.request()
+      .input('nombre', sql.NVarChar(200), nombre)
+      .input('presentacion', sql.NVarChar(200), presentacion || '')
+      .query(`SELECT TOP 1 * FROM medicamentos
+              WHERE activo = 1 AND LOWER(nombre) = LOWER(@nombre)
+                AND LOWER(ISNULL(presentacion, '')) = LOWER(@presentacion)`);
+    return result.recordset[0] ? new Medicamento(result.recordset[0]) : null;
+  }
+
   async guardar(medicamento) {
     const pool = await getPool();
     const result = await pool.request()

@@ -3,6 +3,9 @@ const Prescripcion = require('../models/Prescripcion');
 
 /** Descuento que la fundacion otorga a los miembros del asilo (RN-09) */
 const DESCUENTO_FUNDACION = 0.20; // 20%
+/** Limites del inventario: INT y DECIMAL(10,2) en la tabla medicamentos. */
+const MAX_STOCK = 1000000;
+const MAX_PRECIO = 99999999.99;
 
 /**
  * CAPA DE LOGICA DE NEGOCIO
@@ -31,25 +34,56 @@ class FarmaciaService {
     return medicamento;
   }
 
-  registrarMedicamento(datos) {
-    if (!datos.nombre || datos.nombre.trim() === '') {
-      throw Object.assign(new Error('El nombre del medicamento es requerido'), { status: 400 });
+  /**
+   * Valida y normaliza los datos de un medicamento (alta y edicion).
+   * Stock entero >= 0 y precio > 0 con hasta 2 decimales: un stock negativo
+   * o un precio 0 dejarian el inventario y los costos de RN-09 mal.
+   */
+  _validarMedicamento(datos) {
+    const nombre = typeof datos.nombre === 'string' ? datos.nombre.trim() : '';
+    if (!nombre) throw Object.assign(new Error('El nombre del medicamento es requerido'), { status: 400 });
+    if (nombre.length > 200) throw Object.assign(new Error('El nombre no puede pasar de 200 caracteres'), { status: 400 });
+    const presentacion = datos.presentacion == null ? '' : String(datos.presentacion).trim();
+    if (presentacion.length > 200) throw Object.assign(new Error('La presentación no puede pasar de 200 caracteres'), { status: 400 });
+    const stock = datos.stock === undefined || datos.stock === null || datos.stock === '' ? 0 : Number(datos.stock);
+    if (!Number.isInteger(stock) || stock < 0 || stock > MAX_STOCK) {
+      throw Object.assign(new Error(`El stock debe ser un número entero entre 0 y ${MAX_STOCK}`), { status: 400 });
     }
-    if (datos.precioUnitario === undefined || datos.precioUnitario < 0) {
-      throw Object.assign(new Error('El precio unitario debe ser un valor valido'), { status: 400 });
+    const precio = Number(datos.precioUnitario);
+    if (datos.precioUnitario === null || datos.precioUnitario === '' || !Number.isFinite(precio)
+        || precio <= 0 || precio > MAX_PRECIO || Math.round(precio * 100) !== +(precio * 100).toFixed(6)) {
+      throw Object.assign(new Error(`El precio unitario debe ser mayor a 0, hasta Q${MAX_PRECIO} y con 2 decimales como máximo`), { status: 400 });
     }
-    const medicamento = new Medicamento({
-      nombre: datos.nombre,
-      presentacion: datos.presentacion || '',
-      stock: datos.stock || 0,
-      precioUnitario: datos.precioUnitario
-    });
-    return this.medicamentoRepo.guardar(medicamento);
+    return { nombre, presentacion, stock, precioUnitario: precio };
+  }
+
+  /** No puede haber dos medicamentos activos con el mismo nombre y presentacion. */
+  async _asegurarSinDuplicado({ nombre, presentacion }, exceptoId = null) {
+    const otro = await this.medicamentoRepo.buscarActivoPorNombre(nombre, presentacion);
+    if (otro && otro.id !== exceptoId) {
+      throw Object.assign(
+        new Error(`Ya existe en el inventario "${otro.nombre}"${otro.presentacion ? ` (${otro.presentacion})` : ''}; actualice su stock en lugar de crear otro`),
+        { status: 409 });
+    }
+  }
+
+  async registrarMedicamento(datos) {
+    const valido = this._validarMedicamento(datos);
+    await this._asegurarSinDuplicado(valido);
+    return this.medicamentoRepo.guardar(new Medicamento(valido));
   }
 
   async actualizarMedicamento(id, datos) {
-    await this.obtenerMedicamento(id);
-    return this.medicamentoRepo.actualizar(id, datos);
+    const actual = await this.obtenerMedicamento(id);
+    // PUT con campos omitidos conserva los actuales (antes los dejaba en NULL).
+    const valido = this._validarMedicamento({
+      nombre: datos.nombre ?? actual.nombre,
+      presentacion: datos.presentacion ?? actual.presentacion,
+      stock: datos.stock ?? actual.stock,
+      precioUnitario: datos.precioUnitario ?? actual.precioUnitario
+    });
+    await this._asegurarSinDuplicado(valido, actual.id);
+    return this.medicamentoRepo.actualizar(id, valido);
   }
 
   /** DELETE /medicamentos/:id = borrado logico; las dispensaciones se conservan. */
