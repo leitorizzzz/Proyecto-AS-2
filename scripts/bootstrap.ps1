@@ -19,10 +19,20 @@ function OK($msg)    { Write-Host "    ok. $msg" -ForegroundColor Green }
 function Warn($msg)  { Write-Host "    aviso: $msg" -ForegroundColor Yellow }
 function Fail($msg)  { Write-Host "    FALLA: $msg" -ForegroundColor Red; exit 1 }
 
+# Comandos nativos (docker, npm): docker escribe su progreso por stderr y,
+# con ErrorActionPreference=Stop, PowerShell 5.1 lo convierte en excepcion
+# cuando la salida va redirigida (.\bootstrap.ps1 > log.txt, CI). Se corren
+# con Continue y el exito se decide por $LASTEXITCODE.
+function Nativo([scriptblock]$comando) {
+    $previo = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & $comando 2>&1 | ForEach-Object { "$_" } } finally { $ErrorActionPreference = $previo }
+}
+
 Info "1/7 Verificando requisitos (docker, node)"
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { Fail "docker no esta en PATH" }
 if (-not (Get-Command node   -ErrorAction SilentlyContinue)) { Fail "node no esta en PATH (se requiere node >= 20)" }
-docker version --format '{{.Server.Version}}' *> $null
+Nativo { docker version --format '{{.Server.Version}}' } | Out-Null
 if ($LASTEXITCODE -ne 0) { Fail "el daemon de Docker no responde. Abre Docker Desktop y vuelve a correr." }
 OK "docker y node disponibles"
 
@@ -35,7 +45,7 @@ if (-not (Test-Path .env)) {
 }
 
 Info "3/7 Levantando stack docker-compose (puede tardar algunos minutos la primera vez)"
-docker compose up -d --build
+Nativo { docker compose up -d --build }
 if ($LASTEXITCODE -ne 0) { Fail "docker compose up fallo" }
 OK "contenedores arriba"
 
@@ -57,19 +67,19 @@ for ($i=1; $i -le $intentos; $i++) {
 if (-not $todosOk) { Fail "algun servicio no respondio en $($intentos*3)s. Revisa docker compose logs." }
 
 Info "5/7 Semilla del admin inicial"
-docker compose exec -T auth-service npm run seed
+Nativo { docker compose exec -T auth-service npm run seed }
 if ($LASTEXITCODE -ne 0) { Warn "seed del admin devolvio error (puede ser que ya exista)" }
 else                     { OK "admin seedeado" }
 
 Info "6/7 Instalando devDependencies de la raiz (jest, supertest y deps de las pruebas RBAC)"
 # Siempre: npm install es idempotente y asi se instalan dependencias
 # agregadas despues de la primera corrida.
-npm install --silent
+Nativo { npm install --silent }
 if ($LASTEXITCODE -ne 0) { Fail "npm install fallo" }
 OK "dependencias al dia"
 
 Info "7/7 Semilla de datos de demo"
-npm run seed:demo
+Nativo { npm run seed:demo }
 if ($LASTEXITCODE -ne 0) { Warn "seed:demo devolvio error (puede ser idempotente, revisa salida)" }
 
 Write-Host "`nListo. El sistema esta corriendo en:" -ForegroundColor Green
