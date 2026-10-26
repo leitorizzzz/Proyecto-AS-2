@@ -120,9 +120,13 @@ function chip(estado) {
   const clase = String(estado || '').replace(/\s+/g, '_');
   return `<span class="chip ${clase}">${esc(etiqueta(estado))}</span>`;
 }
+/** Escapa texto para HTML, tambien dentro de atributos (value="...", data-*):
+    sin escapar comillas, un apellido como  x" onfocus="...  inyectaba
+    atributos en los dialogos de edicion (XSS almacenado, auditoria SQA). */
 function esc(s) {
   return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 function decodificarJWT(token) {
   try {
