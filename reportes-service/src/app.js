@@ -12,6 +12,7 @@ const AuditoriaRepository = require('./repositories/AuditoriaRepository');
 const AuditoriaService = require('./services/AuditoriaService');
 const AuditoriaController = require('./controllers/AuditoriaController');
 const crearRutasAuditoria = require('./routes/auditoriaRoutes');
+const { ocultarErrores500, manejadorErrores } = require('./middleware/manejoErrores');
 
 const repo = new ReportesRepository();
 const service = new ReportesService(repo);
@@ -23,6 +24,7 @@ const auditoriaController = new AuditoriaController(new AuditoriaService(new Aud
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(ocultarErrores500);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', servicio: 'reportes-service' });
@@ -30,6 +32,8 @@ app.get('/health', (req, res) => {
 
 app.use('/api/reportes', crearRutasReportes(controller));
 app.use('/api/auditoria', crearRutasAuditoria(auditoriaController));
+// JSON malformado y errores no atrapados: respuesta JSON, sin traza.
+app.use(manejadorErrores);
 
 const PORT = process.env.PORT || 3005;
 

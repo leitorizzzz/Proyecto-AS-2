@@ -13,6 +13,7 @@ const FinancieroController = require('./controllers/FinancieroController');
 const AuditoriaRepository = require('./repositories/AuditoriaRepository');
 const AuditoriaService = require('./services/AuditoriaService');
 const crearRutasFinanciero = require('./routes/financieroRoutes');
+const { ocultarErrores500, manejadorErrores } = require('./middleware/manejoErrores');
 
 const cuentaRepo = new CuentaRepository();
 const donanteRepo = new DonanteRepository();
@@ -25,12 +26,15 @@ const app = express();
 app.set('trust proxy', require('./middleware/confianzaProxy')());
 app.use(cors());
 app.use(express.json());
+app.use(ocultarErrores500);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', servicio: 'financiero-service' });
 });
 
 app.use('/api/financiero', crearRutasFinanciero(financieroController));
+// JSON malformado y errores no atrapados: respuesta JSON, sin traza.
+app.use(manejadorErrores);
 
 const PORT = process.env.PORT || 3004;
 

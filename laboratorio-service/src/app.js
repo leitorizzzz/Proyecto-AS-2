@@ -10,6 +10,7 @@ const PrecioExamenRepository = require('./repositories/PrecioExamenRepository');
 const LaboratorioService = require('./services/LaboratorioService');
 const LaboratorioController = require('./controllers/LaboratorioController');
 const crearRutasLaboratorio = require('./routes/laboratorioRoutes');
+const { ocultarErrores500, manejadorErrores } = require('./middleware/manejoErrores');
 
 const resultadoRepo = new ResultadoExamenRepository();
 const pacienteRepo = new PacienteReadRepository();
@@ -20,12 +21,15 @@ const laboratorioController = new LaboratorioController(laboratorioService);
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(ocultarErrores500);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', servicio: 'laboratorio-service' });
 });
 
 app.use('/api/laboratorio', crearRutasLaboratorio(laboratorioController));
+// JSON malformado y errores no atrapados: respuesta JSON, sin traza.
+app.use(manejadorErrores);
 
 const PORT = process.env.PORT || 3003;
 

@@ -29,6 +29,7 @@ const UsuarioReadRepository = require('./repositories/UsuarioReadRepository');
 const AvisoRepository = require('./repositories/AvisoRepository');
 const AvisoService = require('./services/AvisoService');
 const AvisoController = require('./controllers/AvisoController');
+const { ocultarErrores500, manejadorErrores } = require('./middleware/manejoErrores');
 
 // --- Ensamblado de capas ---
 // El servicio de Pacientes agrupa 3 dominios relacionados: Paciente,
@@ -58,6 +59,7 @@ const app = express();
 app.set('trust proxy', require('./middleware/confianzaProxy')());
 app.use(cors());
 app.use(express.json());
+app.use(ocultarErrores500);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', servicio: 'pacientes-service' });
@@ -67,6 +69,8 @@ app.use('/api/pacientes', crearRutasPacientes(pacienteController));
 app.use('/api/solicitudes', crearRutasSolicitudes(solicitudController, visitaController));
 app.use('/api/visitas', crearRutasVisitas(visitaController));
 app.use('/api/avisos', crearRutasAvisos(new AvisoController(new AvisoService(avisoRepository))));
+// JSON malformado y errores no atrapados: respuesta JSON, sin traza.
+app.use(manejadorErrores);
 
 const PORT = process.env.PORT || 3002;
 

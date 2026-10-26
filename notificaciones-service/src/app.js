@@ -8,6 +8,7 @@ const NotificacionRepository = require('./repositories/NotificacionRepository');
 const NotificacionesService = require('./services/NotificacionesService');
 const NotificacionesController = require('./controllers/NotificacionesController');
 const crearRutasNotificaciones = require('./routes/notificacionesRoutes');
+const { ocultarErrores500, manejadorErrores } = require('./middleware/manejoErrores');
 
 const repo = new NotificacionRepository();
 const service = new NotificacionesService(repo);
@@ -16,6 +17,7 @@ const controller = new NotificacionesController(service);
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(ocultarErrores500);
 
 app.get('/health', (req, res) => {
   res.json({
@@ -27,6 +29,8 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api/notificaciones', crearRutasNotificaciones(controller));
+// JSON malformado y errores no atrapados: respuesta JSON, sin traza.
+app.use(manejadorErrores);
 
 const PORT = process.env.PORT || 3006;
 const INTERVALO_JOB_MS = Math.max(5000,

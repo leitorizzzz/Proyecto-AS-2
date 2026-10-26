@@ -13,6 +13,7 @@ const FarmaciaController = require('./controllers/FarmaciaController');
 const AuditoriaRepository = require('./repositories/AuditoriaRepository');
 const AuditoriaService = require('./services/AuditoriaService');
 const crearRutasFarmacia = require('./routes/farmaciaRoutes');
+const { ocultarErrores500, manejadorErrores } = require('./middleware/manejoErrores');
 
 // --- Ensamblado de capas (inyeccion de dependencias manual) ---
 // Presentacion -> Logica de Negocio -> Acceso a Datos -> Entidades
@@ -31,6 +32,7 @@ const app = express();
 app.set('trust proxy', require('./middleware/confianzaProxy')());
 app.use(cors());
 app.use(express.json());
+app.use(ocultarErrores500);
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.get('/health', (req, res) => {
@@ -38,6 +40,8 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/api/farmacia', crearRutasFarmacia(farmaciaController));
+// JSON malformado y errores no atrapados: respuesta JSON, sin traza.
+app.use(manejadorErrores);
 
 const PORT = process.env.PORT || 3001;
 

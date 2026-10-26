@@ -14,6 +14,7 @@ const TokenRecuperacionRepository = require('./repositories/TokenRecuperacionRep
 const RecuperacionService = require('./services/RecuperacionService');
 const NotificacionesClient = require('./services/NotificacionesClient');
 const LimitadorIntentos = require('./services/LimitadorIntentos');
+const { ocultarErrores500, manejadorErrores } = require('./middleware/manejoErrores');
 
 // --- Ensamblado de capas ---
 const usuarioRepository = new UsuarioRepository();
@@ -28,12 +29,15 @@ const app = express();
 app.set('trust proxy', require('./middleware/confianzaProxy')());
 app.use(cors());
 app.use(express.json());
+app.use(ocultarErrores500);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', servicio: 'auth-service' });
 });
 
 app.use('/api/auth', crearRutasAuth(authController));
+// JSON malformado y errores no atrapados: respuesta JSON, sin traza.
+app.use(manejadorErrores);
 
 const PORT = process.env.PORT || 3000;
 
