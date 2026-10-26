@@ -168,10 +168,10 @@ class LaboratorioService {
   _validarPrecio({ tipo, precioBase }) {
     const t = String(tipo || '').trim();
     if (!t) throw Object.assign(new Error('tipo es requerido'), { status: 400 });
-    if (t.length > 200) throw Object.assign(new Error('tipo admite maximo 200 caracteres'), { status: 400 });
+    if (t.length > 200) throw Object.assign(new Error('tipo admite máximo 200 caracteres'), { status: 400 });
     const p = Number(precioBase);
     if (precioBase == null || precioBase === '' || !Number.isFinite(p) || p <= 0) {
-      throw Object.assign(new Error('precioBase debe ser un numero mayor a 0'), { status: 400 });
+      throw Object.assign(new Error('precioBase debe ser un número mayor a 0'), { status: 400 });
     }
     return new PrecioExamen({ tipo: t, precioBase: this._r(p) });
   }

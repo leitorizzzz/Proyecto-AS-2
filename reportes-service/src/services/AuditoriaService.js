@@ -22,7 +22,7 @@ class AuditoriaService {
     const s = String(valor);
     const d = new Date(SOLO_FECHA.test(s) ? `${s}T00:00:00.000Z` : s);
     if (Number.isNaN(d.getTime())) {
-      throw Object.assign(new Error(`${nombre} no es una fecha valida (YYYY-MM-DD o ISO)`), { status: 400 });
+      throw Object.assign(new Error(`${nombre} no es una fecha válida (YYYY-MM-DD o ISO)`), { status: 400 });
     }
     if (finDeDia && SOLO_FECHA.test(s)) d.setUTCDate(d.getUTCDate() + 1);
     return d;

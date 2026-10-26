@@ -21,7 +21,7 @@ function autenticar(req, res, next) {
     req.usuario = payload; // { sub, email, rol, iat, exp }
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Token invalido o expirado' });
+    return res.status(401).json({ error: 'Token inválido o expirado' });
   }
 }
 

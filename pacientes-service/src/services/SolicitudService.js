@@ -178,7 +178,7 @@ class SolicitudService {
       );
     }
     if (solicitud.estado === SolicitudReferencia.ESTADOS.CANCELADA) {
-      throw Object.assign(new Error('La solicitud ya esta cancelada'), { status: 409 });
+      throw Object.assign(new Error('La solicitud ya está cancelada'), { status: 409 });
     }
     return this.repo.cambiarEstado(id, SolicitudReferencia.ESTADOS.CANCELADA);
   }

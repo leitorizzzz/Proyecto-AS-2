@@ -24,7 +24,7 @@ class ReportesService {
       case Reporte.TIPOS.MEDICAMENTOS_APLICADOS: return this._medicamentosAplicados(filtros);
       default:
         throw Object.assign(
-          new Error(`Tipo de reporte invalido: ${tipo}. Valores validos: ${Object.values(Reporte.TIPOS).join(', ')}`),
+          new Error(`Tipo de reporte inválido: ${tipo}. Valores válidos: ${Object.values(Reporte.TIPOS).join(', ')}`),
           { status: 400 }
         );
     }
@@ -39,7 +39,7 @@ class ReportesService {
     const hasta = filtros.hasta || '2999-12-31';
     for (const [nombre, v] of [['desde', desde], ['hasta', hasta]]) {
       if (!ReportesService.esFechaValida(v)) {
-        throw Object.assign(new Error(`${nombre} debe ser una fecha YYYY-MM-DD valida`), { status: 400 });
+        throw Object.assign(new Error(`${nombre} debe ser una fecha YYYY-MM-DD válida`), { status: 400 });
       }
     }
     if (desde > hasta) throw Object.assign(new Error('desde no puede ser posterior a hasta'), { status: 400 });

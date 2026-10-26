@@ -21,7 +21,7 @@ function hashToken(token) {
 }
 
 const enlaceInvalido = () =>
-  Object.assign(new Error('El enlace de recuperacion no es valido o ya vencio. Solicite uno nuevo.'), { status: 400 });
+  Object.assign(new Error('El enlace de recuperación no es válido o ya venció. Solicite uno nuevo.'), { status: 400 });
 
 class RecuperacionService {
   constructor(usuarioRepo, tokenRepo, hasher, notificaciones, {
@@ -38,7 +38,7 @@ class RecuperacionService {
 
   static validarEmail(email) {
     const e = String(email || '').trim().toLowerCase();
-    if (!EMAIL_REGEX.test(e)) throw Object.assign(new Error('Escriba un correo valido'), { status: 400 });
+    if (!EMAIL_REGEX.test(e)) throw Object.assign(new Error('Escriba un correo válido'), { status: 400 });
     return e;
   }
 

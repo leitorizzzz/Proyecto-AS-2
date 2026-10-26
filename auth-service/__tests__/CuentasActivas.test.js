@@ -31,7 +31,7 @@ describe('AuthService — cuentas desactivadas', () => {
     const passwordHash = await bcrypt.hash('Demo1234', 4);
     const { svc } = await nuevo(new Usuario({ id: 5, email: 'x@asilo.gt', passwordHash, rol: 'farmacia', activo: false }));
     const err = await svc.login({ email: 'x@asilo.gt', password: 'mala' }).catch(e => e);
-    expect(err.message).toBe('Credenciales invalidas');
+    expect(err.message).toBe('Credenciales inválidas');
     expect(err.status).toBeUndefined();
   });
 

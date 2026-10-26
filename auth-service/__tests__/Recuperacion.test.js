@@ -96,7 +96,7 @@ describe('Recuperacion de contrasena (RF-42)', () => {
     await svc.solicitar('ana@asilo.gt');
     tokenRepo.filas[0].expira = new Date(Date.now() - 1000);
     await expect(svc.restablecer({ token: tokenDelEnlace(notif), password: 'Nueva1234' }))
-      .rejects.toMatchObject({ status: 400, message: expect.stringMatching(/no es valido o ya vencio/) });
+      .rejects.toMatchObject({ status: 400, message: expect.stringMatching(/no es válido o ya venció/) });
   });
 
   test('la nueva contrasena cumple la misma regla que el alta; un token falso no gasta bcrypt', async () => {
@@ -148,7 +148,7 @@ describe('AuthController de recuperacion', () => {
     const r = res();
     await new AuthController({}, auditoria, svc).restablecer(
       { body: { token: tokenDelEnlace(notif), password: 'Nueva1234' }, ip: '10.0.0.4', headers: {} }, r);
-    expect(r.body.mensaje).toMatch(/Contrasena actualizada/);
+    expect(r.body.mensaje).toMatch(/Contraseña actualizada/);
     const llamada = JSON.stringify(auditoria.registrar.mock.calls[0]);
     expect(llamada).toMatch(/contrasena restablecida/);
     expect(llamada).not.toMatch(/Nueva1234/);

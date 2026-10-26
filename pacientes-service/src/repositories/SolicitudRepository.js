@@ -90,7 +90,7 @@ class SolicitudRepository {
           WHERE id = @id AND estado = 'pendiente_asignacion'
         `);
       if (r.rowsAffected[0] !== 1) {
-        throw Object.assign(new Error('La solicitud ya no esta pendiente de asignacion'), { status: 409 });
+        throw Object.assign(new Error('La solicitud ya no está pendiente de cita'), { status: 409 });
       }
       await avisoRepo.insertarEn(tx, avisos);
       await tx.commit();

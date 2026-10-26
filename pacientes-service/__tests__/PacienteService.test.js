@@ -24,7 +24,7 @@ describe('PacienteService', () => {
 
   test('registrar con DPI de 12 digitos -> error', async () => {
     const { svc } = nuevoServicio();
-    await expect(svc.registrar({ ...VALIDO, dpi: '123456789012' })).rejects.toThrow(/13 digitos/);
+    await expect(svc.registrar({ ...VALIDO, dpi: '123456789012' })).rejects.toThrow(/13 dígitos/);
   });
 
   test('registrar con DPI ya existente -> error', async () => {

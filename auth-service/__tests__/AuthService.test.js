@@ -25,7 +25,7 @@ describe('AuthService', () => {
   test('registrar con rol invalido -> error con la lista de roles', async () => {
     const { svc, repo } = nuevoServicio();
     await expect(svc.registrar({ nombre: 'X', email: 'x@asilo.gt', password: 'Demo1234', rol: 'jefe' }))
-      .rejects.toThrow(/Rol invalido/);
+      .rejects.toThrow(/Rol inválido/);
     expect(repo.guardar).not.toHaveBeenCalled();
   });
 
@@ -47,7 +47,7 @@ describe('AuthService', () => {
   test('login con password incorrecta -> Credenciales invalidas', async () => {
     const passwordHash = await bcrypt.hash('Demo1234', 4);
     const { svc } = nuevoServicio({ existente: new Usuario({ id: 1, email: 'x@asilo.gt', passwordHash, rol: 'farmacia' }) });
-    await expect(svc.login({ email: 'x@asilo.gt', password: 'otra' })).rejects.toThrow('Credenciales invalidas');
+    await expect(svc.login({ email: 'x@asilo.gt', password: 'otra' })).rejects.toThrow('Credenciales inválidas');
   });
 
   // Auditoria SQA: una peticion sin correo o sin contrasena es 400 (no 401),

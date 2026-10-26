@@ -159,9 +159,9 @@ class NotificacionesService {
   /** Reintento manual forzado (lo lanza el admin desde el UI). */
   async reintentarManual(id) {
     const notif = await this.repo.obtenerPorId(id);
-    if (!notif) throw Object.assign(new Error('Notificacion no encontrada'), { status: 404 });
+    if (!notif) throw Object.assign(new Error('Notificación no encontrada'), { status: 404 });
     if (notif.estado === Notificacion.ESTADOS.ENVIADA) {
-      throw Object.assign(new Error('La notificacion ya fue enviada'), { status: 409 });
+      throw Object.assign(new Error('La notificación ya fue enviada'), { status: 409 });
     }
     // Si estaba definitivamente fallida, un reintento manual la vuelve
     // a dejar en el ciclo con sus intentos reseteados a 0.

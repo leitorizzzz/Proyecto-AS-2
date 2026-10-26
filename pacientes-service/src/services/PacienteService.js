@@ -65,10 +65,10 @@ class PacienteService {
       throw Object.assign(new Error('La fecha de nacimiento no puede ser futura ni anterior a 1900'), { status: 400 });
     }
     if (!GENEROS_VALIDOS.includes(datos.genero)) {
-      throw new Error(`Genero invalido. Debe ser uno de: ${GENEROS_VALIDOS.join(', ')}`);
+      throw new Error(`Género inválido. Debe ser uno de: ${GENEROS_VALIDOS.join(', ')}`);
     }
     if (!datos.dpi || !DPI_REGEX.test(String(datos.dpi))) {
-      throw new Error('El DPI debe tener exactamente 13 digitos');
+      throw new Error('El DPI debe tener exactamente 13 dígitos');
     }
   }
 
@@ -126,7 +126,7 @@ class PacienteService {
   async desactivar(id, { motivoEgreso, fechaEgreso } = {}) {
     const paciente = await this.obtener(id);
     if (paciente.activo === false) {
-      throw Object.assign(new Error('El paciente ya esta desactivado'), { status: 409 });
+      throw Object.assign(new Error('El paciente ya está desactivado'), { status: 409 });
     }
     const motivo = String(motivoEgreso ?? '').trim();
     if (motivo.length < 3 || motivo.length > 300) {
@@ -154,7 +154,7 @@ class PacienteService {
   async reactivar(id) {
     const paciente = await this.obtener(id);
     if (paciente.activo !== false) {
-      throw Object.assign(new Error('El paciente ya esta activo'), { status: 409 });
+      throw Object.assign(new Error('El paciente ya está activo'), { status: 409 });
     }
     return this.repo.cambiarActivo(id, true);
   }

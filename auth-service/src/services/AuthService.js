@@ -30,17 +30,17 @@ class AuthService {
     this.jwtSecret = process.env.JWT_SECRET;
     this.jwtExpiresIn = process.env.JWT_EXPIRES_IN || '8h';
     if (!this.jwtSecret) {
-      throw new Error('JWT_SECRET no esta configurado en .env');
+      throw new Error('JWT_SECRET no está configurado en .env');
     }
   }
 
   async registrar({ nombre, email, password, rol }) {
     if (!nombre || nombre.trim() === '') throw new Error('El nombre es requerido');
-    if (!email || !EMAIL_REGEX.test(email)) throw new Error('El email no es valido');
+    if (!email || !EMAIL_REGEX.test(email)) throw new Error('El email no es válido');
     // Misma regla que el restablecimiento por recuperacion (reglasPassword.js).
     validarPassword(password);
     if (!ROLES_VALIDOS.includes(rol)) {
-      throw new Error(`Rol invalido. Debe ser uno de: ${ROLES_VALIDOS.join(', ')}`);
+      throw new Error(`Rol inválido. Debe ser uno de: ${ROLES_VALIDOS.join(', ')}`);
     }
 
     const existente = await this.usuarioRepo.obtenerPorEmail(email);
@@ -60,10 +60,10 @@ class AuthService {
     }
 
     const usuario = await this.usuarioRepo.obtenerPorEmail(email);
-    if (!usuario) throw new Error('Credenciales invalidas');
+    if (!usuario) throw new Error('Credenciales inválidas');
 
     const ok = await this.hasher.compare(password, usuario.passwordHash);
-    if (!ok) throw new Error('Credenciales invalidas');
+    if (!ok) throw new Error('Credenciales inválidas');
     // Se valida despues de la password para no revelar que la cuenta existe.
     if (usuario.activo === false) {
       throw Object.assign(
@@ -89,7 +89,7 @@ class AuthService {
     const roles = rol ? String(rol).split(',').map(r => r.trim()).filter(Boolean) : [];
     const invalidos = roles.filter(r => !ROLES_VALIDOS.includes(r));
     if (invalidos.length) {
-      throw Object.assign(new Error(`Rol invalido: ${invalidos.join(', ')}`), { status: 400 });
+      throw Object.assign(new Error(`Rol inválido: ${invalidos.join(', ')}`), { status: 400 });
     }
     const usuarios = await this.usuarioRepo.listar({ roles, incluirInactivos });
     return usuarios.map(u => u.toPublic());
@@ -103,7 +103,7 @@ class AuthService {
       throw Object.assign(new Error('No puede desactivar su propia cuenta'), { status: 409 });
     }
     if (usuario.activo === false) {
-      throw Object.assign(new Error('La cuenta ya esta desactivada'), { status: 409 });
+      throw Object.assign(new Error('La cuenta ya está desactivada'), { status: 409 });
     }
     return (await this.usuarioRepo.cambiarActivo(usuario.id, false)).toPublic();
   }
@@ -112,7 +112,7 @@ class AuthService {
     const usuario = await this.usuarioRepo.obtenerPorId(Number(id));
     if (!usuario) throw Object.assign(new Error('Usuario no encontrado'), { status: 404 });
     if (usuario.activo !== false) {
-      throw Object.assign(new Error('La cuenta ya esta activa'), { status: 409 });
+      throw Object.assign(new Error('La cuenta ya está activa'), { status: 409 });
     }
     return (await this.usuarioRepo.cambiarActivo(usuario.id, true)).toPublic();
   }

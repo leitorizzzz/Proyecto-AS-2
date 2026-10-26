@@ -204,7 +204,7 @@ class VisitaMedicaRepository {
       `);
       if (sol.rowsAffected[0] !== 1) {
         throw Object.assign(
-          new Error(`La solicitud ${visita.idSolicitudReferencia} no esta en atencion; no se cierra la visita`),
+          new Error(`La solicitud ${visita.idSolicitudReferencia} no está en atención; no se cierra la visita`),
           { status: 409 }
         );
       }

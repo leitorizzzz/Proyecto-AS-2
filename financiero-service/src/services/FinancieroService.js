@@ -118,7 +118,7 @@ class FinancieroService {
     const cargo = await this.cuentaRepo.obtenerCargo(Number(idCargo));
     if (!cargo) throw Object.assign(new Error('Cargo no encontrado'), { status: 404 });
     if (cargo.estado === CargoServicio.ESTADOS.PAGADO || cargo.saldo <= 0) {
-      throw Object.assign(new Error(`El cargo ${cargo.id} ya esta pagado`), { status: 409 });
+      throw Object.assign(new Error(`El cargo ${cargo.id} ya está pagado`), { status: 409 });
     }
     if (m > cargo.saldo) {
       throw Object.assign(
@@ -158,7 +158,7 @@ class FinancieroService {
     }
     if (cuota.estado === CuotaMensual.ESTADOS.PAGADA)
       throw Object.assign(
-        new Error(`La cuota ${cuota.mes}/${cuota.anio} ya esta pagada`), { status: 409 }
+        new Error(`La cuota ${cuota.mes}/${cuota.anio} ya está pagada`), { status: 409 }
       );
     return this.cuentaRepo.pagarCuota(cuota.id);
   }
@@ -175,7 +175,7 @@ class FinancieroService {
     email = V.correoOpcional(email);
     telefono = telefono == null || String(telefono).trim() === '' ? null : String(telefono).trim();
     if (telefono && (telefono.length > 30 || !/^[0-9+()\-\s]+$/.test(telefono)))
-      throw Object.assign(new Error('telefono solo admite números, espacios, +, - y paréntesis (máx. 30)'), { status: 400 });
+      throw Object.assign(new Error('teléfono solo admite números, espacios, +, - y paréntesis (máx. 30)'), { status: 400 });
     direccion = direccion == null || String(direccion).trim() === '' ? null : String(direccion).trim().slice(0, 300);
     return this.donanteRepo.guardarDonante(new Donante({ nombre, telefono, email, direccion }));
   }
@@ -194,7 +194,7 @@ class FinancieroService {
     const donante = await this.donanteRepo.obtenerDonante(Number(id));
     if (!donante) throw Object.assign(new Error('Donante no encontrado'), { status: 404 });
     if (donante.activo === false) {
-      throw Object.assign(new Error('El donante ya esta desactivado'), { status: 409 });
+      throw Object.assign(new Error('El donante ya está desactivado'), { status: 409 });
     }
     return this.donanteRepo.cambiarActivoDonante(donante.id, false);
   }
@@ -203,7 +203,7 @@ class FinancieroService {
     const donante = await this.donanteRepo.obtenerDonante(Number(id));
     if (!donante) throw Object.assign(new Error('Donante no encontrado'), { status: 404 });
     if (donante.activo !== false) {
-      throw Object.assign(new Error('El donante ya esta activo'), { status: 409 });
+      throw Object.assign(new Error('El donante ya está activo'), { status: 409 });
     }
     return this.donanteRepo.cambiarActivoDonante(donante.id, true);
   }
@@ -243,7 +243,7 @@ class FinancieroService {
     monto = V.montoValido(monto);
     if (categoria && !GastoOperativo.CATEGORIAS.includes(categoria))
       throw Object.assign(
-        new Error(`categoria debe ser una de: ${GastoOperativo.CATEGORIAS.join(', ')}`),
+        new Error(`categoría debe ser una de: ${GastoOperativo.CATEGORIAS.join(', ')}`),
         { status: 400 }
       );
     return this.movimientosRepo.guardarGasto(new GastoOperativo({

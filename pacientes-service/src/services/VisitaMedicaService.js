@@ -86,7 +86,7 @@ class VisitaMedicaService {
   async agregarExamen(id, datos) {
     const visita = await this._obtener(id);
     if (!visita.estaAbierta()) {
-      throw Object.assign(new Error('Solo se pueden agregar examenes a una visita en atencion o incompleta'), { status: 409 });
+      throw Object.assign(new Error('Solo se pueden agregar exámenes a una visita en atención o incompleta'), { status: 409 });
     }
     if (!datos || !datos.tipo || String(datos.tipo).trim() === '') {
       throw Object.assign(new Error('tipo del examen es requerido'), { status: 400 });
@@ -110,7 +110,7 @@ class VisitaMedicaService {
   async agregarPrescripcion(id, datos) {
     const visita = await this._obtener(id);
     if (!visita.estaAbierta()) {
-      throw Object.assign(new Error('Solo se pueden agregar prescripciones a una visita en atencion o incompleta'), { status: 409 });
+      throw Object.assign(new Error('Solo se pueden agregar prescripciones a una visita en atención o incompleta'), { status: 409 });
     }
     if (!datos || !datos.medicamento || String(datos.medicamento).trim() === '') {
       throw Object.assign(new Error('medicamento es requerido'), { status: 400 });

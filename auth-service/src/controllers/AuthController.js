@@ -44,7 +44,7 @@ class AuthController {
     const clave = LimitadorIntentos.clave('recuperar', req.ip, email);
     if (this._bloqueado(res, clave)) return;
     this.limitador.registrarFallo(clave);
-    res.json({ mensaje: 'Si el correo pertenece a una cuenta activa, en unos minutos recibira un enlace para crear una nueva contrasena. El enlace vence en 30 minutos.' });
+    res.json({ mensaje: 'Si el correo pertenece a una cuenta activa, en unos minutos recibirá un enlace para crear una nueva contraseña. El enlace vence en 30 minutos.' });
     try {
       const r = await this.recuperacion.solicitar(email);
       if (r.enviado) {
@@ -60,7 +60,7 @@ class AuthController {
     try {
       const usuario = await this.recuperacion.restablecer(req.body || {});
       await this._auditarCuenta(req, usuario, 'contrasena restablecida con enlace de recuperacion');
-      res.json({ mensaje: 'Contrasena actualizada. Ya puede iniciar sesion.' });
+      res.json({ mensaje: 'Contraseña actualizada. Ya puede iniciar sesión.' });
     } catch (error) {
       res.status(error.status || 500).json({ error: error.message });
     }

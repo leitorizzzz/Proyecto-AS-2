@@ -90,7 +90,7 @@ class FarmaciaService {
   async desactivarMedicamento(id) {
     const medicamento = await this.obtenerMedicamento(id);
     if (medicamento.activo === false) {
-      throw Object.assign(new Error('El medicamento ya esta desactivado'), { status: 409 });
+      throw Object.assign(new Error('El medicamento ya está desactivado'), { status: 409 });
     }
     return this.medicamentoRepo.cambiarActivo(id, false);
   }
@@ -98,7 +98,7 @@ class FarmaciaService {
   async reactivarMedicamento(id) {
     const medicamento = await this.obtenerMedicamento(id);
     if (medicamento.activo !== false) {
-      throw Object.assign(new Error('El medicamento ya esta activo'), { status: 409 });
+      throw Object.assign(new Error('El medicamento ya está activo'), { status: 409 });
     }
     return this.medicamentoRepo.cambiarActivo(id, true);
   }
@@ -145,7 +145,7 @@ class FarmaciaService {
     const prescripcion = await this.prescripcionRepo.obtenerPorId(Number(idPrescripcion));
     if (!prescripcion) {
       throw Object.assign(
-        new Error(`No existe la prescripcion ${idPrescripcion}`),
+        new Error(`No existe la prescripción ${idPrescripcion}`),
         { status: 404 }
       );
     }
@@ -157,13 +157,13 @@ class FarmaciaService {
     }
     if (!prescripcion.idMedicamento) {
       throw Object.assign(
-        new Error(`La prescripcion ${idPrescripcion} no tiene medicamento del inventario asociado; el especialista debe asociarla antes de dispensar`),
+        new Error(`La prescripción ${idPrescripcion} no tiene medicamento del inventario asociado; el especialista debe asociarla antes de dispensar`),
         { status: 400 }
       );
     }
     if (idPaciente != null && Number(idPaciente) !== Number(prescripcion.idPaciente)) {
       throw Object.assign(
-        new Error(`La prescripcion ${idPrescripcion} pertenece al paciente ${prescripcion.idPaciente}, no al ${idPaciente}`),
+        new Error(`La prescripción ${idPrescripcion} pertenece al paciente ${prescripcion.idPaciente}, no al ${idPaciente}`),
         { status: 400 }
       );
     }
@@ -193,7 +193,7 @@ class FarmaciaService {
     // Despacho parcial (caso 18): no se entrega mas de lo que falta.
     if (prescripcion.cantidadRestante != null && Number(cantidad) > prescripcion.cantidadRestante) {
       throw Object.assign(
-        new Error(`La cantidad ${cantidad} excede lo pendiente de la prescripcion ${idPrescripcion}: ` +
+        new Error(`La cantidad ${cantidad} excede lo pendiente de la prescripción ${idPrescripcion}: ` +
                   `faltan ${prescripcion.cantidadRestante} de ${prescripcion.cantidadPrescrita}`),
         { status: 409 }
       );

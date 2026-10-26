@@ -32,7 +32,7 @@ class NotificacionesController {
   obtener = async (req, res) => {
     try {
       const n = await this.service.obtenerPorId(Number(req.params.id));
-      if (!n) return res.status(404).json({ error: 'Notificacion no encontrada' });
+      if (!n) return res.status(404).json({ error: 'Notificación no encontrada' });
       res.json(n);
     } catch (error) { this._fallo(res, error); }
   };
