@@ -75,9 +75,9 @@ class SolicitudService {
     // RN-02
     const duplicada = await this.repo.existeSolicitudActiva(Number(idPaciente), especialidad);
     if (duplicada) {
-      const ref = duplicada.id ? ` (solicitud #${duplicada.id}, estado '${duplicada.estado}')` : '';
+      const ref = duplicada.id ? ` (solicitud #${duplicada.id}, ${SolicitudReferencia.etiquetaEstado(duplicada.estado)})` : '';
       throw Object.assign(
-        new Error(`Ya existe una solicitud activa para el paciente ${idPaciente} en la especialidad "${especialidad}"${ref}`),
+        new Error(`Este paciente ya tiene una solicitud activa en la especialidad "${especialidad}"${ref}. Espere a que se complete o cancélela antes de crear otra.`),
         { status: 409, solicitudActiva: duplicada.id ? { id: duplicada.id, estado: duplicada.estado } : null }
       );
     }
@@ -106,7 +106,7 @@ class SolicitudService {
 
     if (solicitud.estado !== SolicitudReferencia.ESTADOS.PENDIENTE_ASIGNACION) {
       throw Object.assign(
-        new Error(`Solo se puede asignar cita a solicitudes en estado 'pendiente_asignacion' (actual: '${solicitud.estado}')`),
+        new Error(`Solo se asigna cita a solicitudes pendientes de cita; esta solicitud está ${SolicitudReferencia.etiquetaEstado(solicitud.estado)}.`),
         { status: 409 }
       );
     }
@@ -139,7 +139,7 @@ class SolicitudService {
     const solicitud = await this.obtener(id);
     if (solicitud.estado !== SolicitudReferencia.ESTADOS.CITA_ASIGNADA) {
       throw Object.assign(
-        new Error(`Solo se puede iniciar atencion desde estado 'cita_asignada' (actual: '${solicitud.estado}')`),
+        new Error(`Solo se inicia la atención de solicitudes con cita asignada; esta solicitud está ${SolicitudReferencia.etiquetaEstado(solicitud.estado)}.`),
         { status: 409 }
       );
     }
@@ -150,7 +150,7 @@ class SolicitudService {
     const solicitud = await this.obtener(id);
     if (solicitud.estado !== SolicitudReferencia.ESTADOS.EN_ATENCION) {
       throw Object.assign(
-        new Error(`Solo se puede completar una solicitud en estado 'en_atencion' (actual: '${solicitud.estado}')`),
+        new Error(`Solo se completa una solicitud en atención; esta solicitud está ${SolicitudReferencia.etiquetaEstado(solicitud.estado)}.`),
         { status: 409 }
       );
     }

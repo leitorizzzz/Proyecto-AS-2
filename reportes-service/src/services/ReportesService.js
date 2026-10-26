@@ -95,7 +95,7 @@ class ReportesService {
     const filas = await this.repo.analisisMedico(this._limites(rango));
     return new Reporte({
       tipo: Reporte.TIPOS.ANALISIS_MEDICO,
-      titulo: 'Analisis medico por especialidad',
+      titulo: 'Análisis médico por especialidad',
       filtros: rango,
       columnas: [
         { key: 'especialidad', label: 'Especialidad' },
@@ -131,7 +131,7 @@ class ReportesService {
     const filas = await this.repo.pagosFundacion(this._limites(rango));
     return new Reporte({
       tipo: Reporte.TIPOS.PAGOS_FUNDACION,
-      titulo: 'Pagos realizados a la fundacion',
+      titulo: 'Pagos realizados a la fundación',
       filtros: rango,
       columnas: [
         { key: 'fecha', label: 'Fecha', tipo: 'fecha' },
@@ -166,7 +166,7 @@ class ReportesService {
     const filas = await this.repo.examenes(this._limites(rango));
     return new Reporte({
       tipo: Reporte.TIPOS.EXAMENES,
-      titulo: 'Examenes solicitados',
+      titulo: 'Exámenes solicitados',
       filtros: rango,
       columnas: [
         { key: 'idExamen', label: 'ID' },

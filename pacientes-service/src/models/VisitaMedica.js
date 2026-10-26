@@ -54,4 +54,14 @@ VisitaMedica.ESTADOS = Object.freeze({
   CANCELADA: 'cancelada'
 });
 
+// Texto del estado para los mensajes que ve el usuario.
+VisitaMedica.ETIQUETAS_ESTADO = Object.freeze({
+  en_atencion: 'en atención',
+  incompleta: 'incompleta',
+  completada: 'completada',
+  cancelada: 'cancelada'
+});
+VisitaMedica.etiquetaEstado = estado =>
+  VisitaMedica.ETIQUETAS_ESTADO[estado] || String(estado || '').replace(/_/g, ' ');
+
 module.exports = VisitaMedica;

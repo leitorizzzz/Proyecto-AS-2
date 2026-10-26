@@ -46,6 +46,17 @@ SolicitudReferencia.ESTADOS = Object.freeze({
   CANCELADA: 'cancelada'
 });
 
+// Texto del estado para los mensajes que ve el usuario.
+SolicitudReferencia.ETIQUETAS_ESTADO = Object.freeze({
+  pendiente_asignacion: 'pendiente de cita',
+  cita_asignada: 'con cita asignada',
+  en_atencion: 'en atención',
+  completada: 'completada',
+  cancelada: 'cancelada'
+});
+SolicitudReferencia.etiquetaEstado = estado =>
+  SolicitudReferencia.ETIQUETAS_ESTADO[estado] || String(estado || '').replace(/_/g, ' ');
+
 SolicitudReferencia.ESTADOS_ACTIVOS = Object.freeze([
   SolicitudReferencia.ESTADOS.PENDIENTE_ASIGNACION,
   SolicitudReferencia.ESTADOS.CITA_ASIGNADA,

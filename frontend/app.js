@@ -70,15 +70,55 @@ function fechaHora(v) {
 function fechaLocalISO(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+/* Textos para el usuario. Los codigos internos (estados, roles,
+   categorias) nunca se muestran tal cual: la clase CSS usa el codigo y el
+   texto visible usa la etiqueta. */
+const ETIQUETA_ESTADO = {
+  pendiente_asignacion: 'Pendiente de cita', cita_asignada: 'Cita asignada',
+  en_atencion: 'En atención', completada: 'Completada', cancelada: 'Cancelada',
+  incompleta: 'Incompleta', pendiente: 'Pendiente', parcial: 'Parcial',
+  dispensada: 'Dispensada', disponible: 'Disponible', pagada: 'Pagada',
+  pagado: 'Pagado', enviada: 'Enviada', fallida: 'Fallida',
+  fallida_definitiva: 'Fallida sin reintentos', vencida: 'Vencida'
+};
+const ETIQUETA_ROL = {
+  enfermero: 'Enfermería', medico: 'Médico', medico_general: 'Médico general',
+  especialista: 'Médico especialista', medico_especialista: 'Médico especialista',
+  farmacia: 'Farmacia', laboratorio: 'Laboratorio', admin: 'Administración',
+  fundacion: 'Fundación', coordinador_fundacion: 'Coordinación de fundación'
+};
+const ETIQUETA_VALOR = {
+  // Especialidades sugeridas, tipos de resultado, donacion y gasto
+  cardiologia: 'Cardiología', neurologia: 'Neurología', geriatria: 'Geriatría',
+  oftalmologia: 'Oftalmología', traumatologia: 'Traumatología',
+  dermatologia: 'Dermatología', endocrinologia: 'Endocrinología',
+  texto: 'Texto', numerico: 'Numérico', archivo: 'Archivo adjunto', mixto: 'Mixto',
+  dinero: 'Dinero', bienes: 'Bienes', otro: 'Otro', cuota: 'Cuota',
+  servicios: 'Servicios', mantenimiento: 'Mantenimiento', personal: 'Personal',
+  alimentacion: 'Alimentación', medicamentos: 'Medicamentos', otros: 'Otros',
+  // Entidades de la auditoria
+  prescripcion: 'Prescripción', dispensacion: 'Dispensación', donacion: 'Donación',
+  pago_fundacion: 'Pago a la fundación', examen: 'Examen', visitas: 'Visitas'
+};
+/** Codigo interno -> texto legible (sin guiones bajos). */
+function etiqueta(valor) {
+  if (valor == null || valor === '') return '—';
+  const v = String(valor);
+  const t = ETIQUETA_ESTADO[v] || ETIQUETA_ROL[v] || ETIQUETA_VALOR[v.toLowerCase()];
+  if (t) return t;
+  const limpio = v.replace(/_/g, ' ');
+  return limpio.charAt(0).toUpperCase() + limpio.slice(1);
+}
+function textoRol(rol) { return rol ? (ETIQUETA_ROL[rol] || etiqueta(rol)) : '—'; }
 /** Chip de borrado logico (activo / desactivado). */
 function chipActivo(activo) {
   return activo === false
-    ? '<span class="chip desactivado">desactivado</span>'
-    : '<span class="chip activo">activo</span>';
+    ? '<span class="chip desactivado">Desactivado</span>'
+    : '<span class="chip activo">Activo</span>';
 }
 function chip(estado) {
   const clase = String(estado || '').replace(/\s+/g, '_');
-  return `<span class="chip ${clase}">${estado || '—'}</span>`;
+  return `<span class="chip ${clase}">${esc(etiqueta(estado))}</span>`;
 }
 function esc(s) {
   return String(s == null ? '' : s)
@@ -106,7 +146,12 @@ async function api(base, path, opts = {}) {
   else body = await resp.text().catch(() => null);
 
   if (!resp.ok) {
-    const msg = (body && body.error) || (typeof body === 'string' ? body : `HTTP ${resp.status}`);
+    let msg = (body && body.error) || (typeof body === 'string' ? body : `HTTP ${resp.status}`);
+    // Los mensajes tecnicos de sesion y permisos (token, lista de roles)
+    // no se muestran tal cual.
+    if (resp.status === 401 && /token/i.test(msg)) msg = 'Su sesión expiró o no es válida. Vuelva a iniciar sesión.';
+    else if (resp.status === 403 && /^Acceso denegado/.test(msg)) msg = 'Su usuario no tiene permiso para realizar esta acción.';
+    else if (!body || typeof body === 'string' && /<html/i.test(body)) msg = 'El servicio no respondió. Intente de nuevo en unos momentos.';
     const err = new Error(msg);
     err.status = resp.status;
     err.body = body;            // p. ej. camposFaltantes al cerrar una visita
@@ -565,7 +610,7 @@ function abrirApp() {
   $('#vistaApp').classList.remove('hidden');
   const nombre = state.usuario?.email?.split('@')[0] || 'personal';
   $('#usuarioNombre').textContent = state.usuario?.email || '—';
-  $('#usuarioRol').textContent = state.usuario?.rol || '—';
+  $('#usuarioRol').textContent = textoRol(state.usuario?.rol);
   $('#saludoNombre').textContent = nombre.replace(/[._-]+/g, ' ');
   const fh = $('#fechaHoy');
   if (fh) fh.textContent = new Date().toLocaleDateString('es-GT', {
@@ -653,7 +698,7 @@ async function cargarDashboard() {
     const rows = solicitudes.slice(0, 8).map(s => `
       <tr>
         <td>${esc(mapa[s.idPaciente] || `Paciente #${s.idPaciente}`)}</td>
-        <td>${esc(s.especialidad)}</td>
+        <td>${esc(etiqueta(s.especialidad))}</td>
         <td>${chip(s.estado)}</td>
         <td class="tiny">${fechaHora(s.fechaCreacion)}</td>
       </tr>`).join('');
@@ -697,7 +742,7 @@ async function cargarAvisos() {
 const ROLES_ALERTAS_COBRO = ['admin', 'coordinador_fundacion', 'fundacion'];
 function chipAlerta(alerta) {
   if (!alerta) return '<span class="tiny">Sin alertas</span>';
-  return `<span class="chip alerta-${alerta.nivel}">${alerta.nivel === 'roja' ? 'roja' : 'naranja'}</span>`;
+  return `<span class="chip alerta-${alerta.nivel}">${alerta.nivel === 'roja' ? 'Roja' : 'Naranja'}</span>`;
 }
 async function cargarAlertasCobro() {
   const box = $('#kpiAlertasBox');
@@ -1035,7 +1080,7 @@ async function cargarSolicitudes() {
 
       return `<tr>
         <td>${esc(mapa[s.idPaciente] || `#${s.idPaciente}`)}</td>
-        <td>${esc(s.especialidad)}<div class="tiny">${esc(s.motivo)}</div></td>
+        <td>${esc(etiqueta(s.especialidad))}<div class="tiny">${esc(s.motivo)}</div></td>
         <td>${chip(s.estado)}</td>
         <td>${cita}</td>
         <td>${acciones.join(' &middot; ') || '<span class="tiny">—</span>'}</td>
@@ -1100,7 +1145,7 @@ function resumenSolicitud(id) {
   const s = (state.solicitudes || []).find(x => x.id === id);
   if (!s) return `Solicitud #${id}`;
   const paciente = state.mapaPacientes?.[s.idPaciente] || `Paciente #${s.idPaciente}`;
-  return `${paciente} · ${s.especialidad}`;
+  return `${paciente} · ${etiqueta(s.especialidad)}`;
 }
 
 async function asignarCita(id) {
@@ -1143,7 +1188,7 @@ async function convertirEnVisita(id) {
   let visita = null;
   const ok = await confirmar(
     resumenSolicitud(id),
-    'Se abrirá la visita médica y la solicitud pasará a en_atencion.',
+    'Se abrirá la visita médica y la solicitud pasará a «En atención».',
     {
       eyebrow: 'Iniciar visita',
       textoConfirmar: 'Iniciar visita',
@@ -1181,6 +1226,7 @@ async function cargarVisitasTab() {
       pacientesParaNombres()
     ]);
     const mapa = Object.fromEntries(pacientes.map(p => [p.id, `${p.nombres} ${p.apellidos}`]));
+    state.mapaPacientes = mapa;
 
     // Cada solicitud en atencion/completada tiene una visita
     const withVisita = solicitudes.filter(s => ['en_atencion','completada'].includes(s.estado));
@@ -1195,7 +1241,7 @@ async function cargarVisitasTab() {
     const sel = $('#selectorVisita');
     sel.innerHTML = `<option value="">Elegir visita…</option>` +
       opciones.map(({ v, s, paciente }) =>
-        `<option value="${v.id}">${esc(paciente)} — ${esc(s.especialidad)} — ${chipTexto(v.estado)}</option>`
+        `<option value="${v.id}">${esc(paciente)} — ${esc(etiqueta(s.especialidad))} — ${esc(etiqueta(v.estado))}</option>`
       ).join('');
     if (state.visitaSeleccionada && opciones.some(o => o.v.id === state.visitaSeleccionada)) {
       sel.value = state.visitaSeleccionada;
@@ -1207,8 +1253,6 @@ async function cargarVisitasTab() {
     console.error('Visitas:', err);
   }
 }
-
-function chipTexto(estado) { return estado || '—'; }
 
 const CAMPOS_VISITA = {
   diagnostico: ['#vDiagnostico', '#faltaDiagnostico'],
@@ -1238,9 +1282,10 @@ async function cargarDetalleVisita() {
     $('#detalleVisita').classList.remove('hidden');
     $('#visitaTitulo').textContent = `Visita #${v.id}`;
     $('#visitaEstadoChip').className = `chip ${v.estado}`;
-    $('#visitaEstadoChip').textContent = v.estado;
+    $('#visitaEstadoChip').textContent = etiqueta(v.estado);
+    const nombrePaciente = state.mapaPacientes?.[v.idPaciente] || `Paciente #${v.idPaciente}`;
     $('#visitaMeta').textContent =
-      `Paciente #${v.idPaciente} · Médico especialista #${v.idMedicoEspecialista} · Fecha ${fechaHora(v.fecha)}` +
+      `${nombrePaciente} · Fecha ${fechaHora(v.fecha)}` +
       (v.idFichaMedica ? ` · Ficha médica #${v.idFichaMedica}` : '') +
       ` · Costo acumulado con descuento: laboratorio ${money(v.costoLaboratorio || 0)}, farmacia ${money(v.costoFarmacia || 0)}`;
     $('#vDiagnostico').value = v.diagnostico || '';
@@ -1369,7 +1414,7 @@ async function verResultadoExamen(idExamen) {
       : r.tipoResultado === 'archivo' ? r.archivoAdjunto : r.valorTexto;
     avisar(`Resultado del examen #${idExamen}`, `
       <p>${chip(r.estado || 'disponible')} · disponible desde ${fechaHora(r.fechaDisponible)}</p>
-      <p><strong>${esc(r.tipoResultado)}:</strong> ${esc(valor ?? '—')}</p>`);
+      <p><strong>${esc(etiqueta(r.tipoResultado))}:</strong> ${esc(valor ?? '—')}</p>`);
   } catch (err) { avisar('Resultado no disponible', `<div class="msg error">✕ Error — ${esc(err.message)}</div>`); }
 }
 
@@ -1765,7 +1810,7 @@ async function cargarGastos() {
       <tr>
         <td class="tiny">${fechaHora(g.fecha)}</td>
         <td>${esc(g.concepto)}</td>
-        <td>${esc(g.categoria)}</td>
+        <td>${esc(etiqueta(g.categoria))}</td>
         <td class="right num">${money(g.monto)}</td>
       </tr>`).join('');
     $('#vacioGastos').classList.toggle('hidden', list.length > 0);
@@ -1944,7 +1989,7 @@ async function cargarDonaciones() {
       <tr>
         <td class="tiny">${fechaHora(d.fecha)}</td>
         <td>${esc(d.donante)}</td>
-        <td>${esc(d.tipo)}</td>
+        <td>${esc(etiqueta(d.tipo))}</td>
         <td class="tiny">${esc(d.concepto || '')}</td>
         <td class="right num">${money(d.monto)}</td>
       </tr>`).join('');
@@ -2062,6 +2107,14 @@ function cargarAuditoria() {
   consultarAuditoria();
 }
 
+/** Nombre del campo -> texto: "fechaEgreso" -> "fecha egreso", "idEnfermero" -> "enfermero (n.º)". */
+function etiquetaCampo(k) {
+  const esId = /^id[A-Z]/.test(k);
+  const palabras = (esId ? k.slice(2) : k)
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/_/g, ' ').toLowerCase();
+  return esId ? `${palabras} (n.º)` : palabras;
+}
+
 /** Campos que cambiaron entre datosAnteriores y datosNuevos (o los nuevos al crear). */
 function cambiosAuditoria(r) {
   const a = r.datosAnteriores, n = r.datosNuevos;
@@ -2072,8 +2125,8 @@ function cambiosAuditoria(r) {
     .filter(k => !a || val(a[k]) !== val((n || {})[k]));
   if (!claves.length) return '';
   const filas = claves.slice(0, 12).map(k => a
-    ? `<li><code>${esc(k)}</code>: ${esc(val(a[k]))} → ${esc(val((n || {})[k]))}</li>`
-    : `<li><code>${esc(k)}</code>: ${esc(val(n[k]))}</li>`).join('');
+    ? `<li><strong>${esc(etiquetaCampo(k))}</strong>: ${esc(val(a[k]))} → ${esc(val((n || {})[k]))}</li>`
+    : `<li><strong>${esc(etiquetaCampo(k))}</strong>: ${esc(val(n[k]))}</li>`).join('');
   return `<details><summary>${a ? 'Cambios' : 'Datos nuevos'} (${claves.length})</summary><ul class="cambios">${filas}</ul></details>`;
 }
 
@@ -2093,9 +2146,9 @@ async function consultarAuditoria() {
       <tr>
         <td class="tiny">${fechaHora(r.fecha)}</td>
         <td class="tiny">${esc(r.usuario)}<div>${esc(r.ip || 'sin IP')}</div></td>
-        <td class="tiny">${esc(r.modulo || '—')}</td>
+        <td class="tiny">${esc(etiqueta(r.modulo))}</td>
         <td><span class="chip accion-${esc(r.accion)}">${esc(ETIQUETA_ACCION[r.accion] || r.accion)}</span></td>
-        <td>${esc(r.entidad.replace('_', ' '))}${r.idEntidad != null ? ` <span class="num tiny">#${r.idEntidad}</span>` : ''}</td>
+        <td>${esc(etiqueta(r.entidad))}${r.idEntidad != null ? ` <span class="num tiny">#${r.idEntidad}</span>` : ''}</td>
         <td class="tiny">${esc(r.detalle || '')}${cambiosAuditoria(r)}</td>
       </tr>`).join('');
     $('#vacioAuditoria').classList.toggle('hidden', filas.length > 0);
@@ -2127,7 +2180,7 @@ async function cargarUsuarios() {
       return `
       <tr class="${u.activo === false ? 'fila-inactiva' : ''}">
         <td><strong>${esc(u.nombre)}</strong><div class="tiny">${esc(u.email)}</div></td>
-        <td>${esc(u.rol)}</td>
+        <td>${esc(textoRol(u.rol))}</td>
         <td class="tiny">${fechaCorta(u.fechaRegistro)}</td>
         <td>${chipActivo(u.activo)}</td>
         <td class="col-acciones">${accion}</td>
@@ -2145,7 +2198,7 @@ async function cargarUsuarios() {
 async function cambiarActivoUsuario(id, reactivar) {
   const u = (state.usuarios || []).find(x => x.id === id);
   if (!u) return;
-  const ok_ = await confirmar(`${u.nombre} · ${u.rol}`, reactivar
+  const ok_ = await confirmar(`${u.nombre} · ${textoRol(u.rol)}`, reactivar
     ? 'La cuenta podrá volver a iniciar sesión.'
     : 'La cuenta no podrá iniciar sesión. Lo que registró (solicitudes, visitas, dispensaciones) se conserva con su nombre.',
     {
@@ -2174,7 +2227,7 @@ async function onCrearUsuario(e) {
     await api(API.auth, '/api/auth/register', { method: 'POST', body });
     e.target.reset();
     await cargarUsuarios();
-    ok(msg, `Cuenta de ${body.email} creada con rol ${body.rol}.`);
+    ok(msg, `Cuenta de ${body.email} creada con el rol ${textoRol(body.rol)}.`);
   } catch (err) { error(msg, err.message); }
 }
 

@@ -310,11 +310,11 @@
             <label for="sPaciente">Paciente</label>
             <select id="sPaciente" required></select>
             <label for="sEspecialidad">Especialidad</label>
-            <input id="sEspecialidad" list="listaEspecialidades" placeholder="cardiologia, neurologia, geriatria..." required>
+            <input id="sEspecialidad" list="listaEspecialidades" placeholder="Cardiología, neurología, geriatría..." required>
             <datalist id="listaEspecialidades">
-              <option value="cardiologia"><option value="neurologia"><option value="geriatria">
-              <option value="oftalmologia"><option value="traumatologia"><option value="dermatologia">
-              <option value="endocrinologia">
+              <option value="cardiologia" label="Cardiología"><option value="neurologia" label="Neurología"><option value="geriatria" label="Geriatría">
+              <option value="oftalmologia" label="Oftalmología"><option value="traumatologia" label="Traumatología"><option value="dermatologia" label="Dermatología">
+              <option value="endocrinologia" label="Endocrinología">
             </datalist>
             <label for="sEnfermero">Enfermero(a) que acompaña</label>
             <select id="sEnfermero" required></select>
@@ -434,7 +434,7 @@
 
         <div class="card">
           <h3>Dispensar contra prescripción</h3>
-          <p class="hint">RN-06: solo se dispensa lo prescrito por un médico en una visita. Elige al paciente y verás sus prescripciones pendientes.</p>
+          <p class="hint">Solo se entrega lo que un médico recetó en una visita. Elija al paciente para ver sus recetas pendientes.</p>
           <form id="formDispensar">
             <label for="dPaciente">Paciente</label>
             <select id="dPaciente" required></select>
@@ -518,7 +518,7 @@
       <div class="grid-split" style="margin-top:20px">
         <div class="card">
           <h3>Precios de exámenes <span class="contador" id="contadorPrecios"></span></h3>
-          <p class="hint">El costo para el residente lleva siempre el descuento de la fundación (RN-09). El nombre del examen en la visita debe coincidir con el del catálogo para poder calcular su costo.</p>
+          <p class="hint">El costo para el residente lleva siempre el 20 % de descuento de la fundación. El nombre del examen en la visita debe coincidir con el del catálogo para poder calcular su costo.</p>
           <div class="tabla-wrap">
             <table>
               <thead><tr><th>Examen</th><th class="right">Precio base</th><th class="right">Con descuento</th><th class="col-acciones">Acciones</th></tr></thead>
@@ -756,7 +756,7 @@
         <div>
           <div class="eyebrow">Análisis y auditoría</div>
           <h1>Reportes</h1>
-          <p class="lede">Los siete reportes del enunciado. El rango por defecto se ajusta al tipo elegido.</p>
+          <p class="lede">Reportes financieros, operativos y médicos del asilo. El rango de fechas se ajusta solo según el reporte elegido.</p>
         </div>
       </header>
 

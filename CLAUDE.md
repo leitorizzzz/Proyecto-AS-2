@@ -326,6 +326,17 @@ y el aviso de inactividad. Cuidado al editar `app.js` con scripts: en
 `String.replace` el texto de reemplazo interpreta `$$` como `$` (rompe
 los `$$(...)`); usar una función como reemplazo.
 
+**Textos para el usuario (24 oct)**: la UI nunca muestra códigos internos.
+Estados, roles, especialidades, categorías y entidades pasan por
+`etiqueta()` / `textoRol()` de `app.js` (`ETIQUETA_ESTADO`, `ETIQUETA_ROL`,
+`ETIQUETA_VALOR`); la clase CSS del chip sigue usando el código. Nada de
+"RN-xx", "caso N" ni "enunciado" en pantalla. `api()` reemplaza los 401 de
+token y los 403 "Acceso denegado… roles" por mensajes en lenguaje llano. Los
+mensajes 409 de estado del backend usan `SolicitudReferencia.etiquetaEstado`
+y `VisitaMedica.etiquetaEstado`. `styles.css` empieza con `@charset "UTF-8"`
+y nginx envía `charset=utf-8` en HTML/CSS/JS (sin eso los símbolos de los
+chips salían como "âœ•").
+
 **Secciones solo admin**: **Usuarios** (lista con estado, desactivar /
 reactivar, alta de cuenta) y **Auditoría** (rango + entidad; los límites
 del día local se mandan como instantes ISO). Pacientes, inventario y

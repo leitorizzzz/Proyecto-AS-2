@@ -100,7 +100,7 @@ class FarmaciaService {
   async dispensarMedicamento({ idPrescripcion, idPaciente, cantidad }) {
     if (!idPrescripcion) {
       throw Object.assign(
-        new Error('idPrescripcion es requerido (RN-06: se exige prescripcion valida para dispensar)'),
+        new Error('Elija la prescripción a dispensar: solo se entrega lo que un médico recetó en una visita.'),
         { status: 400 }
       );
     }
@@ -117,7 +117,7 @@ class FarmaciaService {
     }
     if (!prescripcion.admiteDespacho()) {
       throw Object.assign(
-        new Error(`La prescripcion ${idPrescripcion} ya fue dispensada o no esta activa (estado: '${prescripcion.estado}')`),
+        new Error(`La prescripción #${idPrescripcion} ya fue entregada por completo o no está activa.`),
         { status: 409 }
       );
     }

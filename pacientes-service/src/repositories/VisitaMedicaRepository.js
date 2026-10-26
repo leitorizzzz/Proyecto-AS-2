@@ -132,7 +132,7 @@ class VisitaMedicaRepository {
       if (!visita) throw Object.assign(new Error('Visita medica no encontrada'), { status: 404 });
       if (!['en_atencion', 'incompleta'].includes(visita.estado)) {
         throw Object.assign(
-          new Error(`La visita ya no esta abierta (estado: '${visita.estado}'); no se genera otro cargo`),
+          new Error(`La visita ya no está abierta (está ${VisitaMedica.etiquetaEstado(visita.estado)}); no se genera otro cargo.`),
           { status: 409 }
         );
       }

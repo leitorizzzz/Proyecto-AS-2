@@ -40,7 +40,7 @@ class VisitaMedicaService {
 
     if (solicitud.estado !== SolicitudReferencia.ESTADOS.CITA_ASIGNADA) {
       throw Object.assign(
-        new Error(`Solo se puede iniciar visita desde solicitudes en 'cita_asignada' (actual: '${solicitud.estado}')`),
+        new Error(`Solo se inicia la visita de solicitudes con cita asignada; esta solicitud está ${SolicitudReferencia.etiquetaEstado(solicitud.estado)}.`),
         { status: 409 }
       );
     }
@@ -73,7 +73,7 @@ class VisitaMedicaService {
     const visita = await this._obtener(id);
     if (!visita.estaAbierta()) {
       throw Object.assign(
-        new Error(`Solo se puede editar una visita en estado 'en_atencion' o 'incompleta' (actual: '${visita.estado}')`),
+        new Error(`Solo se edita una visita en atención o incompleta; esta visita está ${VisitaMedica.etiquetaEstado(visita.estado)}.`),
         { status: 409 }
       );
     }
@@ -145,7 +145,7 @@ class VisitaMedicaService {
     const visita = await this._obtener(id);
     if (!visita.estaAbierta()) {
       throw Object.assign(
-        new Error(`Solo se puede completar una visita en 'en_atencion' o 'incompleta' (actual: '${visita.estado}')`),
+        new Error(`Solo se cierra una visita en atención o incompleta; esta visita está ${VisitaMedica.etiquetaEstado(visita.estado)}.`),
         { status: 409 }
       );
     }

@@ -42,7 +42,7 @@ describe('FarmaciaService', () => {
   test('RN-06: dispensar sin idPrescripcion -> 400', async () => {
     const { svc } = nuevoServicio();
     await expect(svc.dispensarMedicamento({ cantidad: 1 }))
-      .rejects.toMatchObject({ status: 400, message: expect.stringMatching(/RN-06/i) });
+      .rejects.toMatchObject({ status: 400, message: expect.stringMatching(/prescripción/i) });
   });
 
   test('RN-06: prescripcion inexistente -> 404', async () => {
