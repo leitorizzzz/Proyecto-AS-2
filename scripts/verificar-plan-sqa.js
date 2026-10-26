@@ -50,7 +50,7 @@ const sql = q => execFileSync('docker', ['exec', 'asilo-sqlserver', 'sh', '-c',
 
 (async () => {
   const T = {};
-  await caso(1, 'Login vÃ¡lido: 200 + JWT firmado', async () => {
+  await caso(1, 'Login válido: 200 + JWT firmado', async () => {
     const r = st(await req('POST', B('auth/api/auth/login'), { body: { email: 'admin@asilo.gt', password: 'Admin12345' } }), 200, 'login');
     const [h, p] = r.token.split('.').slice(0, 2).map(x => JSON.parse(Buffer.from(x, 'base64url').toString()));
     exige(h.alg === 'HS256' && p.rol === 'admin' && p.exp > p.iat, 'JWT sin HS256/rol/exp');
@@ -68,7 +68,7 @@ const sql = q => execFileSync('docker', ['exec', 'asilo-sqlserver', 'sh', '-c',
   await caso(2, 'RBAC: rol no autorizado en ruta administrativa -> 403', async () => {
     const pruebas = [
       ['laboratorio registra usuario', 'POST', 'auth/api/auth/register', T.lab, { nombre: 'x', email: 'x@x.gt', password: 'Abcdef12', rol: 'admin' }],
-      ['enfermero consulta auditorÃ­a', 'GET', 'reportes/api/auditoria', T.enf],
+      ['enfermero consulta auditoría', 'GET', 'reportes/api/auditoria', T.enf],
       ['farmacia registra gasto', 'POST', 'financiero/api/financiero/gastos', T.far, { concepto: 'x', monto: 1, categoria: 'otros' }],
       ['especialista desactiva paciente', 'DELETE', 'pacientes/api/pacientes/1', T.esp, { motivoEgreso: 'xxxx' }],
       ['coordinador cambia precio', 'POST', 'laboratorio/api/laboratorio/precios', T.coord, { tipo: 'x', precioBase: 1 }],
@@ -109,7 +109,7 @@ const sql = q => execFileSync('docker', ['exec', 'asilo-sqlserver', 'sh', '-c',
     return `sin familiar -> 400 camposFaltantes [${sin.data.camposFaltantes.join(', ')}]; incompleto -> 400 (${inc.data.camposFaltantes.length} faltantes); completo -> 201 id ${p.id}; BD: 1 familiar principal y 1 ficha`;
   });
 
-  await caso(6, 'Egreso: baja lÃ³gica, registro Ã­ntegro, sin DELETE fÃ­sico', async () => {
+  await caso(6, 'Egreso: baja lógica, registro íntegro, sin DELETE físico', async () => {
     const p = st(await req('POST', B('pacientes/api/pacientes'), { token: T.admin, body: { nombres: 'SQA', apellidos: `Egreso ${TS}`, fechaNacimiento: '1940-01-01', genero: 'M', dpi: dpi(6), familiar: familiar(6) } }), 201, 'alta');
     const s1 = await req('DELETE', B(`pacientes/api/pacientes/${p.id}`), { token: T.admin });
     exige(s1.status === 400, `sin motivo -> ${s1.status}`);
@@ -117,7 +117,7 @@ const sql = q => execFileSync('docker', ['exec', 'asilo-sqlserver', 'sh', '-c',
     exige(fut.status === 400, `fecha futura -> ${fut.status}`);
     st(await req('DELETE', B(`pacientes/api/pacientes/${p.id}`), { token: T.admin, body: { motivoEgreso: 'Traslado con su familia' } }), 200, 'egreso');
     const g = st(await req('GET', B(`pacientes/api/pacientes/${p.id}`), { token: T.admin }), 200, 'GET tras egreso');
-    exige(g.activo === false && g.motivoEgreso && g.fechaEgreso, 'no quedÃ³ activo=false con motivo y fecha');
+    exige(g.activo === false && g.motivoEgreso && g.fechaEgreso, 'no quedó activo=false con motivo y fecha');
     const lista = st(await req('GET', B('pacientes/api/pacientes'), { token: T.admin }), 200, 'lista');
     exige(!lista.some(x => x.id === p.id), 'sigue en el listado de activos');
     const fila = sql(`SELECT COUNT(*) FROM pacientes WHERE id=${p.id}`);
@@ -127,18 +127,18 @@ const sql = q => execFileSync('docker', ['exec', 'asilo-sqlserver', 'sh', '-c',
     return [ 'OK con diferencia', `sin motivo -> 400, fecha futura -> 400, con motivo -> 200; GET: activo=false, fechaEgreso ${String(g.fechaEgreso).slice(0, 10)}, motivo guardado; fuera del listado; fila en BD (${fila}); solicitud nueva -> 409. Diferencia de nombre: activo BIT en vez de estado='inactivo'` ];
   });
 
-  await caso(7, 'Solicitud del MÃ©dico General con enfermero: pendiente_asignacion', async () => {
-    const sinEnf = await req('POST', B('pacientes/api/solicitudes'), { token: T.mg, body: { idPaciente: ctx.p.id, especialidad: 'cardiologia', motivo: 'Dolor torÃ¡cico' } });
+  await caso(7, 'Solicitud del Médico General con enfermero: pendiente_asignacion', async () => {
+    const sinEnf = await req('POST', B('pacientes/api/solicitudes'), { token: T.mg, body: { idPaciente: ctx.p.id, especialidad: 'cardiologia', motivo: 'Dolor torácico' } });
     exige(sinEnf.status === 400, `sin enfermero -> ${sinEnf.status}`);
-    const noEnf = await req('POST', B('pacientes/api/solicitudes'), { token: T.mg, body: { idPaciente: ctx.p.id, especialidad: 'cardiologia', motivo: 'Dolor torÃ¡cico', idEnfermero: ctx.idEsp } });
+    const noEnf = await req('POST', B('pacientes/api/solicitudes'), { token: T.mg, body: { idPaciente: ctx.p.id, especialidad: 'cardiologia', motivo: 'Dolor torácico', idEnfermero: ctx.idEsp } });
     exige(noEnf.status === 400, `con un especialista como enfermero -> ${noEnf.status}`);
-    const s = st(await req('POST', B('pacientes/api/solicitudes'), { token: T.mg, body: { idPaciente: ctx.p.id, especialidad: 'cardiologia', motivo: 'Dolor torÃ¡cico y disnea', idEnfermero: ctx.idEnf } }), 201, 'crear');
+    const s = st(await req('POST', B('pacientes/api/solicitudes'), { token: T.mg, body: { idPaciente: ctx.p.id, especialidad: 'cardiologia', motivo: 'Dolor torácico y disnea', idEnfermero: ctx.idEnf } }), 201, 'crear');
     exige(s.estado === 'pendiente_asignacion' && s.idEnfermero === ctx.idEnf, `estado ${s.estado}, enfermero ${s.idEnfermero}`);
     ctx.sol = s;
-    return `sin enfermero -> 400; con usuario que no es enfermero -> 400; vÃ¡lida -> 201 id ${s.id}, estado pendiente_asignacion, idEnfermero ${s.idEnfermero}`;
+    return `sin enfermero -> 400; con usuario que no es enfermero -> 400; válida -> 201 id ${s.id}, estado pendiente_asignacion, idEnfermero ${s.idEnfermero}`;
   });
 
-  await caso(8, 'Perfiles que no son mÃ©dico general no crean solicitudes', async () => {
+  await caso(8, 'Perfiles que no son médico general no crean solicitudes', async () => {
     const out = [];
     for (const [n, t] of [['enfermero', T.enf], ['especialista', T.esp], ['coordinador', T.coord], ['farmacia', T.far], ['admin', T.admin]]) {
       const r = await req('POST', B('pacientes/api/solicitudes'), { token: t, body: { idPaciente: ctx.p.id, especialidad: 'neurologia', motivo: 'x', idEnfermero: ctx.idEnf } });
@@ -156,13 +156,13 @@ const sql = q => execFileSync('docker', ['exec', 'asilo-sqlserver', 'sh', '-c',
     return `misma especialidad -> 409 solicitudActiva {id ${r.data.solicitudActiva.id}, ${r.data.solicitudActiva.estado}}: "${r.data.error}"; otra especialidad -> 201`;
   });
 
-  await caso(10, 'NotificaciÃ³n por Brevo: log con estado e ID', async () => {
+  await caso(10, 'Notificación por Brevo: log con estado e ID', async () => {
     await new Promise(r => setTimeout(r, 1500));
     const log = st(await req('GET', B('notificaciones/api/notificaciones?limit=50'), { token: T.admin }), 200, 'log');
     const n = log.find(x => x.destinatarioEmail === 'sqa.familiar5@example.com');
-    exige(n && n.estado === 'enviada' && /^sim-/.test(n.idMensajeProveedor || ''), `notificaciÃ³n: ${JSON.stringify(n)}`);
+    exige(n && n.estado === 'enviada' && /^sim-/.test(n.idMensajeProveedor || ''), `notificación: ${JSON.stringify(n)}`);
     const salud = st(await req('GET', 'http://localhost:3006/health'), 200, 'health');
-    return ['OK con diferencia', `notificaciÃ³n #${n.id} a ${n.destinatarioEmail}: estado ${n.estado}, idMensajeProveedor ${n.idMensajeProveedor}; servicio en modoSimulacion=${salud.modoSimulacion}. No se ejecutÃ³ Brevo real`];
+    return ['OK con diferencia', `notificación #${n.id} a ${n.destinatarioEmail}: estado ${n.estado}, idMensajeProveedor ${n.idMensajeProveedor}; servicio en modoSimulacion=${salud.modoSimulacion}. No se ejecutó Brevo real`];
   });
 
   await caso(12, 'Asignar cita: cita_asignada y aviso interno', async () => {
@@ -180,21 +180,21 @@ const sql = q => execFileSync('docker', ['exec', 'asilo-sqlserver', 'sh', '-c',
     const ajeno = await req('PATCH', B(`pacientes/api/avisos/${a1.id}/leido`), { token: T.enf });
     exige(ajeno.status === 404, `marcar aviso ajeno -> ${ajeno.status}`);
     st(await req('PATCH', B(`pacientes/api/avisos/${a1.id}/leido`), { token: T.mg }), 200, 'leido');
-    return `enfermero -> 403; coordinador -> 200 cita_asignada; reasignar -> 409; aviso #${a1.id} para el mÃ©dico general y #${a2.id} para el enfermero ("${a1.mensaje}"); aviso ajeno -> 404; marcar leÃ­do -> 200`;
+    return `enfermero -> 403; coordinador -> 200 cita_asignada; reasignar -> 409; aviso #${a1.id} para el médico general y #${a2.id} para el enfermero ("${a1.mensaje}"); aviso ajeno -> 404; marcar leído -> 200`;
   });
 
   await caso(13, 'Convertir a visita: en_atencion vinculada a la ficha', async () => {
     const mg = await req('POST', B(`pacientes/api/solicitudes/${ctx.sol.id}/convertir-a-visita`), { token: T.mg });
-    exige(mg.status === 403, `mÃ©dico general convierte -> ${mg.status}`);
+    exige(mg.status === 403, `médico general convierte -> ${mg.status}`);
     const v = st(await req('POST', B(`pacientes/api/solicitudes/${ctx.sol.id}/convertir-a-visita`), { token: T.esp }), 201, 'convertir');
     const ficha = sql(`SELECT id FROM fichas_medicas WHERE idPaciente=${ctx.p.id}`);
     exige(String(v.idFichaMedica) === ficha && v.estado === 'en_atencion', `visita ${JSON.stringify(v)} ficha ${ficha}`);
     const s = st(await req('GET', B(`pacientes/api/solicitudes/${ctx.sol.id}`), { token: T.esp }), 200, 'sol');
     exige(s.estado === 'en_atencion', `solicitud ${s.estado}`);
     const dos = await req('POST', B(`pacientes/api/solicitudes/${ctx.sol.id}/convertir-a-visita`), { token: T.esp });
-    exige(dos.status === 409, `segunda conversiÃ³n -> ${dos.status}`);
+    exige(dos.status === 409, `segunda conversión -> ${dos.status}`);
     ctx.v = v;
-    return `mÃ©dico general -> 403; especialista -> 201 visita ${v.id} en_atencion con idFichaMedica ${v.idFichaMedica} = ficha del paciente; solicitud en_atencion; segunda conversiÃ³n -> 409`;
+    return `médico general -> 403; especialista -> 201 visita ${v.id} en_atencion con idFichaMedica ${v.idFichaMedica} = ficha del paciente; solicitud en_atencion; segunda conversión -> 409`;
   });
 
   await caso(14, 'Cerrar visita sin campos: rechazo y estado incompleta', async () => {
@@ -202,11 +202,11 @@ const sql = q => execFileSync('docker', ['exec', 'asilo-sqlserver', 'sh', '-c',
     exige(r.status === 400 && r.data.camposFaltantes?.includes('diagnostico') && r.data.camposFaltantes?.includes('observaciones'), `-> ${r.status} ${JSON.stringify(r.data)}`);
     const v = st(await req('GET', B(`pacientes/api/visitas/${ctx.v.id}`), { token: T.esp }), 200, 'visita');
     exige(v.estado === 'incompleta', `estado ${v.estado}`);
-    const solo = await req('PATCH', B(`pacientes/api/visitas/${ctx.v.id}`), { token: T.esp, body: { diagnostico: 'FibrilaciÃ³n auricular' } });
-    st(solo, 200, 'guardar diagnÃ³stico');
+    const solo = await req('PATCH', B(`pacientes/api/visitas/${ctx.v.id}`), { token: T.esp, body: { diagnostico: 'Fibrilación auricular' } });
+    st(solo, 200, 'guardar diagnóstico');
     const r2 = await req('POST', B(`pacientes/api/visitas/${ctx.v.id}/completar`), { token: T.esp });
-    exige(r2.status === 400 && r2.data.camposFaltantes.join() === 'observaciones', `solo diagnÃ³stico -> ${JSON.stringify(r2.data)}`);
-    return `sin nada -> 400 camposFaltantes [diagnostico, observaciones] y la visita queda incompleta (sigue editable); con solo diagnÃ³stico -> 400 [observaciones]; la UI resalta los campos (no automatizado aquÃ­)`;
+    exige(r2.status === 400 && r2.data.camposFaltantes.join() === 'observaciones', `solo diagnóstico -> ${JSON.stringify(r2.data)}`);
+    return `sin nada -> 400 camposFaltantes [diagnostico, observaciones] y la visita queda incompleta (sigue editable); con solo diagnóstico -> 400 [observaciones]; la UI resalta los campos (no automatizado aquí)`;
   });
 
   await caso(15, 'Orden de laboratorio con costo con descuento registrado', async () => {
@@ -214,19 +214,19 @@ const sql = q => execFileSync('docker', ['exec', 'asilo-sqlserver', 'sh', '-c',
     exige(sinPrecio.status === 409, `sin precio -> ${sinPrecio.status}`);
     const ex = st(await req('POST', B(`pacientes/api/visitas/${ctx.v.id}/examenes`), { token: T.esp, body: { tipo: 'Electrocardiograma de 12 derivaciones' } }), 201, 'ordenar');
     exige(Number(ex.precioBase) === 200 && Number(ex.costo) === 160 && ex.estado === 'pendiente', `examen ${JSON.stringify(ex)}`);
-    const ord = st(await req('GET', B('laboratorio/api/laboratorio/ordenes-pendientes'), { token: T.lab }), 200, 'Ã³rdenes');
-    exige(ord.some(o => (o.id ?? o.idExamen) === ex.id), 'no aparece en Ã³rdenes pendientes');
+    const ord = st(await req('GET', B('laboratorio/api/laboratorio/ordenes-pendientes'), { token: T.lab }), 200, 'órdenes');
+    exige(ord.some(o => (o.id ?? o.idExamen) === ex.id), 'no aparece en órdenes pendientes');
     const costo = st(await req('GET', B(`laboratorio/api/laboratorio/examenes/${ex.id}/costo`), { token: T.lab }), 200, 'costo');
     exige(Number(costo.total) === 160 && costo.registradoAlOrdenar, `costo ${JSON.stringify(costo)}`);
     ctx.ex = ex;
-    return `tipo sin precio -> 409; ECG ordenado -> 201 precioBase Q200, costo Q160 (20 % fundaciÃ³n) guardado al ordenar, estado pendiente; aparece en Ã³rdenes pendientes de laboratorio; costo registradoAlOrdenar=true`;
+    return `tipo sin precio -> 409; ECG ordenado -> 201 precioBase Q200, costo Q160 (20 % fundación) guardado al ordenar, estado pendiente; aparece en órdenes pendientes de laboratorio; costo registradoAlOrdenar=true`;
   });
 
   await caso(16, 'Resultado disponible y visible al especialista', async () => {
     const esp = await req('POST', B(`laboratorio/api/laboratorio/resultados/examen/${ctx.ex.id}`), { token: T.esp, body: { tipoResultado: 'texto', valorTexto: 'x' } });
     exige(esp.status === 403, `especialista registra resultado -> ${esp.status}`);
     const vac = await req('POST', B(`laboratorio/api/laboratorio/resultados/examen/${ctx.ex.id}`), { token: T.lab, body: { tipoResultado: 'numerico' } });
-    exige(vac.status === 400, `numÃ©rico sin valor -> ${vac.status}`);
+    exige(vac.status === 400, `numérico sin valor -> ${vac.status}`);
     st(await req('POST', B(`laboratorio/api/laboratorio/resultados/examen/${ctx.ex.id}`), { token: T.lab, body: { tipoResultado: 'texto', valorTexto: 'Ritmo sinusal, sin alteraciones agudas' } }), 201, 'registrar');
     const dup = await req('POST', B(`laboratorio/api/laboratorio/resultados/examen/${ctx.ex.id}`), { token: T.lab, body: { tipoResultado: 'texto', valorTexto: 'otro' } });
     exige(dup.status === 409, `segundo resultado -> ${dup.status}`);
@@ -234,30 +234,30 @@ const sql = q => execFileSync('docker', ['exec', 'asilo-sqlserver', 'sh', '-c',
     const e = (v.examenes || []).find(x => x.id === ctx.ex.id);
     exige(e && e.estado === 'disponible', `examen en la visita: ${JSON.stringify(e)}`);
     const res = st(await req('GET', B(`laboratorio/api/laboratorio/resultados/examen/${ctx.ex.id}`), { token: T.esp }), 200, 'leer');
-    return `especialista no registra (403); numÃ©rico sin valor -> 400; laboratorio registra -> 201; duplicado -> 409; la visita ya muestra el examen "disponible" y el especialista lee "${res.valorTexto}"`;
+    return `especialista no registra (403); numérico sin valor -> 400; laboratorio registra -> 201; duplicado -> 409; la visita ya muestra el examen "disponible" y el especialista lee "${res.valorTexto}"`;
   });
 
-  await caso(17, 'Despacho sin prescripciÃ³n: rechazo (RN-06)', async () => {
+  await caso(17, 'Despacho sin prescripción: rechazo (RN-06)', async () => {
     const med = st(await req('POST', B('farmacia/api/farmacia/medicamentos'), { token: T.far, body: { nombre: `SQA Amiodarona ${TS}`, presentacion: 'tableta 200 mg', stock: 50, precioUnitario: 2.5 } }), 201, 'medicamento');
     ctx.med = med;
     const sinRx = await req('POST', B('farmacia/api/farmacia/dispensaciones'), { token: T.far, body: { idPaciente: ctx.p.id, cantidad: 1 } });
-    exige(sinRx.status === 400, `sin prescripciÃ³n -> ${sinRx.status}`);
+    exige(sinRx.status === 400, `sin prescripción -> ${sinRx.status}`);
     const inexist = await req('POST', B('farmacia/api/farmacia/dispensaciones'), { token: T.far, body: { idPrescripcion: 999999, idPaciente: ctx.p.id, cantidad: 1 } });
-    exige(inexist.status === 404, `prescripciÃ³n inexistente -> ${inexist.status}`);
+    exige(inexist.status === 404, `prescripción inexistente -> ${inexist.status}`);
     const rxLibre = st(await req('POST', B(`pacientes/api/visitas/${ctx.v.id}/prescripciones`), { token: T.esp, body: { medicamento: 'Vitamina sin inventario', dosis: '1/24h', cantidadPrescrita: 3 } }), 201, 'rx sin inventario');
     const sinMed = await req('POST', B('farmacia/api/farmacia/dispensaciones'), { token: T.far, body: { idPrescripcion: rxLibre.id, idPaciente: ctx.p.id, cantidad: 1 } });
-    exige([400, 409].includes(sinMed.status), `prescripciÃ³n sin medicamento de inventario -> ${sinMed.status}`);
+    exige([400, 409].includes(sinMed.status), `prescripción sin medicamento de inventario -> ${sinMed.status}`);
     const esp = await req('POST', B('farmacia/api/farmacia/dispensaciones'), { token: T.esp, body: { idPrescripcion: rxLibre.id, cantidad: 1 } });
     exige(esp.status === 403, `especialista dispensa -> ${esp.status}`);
-    return `sin prescripciÃ³n -> 400 ("${sinRx.data.error}"); inexistente -> 404; prescripciÃ³n sin medicamento de inventario -> ${sinMed.status}; especialista -> 403`;
+    return `sin prescripción -> 400 ("${sinRx.data.error}"); inexistente -> 404; prescripción sin medicamento de inventario -> ${sinMed.status}; especialista -> 403`;
   });
 
-  await caso(18, 'Despacho parcial: prescripciÃ³n parcial y costo sumado a la visita', async () => {
+  await caso(18, 'Despacho parcial: prescripción parcial y costo sumado a la visita', async () => {
     const rx = st(await req('POST', B(`pacientes/api/visitas/${ctx.v.id}/prescripciones`), { token: T.esp, body: { medicamento: ctx.med.nombre, dosis: '1 tab/24h', indicaciones: 'con alimentos', idMedicamento: ctx.med.id, cantidadPrescrita: 10 } }), 201, 'rx');
     const d1 = st(await req('POST', B('farmacia/api/farmacia/dispensaciones'), { token: T.far, body: { idPrescripcion: rx.id, idPaciente: ctx.p.id, cantidad: 4 } }), 201, 'despacho 4');
     const pend = st(await req('GET', B(`farmacia/api/farmacia/prescripciones/pendientes/paciente/${ctx.p.id}`), { token: T.far }), 200, 'pendientes');
     const p = pend.find(x => x.id === rx.id);
-    exige(p && p.estado === 'parcial' && p.cantidadRestante === 6, `prescripciÃ³n tras 4: ${JSON.stringify(p)}`);
+    exige(p && p.estado === 'parcial' && p.cantidadRestante === 6, `prescripción tras 4: ${JSON.stringify(p)}`);
     const exceso = await req('POST', B('farmacia/api/farmacia/dispensaciones'), { token: T.far, body: { idPrescripcion: rx.id, idPaciente: ctx.p.id, cantidad: 7 } });
     exige(exceso.status === 409, `exceso -> ${exceso.status}`);
     const stock = st(await req('GET', B(`farmacia/api/farmacia/medicamentos/${ctx.med.id}`), { token: T.far }), 200, 'med');
@@ -265,11 +265,11 @@ const sql = q => execFileSync('docker', ['exec', 'asilo-sqlserver', 'sh', '-c',
     const v = st(await req('GET', B(`pacientes/api/visitas/${ctx.v.id}`), { token: T.esp }), 200, 'visita');
     exige(Math.abs(Number(v.costoFarmacia) - 8) < 0.001, `costoFarmacia ${v.costoFarmacia} (esperaba 4 x 2.50 x 0.8 = 8)`);
     ctx.rx = rx;
-    return `10 prescritas, entrega 4 -> 201, estado parcial, faltan 6; pedir 7 -> 409 sin tocar stock (46); costoFarmacia de la visita Q${Number(v.costoFarmacia).toFixed(2)} = 4 Ã— Q2.50 Ã— 0.8; monto despacho Q${Number(d1.costoTotal ?? d1.monto ?? 0).toFixed(2)}`;
+    return `10 prescritas, entrega 4 -> 201, estado parcial, faltan 6; pedir 7 -> 409 sin tocar stock (46); costoFarmacia de la visita Q${Number(v.costoFarmacia).toFixed(2)} = 4 × Q2.50 × 0.8; monto despacho Q${Number(d1.costoTotal ?? d1.monto ?? 0).toFixed(2)}`;
   });
 
-  await caso(19, 'Cierre: completada y cargo atÃ³mico consulta+lab+farmacia', async () => {
-    st(await req('PATCH', B(`pacientes/api/visitas/${ctx.v.id}`), { token: T.esp, body: { observaciones: 'Control en 30 dÃ­as; anticoagulaciÃ³n' } }), 200, 'observaciones');
+  await caso(19, 'Cierre: completada y cargo atómico consulta+lab+farmacia', async () => {
+    st(await req('PATCH', B(`pacientes/api/visitas/${ctx.v.id}`), { token: T.esp, body: { observaciones: 'Control en 30 días; anticoagulación' } }), 200, 'observaciones');
     const c = st(await req('POST', B(`pacientes/api/visitas/${ctx.v.id}/completar`), { token: T.esp }), 200, 'completar');
     const v = c.visita || c;
     exige(v.estado === 'completada', `estado ${v.estado}`);
@@ -287,7 +287,7 @@ const sql = q => execFileSync('docker', ['exec', 'asilo-sqlserver', 'sh', '-c',
     const edit = await req('PATCH', B(`pacientes/api/visitas/${ctx.v.id}`), { token: T.esp, body: { diagnostico: 'cambio' } });
     exige(edit.status === 409, `editar cerrada -> ${edit.status}`);
     ctx.cargo = cargo;
-    return `cierre -> 200 completada y solicitud completada; un solo cargo #${cargo.id} Q${cargo.monto} al familiar #${cargo.idFamiliar}: consulta Q120 (150 âˆ’ 20 %), laboratorio Q160, farmacia Q8; segundo cierre -> 409; editar cerrada -> 409`;
+    return `cierre -> 200 completada y solicitud completada; un solo cargo #${cargo.id} Q${cargo.monto} al familiar #${cargo.idFamiliar}: consulta Q120 (150 − 20 %), laboratorio Q160, farmacia Q8; segundo cierre -> 409; editar cerrada -> 409`;
   });
 
   await caso(20, 'Saldos no negativos y familiar completo', async () => {
@@ -328,10 +328,10 @@ const sql = q => execFileSync('docker', ['exec', 'asilo-sqlserver', 'sh', '-c',
     st(await req('POST', B('financiero/api/financiero/pagos-cuota'), { token: T.admin, body: { idPaciente: pN.id, mes: 1, anio: 2025 } }), 201, 'pagar');
     const panel2 = st(await req('GET', B('financiero/api/financiero/alertas'), { token: T.admin }), 200, 'alertas 2');
     exige(!panel2.some(a => a.idPaciente === pN.id), 'la pagada sigue con alerta');
-    return `cuota vencida hace 5 dÃ­as -> naranja ("${aN.alerta.motivos[0]}"); hace 40 -> roja ("${aR.alerta.motivos[0]}"); rojas primero; coordinador ve el panel, enfermero -> 403, coordinador no emite -> 403; al pagarla sale del panel`;
+    return `cuota vencida hace 5 días -> naranja ("${aN.alerta.motivos[0]}"); hace 40 -> roja ("${aR.alerta.motivos[0]}"); rojas primero; coordinador ve el panel, enfermero -> 403, coordinador no emite -> 403; al pagarla sale del panel`;
   });
 
-  await caso(22, 'ExportaciÃ³n PDF y Excel con diseÃ±o y fÃ³rmulas', async () => {
+  await caso(22, 'Exportación PDF y Excel con diseño y fórmulas', async () => {
     const tipos = st(await req('GET', B('reportes/api/reportes/tipos'), { token: T.admin }), 200, 'tipos');
     const lista = (tipos.tipos || tipos).map(t => t.id || t.tipo || t);
     const desde = hoyGt(30), hasta = hoyGt(0);
@@ -345,7 +345,7 @@ const sql = q => execFileSync('docker', ['exec', 'asilo-sqlserver', 'sh', '-c',
     const wb = new ExcelJS.Workbook(); await wb.xlsx.load(xl.buf); const ws = wb.worksheets[0];
     let formTotal = null, formFila = null, banda = String(ws.getCell('A1').value);
     ws.eachRow(r => r.eachCell(c => { const f = c.formula || c.value?.formula; if (f && /^SUM/.test(f)) formTotal = f; else if (f && /\+/.test(f)) formFila = f; }));
-    exige(formTotal && formFila && /CABEZA DE ALGOD/i.test(banda), `fÃ³rmulas ${formTotal} / ${formFila}, banda ${banda}`);
+    exige(formTotal && formFila && /CABEZA DE ALGOD/i.test(banda), `fórmulas ${formTotal} / ${formFila}, banda ${banda}`);
     const json = st(await req('GET', B(`reportes/api/reportes/costos-por-paciente?desde=${desde}&hasta=${hasta}`), { token: T.admin }), 200, 'json');
     const fila = json.filas.find(f => f.idPaciente === ctx.p.id);
     exige(fila && Number(fila.totalGeneral) === 288 && Number(fila.farmacia) === 8, `fila del paciente ${JSON.stringify(fila)}`);
@@ -358,7 +358,7 @@ const sql = q => execFileSync('docker', ['exec', 'asilo-sqlserver', 'sh', '-c',
     const nombre = "Robert'); DROP TABLE pacientes;--";
     const p = st(await req('POST', B('pacientes/api/pacientes'), { token: T.admin, body: { nombres: nombre, apellidos: `O'Brien ${TS}`, fechaNacimiento: '1942-02-02', genero: 'M', dpi: dpi(23), familiar: familiar(23) } }), 201, 'alta con SQL');
     const g = st(await req('GET', B(`pacientes/api/pacientes/${p.id}`), { token: T.admin }), 200, 'leer');
-    exige(g.nombres === nombre, 'no se guardÃ³ literal');
+    exige(g.nombres === nombre, 'no se guardó literal');
     const id = await req('GET', B('pacientes/api/pacientes/1%20OR%201=1'), { token: T.admin });
     exige([400, 404].includes(id.status), `id inyectado -> ${id.status}`);
     const rep = await req('GET', B("reportes/api/reportes/costos-por-paciente?idPaciente=1%20OR%201=1"), { token: T.admin });
@@ -367,18 +367,18 @@ const sql = q => execFileSync('docker', ['exec', 'asilo-sqlserver', 'sh', '-c',
     const dpiR = await req('GET', B(`laboratorio/api/laboratorio/pacientes/dpi/${encodeURIComponent("1' OR '1'='1")}`), { token: T.lab });
     exige([400, 404].includes(dpiR.status), `dpi inyectado -> ${dpiR.status}`);
     const sigue = sql('SELECT COUNT(*) FROM pacientes');
-    return `login con ' OR 1=1 -> ${l.status}; paciente "${nombre}" guardado y leÃ­do literal; id "1 OR 1=1" -> ${id.status}; filtros de reportes -> 400; DPI inyectado -> ${dpiR.status}; la tabla pacientes sigue (${sigue} filas)`;
+    return `login con ' OR 1=1 -> ${l.status}; paciente "${nombre}" guardado y leído literal; id "1 OR 1=1" -> ${id.status}; filtros de reportes -> 400; DPI inyectado -> ${dpiR.status}; la tabla pacientes sigue (${sigue} filas)`;
   });
 
-  await caso(24, 'AuditorÃ­a: usuario, IP, mÃ³dulo, datos anteriores/nuevos', async () => {
+  await caso(24, 'Auditoría: usuario, IP, módulo, datos anteriores/nuevos', async () => {
     const enf = await req('GET', B('reportes/api/auditoria'), { token: T.enf });
     exige(enf.status === 403, `enfermero -> ${enf.status}`);
-    const a = st(await req('GET', B(`reportes/api/auditoria?entidad=paciente&idEntidad=${ctx.pEgreso}`), { token: T.admin }), 200, 'auditorÃ­a');
+    const a = st(await req('GET', B(`reportes/api/auditoria?entidad=paciente&idEntidad=${ctx.pEgreso}`), { token: T.admin }), 200, 'auditoría');
     const des = a.find(r => r.accion === 'desactivar');
     exige(des && des.usuario === 'admin@asilo.gt' && des.ip && des.modulo && des.datosAnteriores?.activo === true && des.datosNuevos?.activo === false, `registro ${JSON.stringify(des)}`);
     const todo = JSON.stringify(st(await req('GET', B('reportes/api/auditoria?limite=500'), { token: T.admin }), 200, 'todo'));
-    exige(!/passwordHash|\$2[aby]\$/.test(todo), 'la auditorÃ­a contiene hashes de contraseÃ±a');
-    return ['OK con diferencia', `egreso del paciente ${ctx.pEgreso}: usuario ${des.usuario}, IP ${des.ip}, mÃ³dulo ${des.modulo}, antes activo=true â†’ despuÃ©s activo=false, motivo "${des.datosNuevos.motivoEgreso}"; sin contraseÃ±as en la bitÃ¡cora; enfermero -> 403. En Docker Desktop la IP es la del gateway; la IP real del navegador solo se ve en el Debian (no verificado)`];
+    exige(!/passwordHash|\$2[aby]\$/.test(todo), 'la auditoría contiene hashes de contraseña');
+    return ['OK con diferencia', `egreso del paciente ${ctx.pEgreso}: usuario ${des.usuario}, IP ${des.ip}, módulo ${des.modulo}, antes activo=true → después activo=false, motivo "${des.datosNuevos.motivoEgreso}"; sin contraseñas en la bitácora; enfermero -> 403. En Docker Desktop la IP es la del gateway; la IP real del navegador solo se ve en el Debian (no verificado)`];
   });
 
   // caso 11 y 25 se corren aparte (override de Brevo y carga con 50 usuarios)
