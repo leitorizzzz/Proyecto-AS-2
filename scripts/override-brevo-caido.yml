@@ -1,0 +1,10 @@
+# Caso 11: Brevo inalcanzable (no es Brevo real). Temporal, solo local.
+services:
+  notificaciones-service:
+    environment:
+      BREVO_API_URL: http://127.0.0.1:9/v3/smtp/email
+      BREVO_API_KEY: clave-ficticia-caso-11
+      MODO_SIMULACION: "false"
+      NOTIF_ESPERA_BASE_SEG: "3"
+      NOTIF_ESPERA_MAX_SEG: "6"
+      NOTIF_INTERVALO_JOB_SEG: "3"
