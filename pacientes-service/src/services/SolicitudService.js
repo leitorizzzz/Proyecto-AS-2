@@ -5,6 +5,7 @@ const Aviso = require('../models/Aviso');
 const ESPECIALIDAD_MAX = 100;
 const MOTIVO_MAX = 1000;
 const HORA_REGEX = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/;
+const ROLES_ESPECIALISTA = ['medico_especialista', 'especialista'];
 
 /**
  * CAPA DE LOGICA DE NEGOCIO
@@ -110,21 +111,32 @@ class SolicitudService {
         { status: 409 }
       );
     }
-    if (!fechaCita || isNaN(Date.parse(fechaCita))) {
-      throw Object.assign(new Error('fechaCita no es una fecha valida (YYYY-MM-DD)'), { status: 400 });
+    // Fecha que exista en el calendario y no anterior a hoy (Guatemala).
+    const fecha = String(fechaCita ?? '').slice(0, 10);
+    const d = new Date(`${fecha}T00:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || isNaN(d) || d.toISOString().slice(0, 10) !== fecha) {
+      throw Object.assign(new Error('La fecha de la cita no es válida (formato YYYY-MM-DD)'), { status: 400 });
+    }
+    const hoyGt = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    if (fecha < hoyGt) {
+      throw Object.assign(new Error('La fecha de la cita no puede ser anterior a hoy'), { status: 400 });
     }
     if (!horaCita || !HORA_REGEX.test(String(horaCita))) {
-      throw Object.assign(new Error('horaCita debe tener formato HH:mm o HH:mm:ss'), { status: 400 });
+      throw Object.assign(new Error('La hora de la cita debe tener formato HH:mm (00:00 a 23:59)'), { status: 400 });
     }
-    if (!idMedicoEspecialista || Number.isNaN(Number(idMedicoEspecialista))) {
-      throw Object.assign(new Error('idMedicoEspecialista es requerido'), { status: 400 });
+    if (!idMedicoEspecialista || !Number.isInteger(Number(idMedicoEspecialista))) {
+      throw Object.assign(new Error('Elija el médico especialista de la cita'), { status: 400 });
     }
     const paciente = await asegurarPacienteActivo(this.pacienteRepo, solicitud.idPaciente, 'asignarle citas');
-    const datos = { fechaCita, horaCita: String(horaCita), idMedicoEspecialista: Number(idMedicoEspecialista) };
+    // El medico de la cita debe ser un especialista con cuenta activa.
+    const especialista = await this.usuarioRepo.obtenerPorId(Number(idMedicoEspecialista));
+    if (!especialista || !ROLES_ESPECIALISTA.includes(especialista.rol) || especialista.activo === false) {
+      throw Object.assign(new Error(`El usuario ${idMedicoEspecialista} no es un médico especialista activo`), { status: 400 });
+    }
+    const datos = { fechaCita: fecha, horaCita: String(horaCita), idMedicoEspecialista: Number(idMedicoEspecialista) };
 
     // Caso 12: aviso interno al medico general que refirio (medico del
     // asilo) y al enfermero que acompana, en la misma transaccion.
-    const especialista = await this.usuarioRepo.obtenerPorId(datos.idMedicoEspecialista);
     const mensaje = `Cita asignada: ${paciente.nombres} ${paciente.apellidos}, ${solicitud.especialidad}, ` +
       `${String(fechaCita).slice(0, 10)} ${String(horaCita).slice(0, 5)}` +
       (especialista ? ` con ${especialista.nombre}` : '') + ` (solicitud #${solicitud.id})`;

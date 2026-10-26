@@ -81,6 +81,8 @@ async function peticion(method, url, { body, token } = {}) {
 const log  = (msg) => console.log(`  · ${msg}`);
 const warn = (msg) => console.warn(`  ! ${msg}`);
 const paso = (msg) => console.log(`\n${msg}`);
+/** Dia de Guatemala dentro de N dias (YYYY-MM-DD): una cita no puede ser en el pasado. */
+const diaFuturo = n => new Date(Date.now() - 6 * 3600e3 + n * 864e5).toISOString().slice(0, 10);
 
 async function login(email, password) {
   const r = await peticion('POST', `${API.auth}/api/auth/login`, { body: { email, password } });
@@ -187,7 +189,7 @@ async function login(email, password) {
     }
 
     const rAsig = await peticion('PATCH', `${API.pacientes}/api/solicitudes/${sol.id}/asignar-cita`, {
-      body: { fechaCita: '2026-11-15', horaCita: '09:00',
+      body: { fechaCita: diaFuturo(20), horaCita: '09:00',
               idMedicoEspecialista: idEspecialista || 1 },
       token: tokenCF
     });

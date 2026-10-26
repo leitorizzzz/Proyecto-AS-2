@@ -55,6 +55,8 @@ const ADMIN = {
 // -------- utilidades ----------
 let hubieronFallos = 0;
 let pasoActual = 0;
+/** Dia de Guatemala dentro de N dias (YYYY-MM-DD): una cita no puede ser en el pasado. */
+const diaFuturo = n => new Date(Date.now() - 6 * 3600e3 + n * 864e5).toISOString().slice(0, 10);
 
 function paso(nombre) {
   pasoActual += 1;
@@ -193,7 +195,7 @@ function familiarE2E(dpi) {
   paso('coordinador: PATCH /api/solicitudes/:id/asignar-cita');
   try {
     const r = await req('PATCH', `${API.pacientes}/api/solicitudes/${solicitudId}/asignar-cita`, {
-      body: { fechaCita: '2026-12-01', horaCita: '10:00', idMedicoEspecialista: idEsp },
+      body: { fechaCita: diaFuturo(30), horaCita: '10:00', idMedicoEspecialista: idEsp },
       token: cfToken, esperarStatus: 200
     });
     ok(`estado=${r.data.estado}`);
@@ -534,7 +536,7 @@ function familiarE2E(dpi) {
       body: { idPaciente: pac.id, especialidad: 'caso15-e2e', motivo: 'caso 15', idEnfermero: idEnf }, token: mgToken, esperarStatus: 201
     })).data;
     await req('PATCH', `${API.pacientes}/api/solicitudes/${sol.id}/asignar-cita`, {
-      body: { fechaCita: '2026-12-03', horaCita: '08:00', idMedicoEspecialista: idEsp }, token: cfToken, esperarStatus: 200
+      body: { fechaCita: diaFuturo(32), horaCita: '08:00', idMedicoEspecialista: idEsp }, token: cfToken, esperarStatus: 200
     });
     const vis = (await req('POST', `${API.pacientes}/api/solicitudes/${sol.id}/convertir-a-visita`, { token: meToken, esperarStatus: 201 })).data;
     // Tipo sin precio en el catalogo -> 409, no se ordena.
@@ -606,7 +608,7 @@ function familiarE2E(dpi) {
       token: mgToken, esperarStatus: 201
     })).data;
     await req('PATCH', `${API.pacientes}/api/solicitudes/${sol.id}/asignar-cita`, {
-      body: { fechaCita: '2026-12-02', horaCita: '09:00', idMedicoEspecialista: idEsp }, token: cfToken, esperarStatus: 200
+      body: { fechaCita: diaFuturo(31), horaCita: '09:00', idMedicoEspecialista: idEsp }, token: cfToken, esperarStatus: 200
     });
     visitaB = (await req('POST', `${API.pacientes}/api/solicitudes/${sol.id}/convertir-a-visita`, { token: meToken, esperarStatus: 201 })).data;
     rxB = (await req('POST', `${API.pacientes}/api/visitas/${visitaB.id}/prescripciones`, {

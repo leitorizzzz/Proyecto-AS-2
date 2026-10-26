@@ -42,7 +42,7 @@ describe('Regla paciente activo', () => {
       asignarCita: jest.fn()
     };
     const svc = new SolicitudService(repo, pacienteRepo(false), null);
-    await expect(svc.asignarCita(1, { fechaCita: '2026-12-01', horaCita: '10:00', idMedicoEspecialista: 3 }))
+    await expect(svc.asignarCita(1, { fechaCita: '2099-12-01', horaCita: '10:00', idMedicoEspecialista: 3 }))
       .rejects.toMatchObject({ status: 409 });
     expect(repo.asignarCita).not.toHaveBeenCalled();
   });

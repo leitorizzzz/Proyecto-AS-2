@@ -32,7 +32,8 @@ const pacienteRepoMock = {
 // Caso 7: el enfermero asignado debe ser un enfermero activo.
 const usuarioRepoMock = {
   obtenerPorId: jest.fn(async id => (id === 8 ? { id: 8, nombre: 'Enf. Patricia', rol: 'enfermero', activo: true }
-    : id === 9 ? { id: 9, nombre: 'Farmacia', rol: 'farmacia', activo: true } : null))
+    : id === 9 ? { id: 9, nombre: 'Farmacia', rol: 'farmacia', activo: true }
+    : id === 7 ? { id: 7, nombre: 'Dr. Especialista', rol: 'medico_especialista', activo: true } : null))
 };
 
 describe('SolicitudService', () => {
@@ -74,11 +75,11 @@ describe('SolicitudService', () => {
     repo.asignarCitaConAvisos = jest.fn(async (id) => ({ id, estado: 'cita_asignada' }));
     const avisoRepo = {};
     const svc = new SolicitudService(repo, pacienteRepoMock, null, usuarioRepoMock, avisoRepo);
-    await svc.asignarCita(5, { fechaCita: '2026-12-01', horaCita: '10:00', idMedicoEspecialista: 8 });
+    await svc.asignarCita(5, { fechaCita: '2099-12-01', horaCita: '10:00', idMedicoEspecialista: 7 });
     const [, datos, avisos, repoAvisos] = repo.asignarCitaConAvisos.mock.calls[0];
-    expect(datos).toEqual({ fechaCita: '2026-12-01', horaCita: '10:00', idMedicoEspecialista: 8 });
+    expect(datos).toEqual({ fechaCita: '2099-12-01', horaCita: '10:00', idMedicoEspecialista: 7 });
     expect(avisos.map(a => a.idUsuario).sort((x, y) => x - y)).toEqual([8, 42]);
-    expect(avisos[0]).toMatchObject({ tipo: 'cita_asignada', idSolicitud: 5, mensaje: expect.stringMatching(/2026-12-01 10:00/) });
+    expect(avisos[0]).toMatchObject({ tipo: 'cita_asignada', idSolicitud: 5, mensaje: expect.stringMatching(/2099-12-01 10:00/) });
     expect(repoAvisos).toBe(avisoRepo);
   });
 
@@ -103,7 +104,7 @@ describe('SolicitudService', () => {
     });
     const svc = new SolicitudService(repo, pacienteRepoMock, null, usuarioRepoMock);
     await expect(svc.asignarCita(1, {
-      fechaCita: '2026-12-01', horaCita: '10:00', idMedicoEspecialista: 2
+      fechaCita: '2099-12-01', horaCita: '10:00', idMedicoEspecialista: 2
     })).rejects.toMatchObject({ status: 409 });
   });
 

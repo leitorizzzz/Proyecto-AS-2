@@ -122,6 +122,18 @@ class VisitaMedicaService {
     if (!Number.isInteger(cantidadPrescrita) || cantidadPrescrita < 1 || cantidadPrescrita > 10000) {
       throw Object.assign(new Error('cantidadPrescrita es requerida: entero entre 1 y 10000'), { status: 400 });
     }
+    // Si se asocia al inventario, el medicamento debe existir y estar activo:
+    // si no, farmacia nunca podria dispensarla (RN-06).
+    if (datos.idMedicamento != null && datos.idMedicamento !== '' && this.repo.obtenerMedicamento) {
+      const idMed = Number(datos.idMedicamento);
+      const med = Number.isInteger(idMed) && idMed > 0 ? await this.repo.obtenerMedicamento(idMed) : null;
+      if (!med) {
+        throw Object.assign(new Error(`El medicamento ${datos.idMedicamento} no existe en el inventario`), { status: 400 });
+      }
+      if (med.activo === false) {
+        throw Object.assign(new Error(`El medicamento ${med.nombre} está desactivado en el inventario`), { status: 409 });
+      }
+    }
     return this.repo.agregarPrescripcion(id, {
       cantidadPrescrita,
       medicamento: String(datos.medicamento).trim(),

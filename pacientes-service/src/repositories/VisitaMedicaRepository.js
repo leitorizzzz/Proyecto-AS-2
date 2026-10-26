@@ -231,6 +231,16 @@ class VisitaMedicaRepository {
     return result.recordset[0] ? Number(result.recordset[0].precioBase) : null;
   }
 
+  /** Medicamento del inventario de farmacia (medicamentos, BD compartida). */
+  async obtenerMedicamento(id) {
+    const pool = await getPool();
+    const result = await pool.request()
+      .input('id', sql.Int, id)
+      .query('SELECT id, nombre, activo FROM medicamentos WHERE id = @id');
+    const m = result.recordset[0];
+    return m ? { ...m, activo: m.activo === undefined ? true : Boolean(m.activo) } : null;
+  }
+
   async agregarExamen(idVisita, { tipo, precioBase, descuento, costo }) {
     const pool = await getPool();
     const result = await pool.request()

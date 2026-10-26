@@ -4,6 +4,16 @@ const { asegurarFamiliarCompleto } = require('./reglasFamiliar');
 const GENEROS_VALIDOS = ['M', 'F', 'Otro'];
 const DPI_REGEX = /^\d{13}$/; // DPI de Guatemala: 13 digitos
 
+/** "YYYY-MM-DD" (o un instante ISO) -> "YYYY-MM-DD" si existe en el calendario; si no, null. */
+function fechaCalendario(valor) {
+  const s = String(valor ?? '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !isNaN(d) && d.toISOString().slice(0, 10) === s ? s : null;
+}
+/** Hoy en Guatemala (UTC-6, sin horario de verano). */
+const hoyGuatemala = () => new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
 /**
  * CAPA DE LOGICA DE NEGOCIO
  * Validaciones y reglas del dominio de pacientes.
@@ -45,8 +55,14 @@ class PacienteService {
     if (!datos.apellidos || datos.apellidos.trim() === '') {
       throw new Error('Los apellidos son requeridos');
     }
-    if (!datos.fechaNacimiento || isNaN(Date.parse(datos.fechaNacimiento))) {
-      throw new Error('La fecha de nacimiento no es valida');
+    // Fecha que exista en el calendario (2020-02-31 ya no se corre al 2 de
+    // marzo), no futura y no anterior a 1900.
+    const nac = fechaCalendario(datos.fechaNacimiento);
+    if (!nac) {
+      throw Object.assign(new Error('La fecha de nacimiento no es válida (formato YYYY-MM-DD)'), { status: 400 });
+    }
+    if (nac > hoyGuatemala() || nac < '1900-01-01') {
+      throw Object.assign(new Error('La fecha de nacimiento no puede ser futura ni anterior a 1900'), { status: 400 });
     }
     if (!GENEROS_VALIDOS.includes(datos.genero)) {
       throw new Error(`Genero invalido. Debe ser uno de: ${GENEROS_VALIDOS.join(', ')}`);
@@ -120,7 +136,7 @@ class PacienteService {
     const hoyGt = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString().slice(0, 10);
     let fecha = new Date(`${hoyGt}T18:00:00Z`);
     if (fechaEgreso != null && fechaEgreso !== '') {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(fechaEgreso)) || isNaN(Date.parse(`${fechaEgreso}T12:00:00Z`))) {
+      if (!fechaCalendario(fechaEgreso)) {
         throw Object.assign(new Error('fechaEgreso debe tener formato YYYY-MM-DD'), { status: 400 });
       }
       // Mediodia de Guatemala (18:00 UTC): la fecha no cambia al mostrarla en UTC-6.
