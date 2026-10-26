@@ -143,11 +143,11 @@ async function login(email, password) {
   // asignamos a cada estado un paciente distinto. Si ya hay una activa
   // para esa combinacion paciente+especialidad, se omite (RN-02).
   const asignaciones = [
-    { paciente: 'Rosa',   especialidad: 'geriatria',    objetivo: 'pendiente_asignacion' },
-    { paciente: 'Pedro',  especialidad: 'traumatologia', objetivo: 'cita_asignada'       },
-    { paciente: 'Dolores',especialidad: 'neurologia',   objetivo: 'en_atencion'          },
-    { paciente: 'Esteban',especialidad: 'cardiologia',  objetivo: 'completada'           },
-    { paciente: 'Lucia',  especialidad: 'oftalmologia', objetivo: 'cancelada'            }
+    { paciente: 'Rosa',   especialidad: 'geriatria',    objetivo: 'pendiente_asignacion', motivo: 'Deterioro funcional y caídas frecuentes en el último mes' },
+    { paciente: 'Pedro',  especialidad: 'traumatologia', objetivo: 'cita_asignada',        motivo: 'Dolor de cadera derecha al caminar' },
+    { paciente: 'Dolores',especialidad: 'neurologia',   objetivo: 'en_atencion',          motivo: 'Temblor en manos y olvidos recientes' },
+    { paciente: 'Esteban',especialidad: 'cardiologia',  objetivo: 'completada',           motivo: 'Palpitaciones y presión arterial elevada' },
+    { paciente: 'Lucia',  especialidad: 'oftalmologia', objetivo: 'cancelada',            motivo: 'Visión borrosa en ojo izquierdo' }
   ];
 
   paso('6) Solicitudes de demo en cada estado');
@@ -172,7 +172,7 @@ async function login(email, password) {
     // 1) Crear como medico_general
     const r = await peticion('POST', `${API.pacientes}/api/solicitudes`, {
       body: { idPaciente: paciente.id, especialidad: a.especialidad,
-              motivo: `Caso demo: ${a.objetivo}`, idEnfermero },
+              motivo: a.motivo, idEnfermero },
       token: tokenMG
     });
     if (!r.ok) { warn(`crear ${a.paciente}/${a.especialidad}: ${JSON.stringify(r.data)}`); continue; }
