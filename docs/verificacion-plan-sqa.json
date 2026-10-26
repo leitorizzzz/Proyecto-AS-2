@@ -1,0 +1,140 @@
+[
+  {
+    "id": 1,
+    "nombre": "Login válido: 200 + JWT firmado",
+    "estado": "OK",
+    "evidencia": "POST /api/auth/login -> 200, alg HS256, rol admin, vence en 8 h; password mala -> 401"
+  },
+  {
+    "id": 2,
+    "nombre": "RBAC: rol no autorizado en ruta administrativa -> 403",
+    "estado": "OK",
+    "evidencia": "6 intentos -> 403: laboratorio registra usuario; enfermero consulta auditoría; farmacia registra gasto; especialista desactiva paciente; coordinador cambia precio; enfermero desactiva usuario"
+  },
+  {
+    "id": 3,
+    "nombre": "Endpoint protegido sin token -> 401",
+    "estado": "OK",
+    "evidencia": "7 rutas de los 7 servicios sin token -> 401; token con firma alterada -> 401 (que no toca la BD lo prueba rbac.test.js con repos simulados)"
+  },
+  {
+    "id": 4,
+    "nombre": "Mismo JWT aceptado por los 7 microservicios",
+    "estado": "OK",
+    "evidencia": "el mismo token admin -> 200 en los 7 servicios, directo (3000-3006) y por nginx (/svc)"
+  },
+  {
+    "id": 5,
+    "nombre": "Alta de interno con familiar principal y ficha 1:1",
+    "estado": "OK",
+    "evidencia": "sin familiar -> 400 camposFaltantes [nombres, apellidos, dpi, parentesco, telefono, email, direccion]; incompleto -> 400 (6 faltantes); completo -> 201 id 73; BD: 1 familiar principal y 1 ficha"
+  },
+  {
+    "id": 6,
+    "nombre": "Egreso: baja lógica, registro íntegro, sin DELETE físico",
+    "estado": "OK con diferencia",
+    "evidencia": "sin motivo -> 400, fecha futura -> 400, con motivo -> 200; GET: activo=false, fechaEgreso 2026-10-26, motivo guardado; fuera del listado; fila en BD (1); solicitud nueva -> 409. Diferencia de nombre: activo BIT en vez de estado='inactivo'"
+  },
+  {
+    "id": 7,
+    "nombre": "Solicitud del Médico General con enfermero: pendiente_asignacion",
+    "estado": "OK",
+    "evidencia": "sin enfermero -> 400; con usuario que no es enfermero -> 400; válida -> 201 id 164, estado pendiente_asignacion, idEnfermero 5"
+  },
+  {
+    "id": 8,
+    "nombre": "Perfiles que no son médico general no crean solicitudes",
+    "estado": "OK",
+    "evidencia": "enfermero, especialista, coordinador, farmacia, admin -> 403 con mensaje (\"Acceso denegado. Se requiere uno de los roles: medico_general\"); en la UI el formulario queda deshabilitado con aviso"
+  },
+  {
+    "id": 9,
+    "nombre": "RN-02: solicitud duplicada rechazada con la activa",
+    "estado": "OK",
+    "evidencia": "misma especialidad -> 409 solicitudActiva {id 164, pendiente_asignacion}: \"Este paciente ya tiene una solicitud activa en la especialidad \"cardiologia\" (solicitud #164, pendiente de cita). Espere a que se complete o cancélela antes de crear otra.\"; otra especialidad -> 201"
+  },
+  {
+    "id": 10,
+    "nombre": "Notificación por Brevo: log con estado e ID",
+    "estado": "OK con diferencia",
+    "evidencia": "notificación #166 a sqa.familiar5@example.com: estado enviada, idMensajeProveedor sim-86ede07e-059c-4b1e-9583-69ea692c48d8; servicio en modoSimulacion=true. No se ejecutó Brevo real"
+  },
+  {
+    "id": 12,
+    "nombre": "Asignar cita: cita_asignada y aviso interno",
+    "estado": "OK",
+    "evidencia": "enfermero -> 403; coordinador -> 200 cita_asignada; reasignar -> 409; aviso #17 para el médico general y #18 para el enfermero (\"Cita asignada: SQA Caso Cinco 1793054878531, cardiologia, 2026-12-01 10:00 con Dr. Rodrigo Especialista (solicitud #164)\"); aviso ajeno -> 404; marcar leído -> 200"
+  },
+  {
+    "id": 13,
+    "nombre": "Convertir a visita: en_atencion vinculada a la ficha",
+    "estado": "OK",
+    "evidencia": "médico general -> 403; especialista -> 201 visita 8 en_atencion con idFichaMedica 72 = ficha del paciente; solicitud en_atencion; segunda conversión -> 409"
+  },
+  {
+    "id": 14,
+    "nombre": "Cerrar visita sin campos: rechazo y estado incompleta",
+    "estado": "OK",
+    "evidencia": "sin nada -> 400 camposFaltantes [diagnostico, observaciones] y la visita queda incompleta (sigue editable); con solo diagnóstico -> 400 [observaciones]; la UI resalta los campos (no automatizado aquí)"
+  },
+  {
+    "id": 15,
+    "nombre": "Orden de laboratorio con costo con descuento registrado",
+    "estado": "OK",
+    "evidencia": "tipo sin precio -> 409; ECG ordenado -> 201 precioBase Q200, costo Q160 (20 % fundación) guardado al ordenar, estado pendiente; aparece en órdenes pendientes de laboratorio; costo registradoAlOrdenar=true"
+  },
+  {
+    "id": 16,
+    "nombre": "Resultado disponible y visible al especialista",
+    "estado": "OK",
+    "evidencia": "especialista no registra (403); numérico sin valor -> 400; laboratorio registra -> 201; duplicado -> 409; la visita ya muestra el examen \"disponible\" y el especialista lee \"Ritmo sinusal, sin alteraciones agudas\""
+  },
+  {
+    "id": 17,
+    "nombre": "Despacho sin prescripción: rechazo (RN-06)",
+    "estado": "OK",
+    "evidencia": "sin prescripción -> 400 (\"Elija la prescripción a dispensar: solo se entrega lo que un médico recetó en una visita.\"); inexistente -> 404; prescripción sin medicamento de inventario -> 400; especialista -> 403"
+  },
+  {
+    "id": 18,
+    "nombre": "Despacho parcial: prescripción parcial y costo sumado a la visita",
+    "estado": "OK",
+    "evidencia": "10 prescritas, entrega 4 -> 201, estado parcial, faltan 6; pedir 7 -> 409 sin tocar stock (46); costoFarmacia de la visita Q8.00 = 4 × Q2.50 × 0.8; monto despacho Q8.00"
+  },
+  {
+    "id": 19,
+    "nombre": "Cierre: completada y cargo atómico consulta+lab+farmacia",
+    "estado": "OK",
+    "evidencia": "cierre -> 200 completada y solicitud completada; un solo cargo #7 Q288 al familiar #72: consulta Q120 (150 − 20 %), laboratorio Q160, farmacia Q8; segundo cierre -> 409; editar cerrada -> 409"
+  },
+  {
+    "id": 20,
+    "nombre": "Saldos no negativos y familiar completo",
+    "estado": "OK",
+    "evidencia": "abono mayor al saldo -> 409; abono 0/negativo/texto -> 400; abono Q100 -> saldo Q188 parcial; poner el saldo negativo directo en la BD -> CHECK CK_cargos_saldo_no_negativo lo rechaza; cargo y cuota a paciente sin familiar -> 409 (\"El paciente 75 no tiene familiar responsable registrado: no se pueden registrar movimientos en su cuenta\")"
+  },
+  {
+    "id": 21,
+    "nombre": "Alertas de cuotas y saldos vencidos (naranja / roja)",
+    "estado": "OK",
+    "evidencia": "cuota vencida hace 5 días -> naranja (\"1 cuota(s) vencida(s): 1/2025 (5 d)\"); hace 40 -> roja (\"1 cuota(s) vencida(s): 1/2025 (40 d)\"); rojas primero; coordinador ve el panel, enfermero -> 403, coordinador no emite -> 403; al pagarla sale del panel"
+  },
+  {
+    "id": 22,
+    "nombre": "Exportación PDF y Excel con diseño y fórmulas",
+    "estado": "OK",
+    "evidencia": "7 reportes -> PDF (%PDF) y Excel (xlsx) 200; costos por paciente: total con SUM(H6:H11), fila con D11+E11+F11+G11, banda \"ASILO DE ANCIANOS \"CABEZA DE ALGODON\" - \"; el paciente del flujo suma Q288 (farmacia Q8, sin doble conteo)"
+  },
+  {
+    "id": 23,
+    "nombre": "SQL injection: entrada tratada como texto literal",
+    "estado": "OK",
+    "evidencia": "login con ' OR 1=1 -> 401; paciente \"Robert'); DROP TABLE pacientes;--\" guardado y leído literal; id \"1 OR 1=1\" -> 404; filtros de reportes -> 400; DPI inyectado -> 404; la tabla pacientes sigue (78 filas)"
+  },
+  {
+    "id": 24,
+    "nombre": "Auditoría: usuario, IP, módulo, datos anteriores/nuevos",
+    "estado": "OK con diferencia",
+    "evidencia": "egreso del paciente 74: usuario admin@asilo.gt, IP 172.18.0.1, módulo pacientes, antes activo=true → después activo=false, motivo \"Traslado con su familia\"; sin contraseñas en la bitácora; enfermero -> 403. En Docker Desktop la IP es la del gateway; la IP real del navegador solo se ve en el Debian (no verificado)"
+  }
+]

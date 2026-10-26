@@ -62,3 +62,17 @@ Todos con la misma password: **`Demo1234`**.
 
 Corre la suite Jest completa (unitaria + supertest). No necesita que
 docker-compose esté arriba. Ver `docs/PLAN_PRUEBAS.md`.
+
+## Auditoría SQA (26 oct 2026)
+
+Solo contra el stack **local** (crean registros "SQA …" y usan `docker exec`
+sobre `asilo-sqlserver`); nunca contra el servidor con datos reales.
+
+| Comando | Script | Qué hace |
+|---|---|---|
+| `npm run test:sqa` | `verificar-plan-sqa.js` | 23 de los 25 casos del plan del SQA, uno por uno; deja la evidencia en `docs/verificacion-plan-sqa.json` |
+| `npm run test:caso11` | `caso11-brevo-caido.js` | Caso 11. Antes: `docker compose -f docker-compose.yml -f scripts/override-brevo-caido.yml up -d --no-deps notificaciones-service`; después: `docker compose up -d --no-deps notificaciones-service`. Brevo apunta a 127.0.0.1:9: nunca se llama al Brevo real |
+| `npm run test:hostil` | `pruebas-hostiles.js` | Cada escritura con el token de cada rol (según `CONTEXT_SISTEMA.md` §3.3) y validaciones de entrada |
+| `npm run test:integridad` | `integridad-bd.js` | 18 consultas que deben devolver 0 filas (saldos, descuentos, cargos, RN-02, stock…) |
+
+El caso 25 es `npm run test:carga` con `USUARIOS=50`.

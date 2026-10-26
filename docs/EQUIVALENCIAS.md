@@ -80,3 +80,13 @@ minúsculas con guion bajo.
 | IP del cliente en la auditoría (caso 24) | `auditoria.ip` = `req.ip` tras el nginx del frontend (`X-Forwarded-For`, `trust proxy` solo para `frontend`) |
 | Log de notificaciones con estado "error" (caso 11) | `notificaciones.estado = 'fallida'` (reintentable) / `'fallida_definitiva'` + `mensajeError` |
 | Recuperación de contraseña (RF-42, UC-10.4) | `POST /api/auth/recuperar` y `/restablecer`; tabla `tokens_recuperacion` (hash SHA-256, 30 min, un uso); correo `notificaciones.tipoEvento = 'recuperacion_password'` |
+
+## Auditoría final (26 oct 2026)
+
+| Plan / Análisis | Código |
+|---|---|
+| Estados y roles tal como los ve el usuario | En pantalla nunca aparece el código: `pendiente_asignacion` → «Pendiente de cita», `en_atencion` → «En atención», `medico_especialista` → «Médico especialista», etc. (`etiqueta()` / `textoRol()` en `frontend/app.js`). En la BD y la API siguen en minúsculas con guion bajo |
+| Cobros / entradas de dinero | Reportes `cobros-por-rango` y `entradas`: cuotas pagadas + **abonos a cargos** (`abonos_cargo`, tipo `abono`) + donaciones (solo entradas) |
+| Error interno del servidor | Cualquier 5xx responde «Ocurrió un error interno…»; el detalle queda en el log del contenedor (`middleware/manejoErrores.js`, copia idéntica en los 7) |
+| Cita médica | `fechaCita` ≥ hoy (Guatemala) y `idMedicoEspecialista` = usuario activo con rol `medico_especialista` / `especialista` |
+| Prescripción asociada al inventario | `visita_prescripciones.idMedicamento` debe existir en `medicamentos` y estar activo (400 / 409) |

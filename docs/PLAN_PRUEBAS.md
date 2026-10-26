@@ -23,8 +23,8 @@ las pruebas corran en un clon limpio sin instalar cada servicio.
 ./scripts/run-all-tests.ps1        # PowerShell
 npm run test:todo
 ```
-Ultima ejecucion (24 oct 2026, sobre un stack recien creado con `docker compose down -v` +
-`scripts/bootstrap.ps1`): **293 casos en 38 archivos, 293 OK, 0 fallas**.
+Ultima ejecucion (26 oct 2026, auditoria final, sobre un stack recien creado con
+`docker compose down -v` + `scripts/bootstrap.ps1`): **382 casos en 44 archivos, 382 OK, 0 fallas**.
 
 **(2) Integracion end-to-end**: requieren el stack docker-compose
 arriba. Recorren el flujo completo de un paciente, con usuarios reales
@@ -33,7 +33,9 @@ y JWT, contra las APIs HTTP. Un paso por linea con [ OK ] / [FALLA].
 npm run test:e2e                         # localhost
 BASE_HOST=100.96.172.77 npm run test:e2e  # servidor Debian
 ```
-Ultima ejecucion (24 oct 2026, stack local recien creado): **62 pasos, 62 OK**.
+Ultima ejecucion (26 oct 2026, stack local recien creado): **62 pasos, 62 OK**. El
+paso 58 verifica ademas que los abonos a cargos aparecen en "Cobros por rango"
+y "Entradas de dinero" por su monto exacto.
 El paso de RF-42 lee el enlace de recuperacion de la tabla `notificaciones`
 con `docker exec` (la API no lo expone a proposito); contra otro host solo
 verifica la parte de API.
@@ -41,9 +43,24 @@ verifica la parte de API.
 **(3) Carga** (caso 25): `npm run test:carga` (`USUARIOS=20..50`, `VUELTAS`,
 `LIMITE_MS`). Cada usuario virtual hace login, lista pacientes, crea y
 lista solicitudes; reporta p50/p95/max por operacion y falla si una
-peticion supera 3 s. Ultima ejecucion (24 oct, stack recien creado): 50 usuarios x 3 vueltas,
-600 peticiones, max 899 ms, p95 608 ms, 0 errores. Antes del arreglo (bcrypt en
+peticion supera 3 s. Ultima ejecucion (26 oct, stack recien creado): 50 usuarios x 3 vueltas,
+600 peticiones, max 911 ms, p95 626 ms, 0 errores. Antes del arreglo (bcrypt en
 el hilo principal) el login llegaba a 7,1 s con 30 usuarios.
+
+**(4) Auditoria SQA** (26 oct 2026, solo stack local: crean registros "SQA ..."
+y usan `docker exec`):
+
+| Comando | Que hace | Ultima ejecucion |
+|---|---|---|
+| `npm run test:sqa` | Ejecuta 23 de los 25 casos del plan contra el stack, uno por uno, y guarda la evidencia en [verificacion-plan-sqa.json](verificacion-plan-sqa.json) | 23/23 OK (3 con diferencia de nombre) |
+| `npm run test:caso11` + [override-brevo-caido.yml](../scripts/override-brevo-caido.yml) | Caso 11 con Brevo inalcanzable (127.0.0.1:9; nunca el Brevo real) | solicitud 201; fallida -> fallida -> fallida_definitiva |
+| `npm run test:carga` (`USUARIOS=50`) | Caso 25 | max 911 ms |
+| `npm run test:hostil` | Matriz de permisos (cada escritura x 7 roles, segun `CONTEXT_SISTEMA.md` §3.3) y ~80 validaciones de entrada (DPI, correos, montos, fechas, textos largos, tildes, JSON roto) | 363 comprobaciones, 0 problemas |
+| `npm run test:integridad` | 18 consultas de consistencia en la BD (cargo = desglose, pagado = abonos, 20 % en todo, un cargo por visita, RN-02, stock >= 0...) | 18/18 limpias |
+
+Ademas se recorrio el frontend en Chrome con los 7 roles (todas las secciones:
+sin errores de consola, sin pantallas en blanco, sin codigos internos) y a 390 px
+de ancho (sin desborde horizontal).
 
 **Regla de las pruebas de integracion:** el e2e solo crea, modifica,
 desactiva o reactiva registros que creo el mismo (pacientes "E2E ...",
@@ -73,7 +90,7 @@ cada caso:
 | 8 No-MG no crea | rbacPacientes.test.js | caso 7 (enfermero y especialista 403) |
 | 9 RN-02 con la activa | SolicitudService.test.js | RN-02: segunda solicitud activa... -> 409 |
 | 10 Brevo: enviada + ID | NotificacionesService.test.js | notificaciones: existe una para este paciente |
-| 11 Caida de Brevo | NotificacionesService.test.js | — (verificado en vivo el 23 oct con override temporal; ver CSV) |
+| 11 Caida de Brevo | NotificacionesService.test.js | — (`npm run test:caso11` con el override; 26 oct) |
 | 12 Aviso interno al medico | SolicitudService.test.js | caso 12 |
 | 13 Visita vinculada a la ficha | VisitaMedicaService.test.js | caso 13 |
 | 14 Visita INCOMPLETA | VisitaIncompleta.test.js | caso 14 |
@@ -291,11 +308,11 @@ verificar el mapeo abriendo cada archivo (ver "Mapa a archivos").
 | SQA 20 | [financiero-service/__tests__/TitularCuenta.test.js](../financiero-service/__tests__/TitularCuenta.test.js) | 3 |
 | SQA 21 | [financiero-service/__tests__/AlertasCobro.test.js](../financiero-service/__tests__/AlertasCobro.test.js) | 9 |
 | RBI-xx | [financiero-service/__tests__/rbac.test.js](../financiero-service/__tests__/rbac.test.js) | 9 |
-| AU-xx | [auth-service/__tests__/AuthService.test.js](../auth-service/__tests__/AuthService.test.js) | 7 |
+| AU-xx | [auth-service/__tests__/AuthService.test.js](../auth-service/__tests__/AuthService.test.js) | 11 |
 | CU-xx | [auth-service/__tests__/CuentasActivas.test.js](../auth-service/__tests__/CuentasActivas.test.js) | 7 |
 | SQA 25 | [auth-service/__tests__/HashPool.test.js](../auth-service/__tests__/HashPool.test.js) | 4 |
 | RBA-xx | [auth-service/__tests__/rbac.test.js](../auth-service/__tests__/rbac.test.js) | 8 |
-| RF-42 regla | [auth-service/__tests__/PasswordRegla.test.js](../auth-service/__tests__/PasswordRegla.test.js) | 21 |
+| RF-42 regla | [auth-service/__tests__/PasswordRegla.test.js](../auth-service/__tests__/PasswordRegla.test.js) | 19 |
 | Límite | [auth-service/__tests__/LimitadorIntentos.test.js](../auth-service/__tests__/LimitadorIntentos.test.js) | 7 |
 | RF-42 | [auth-service/__tests__/Recuperacion.test.js](../auth-service/__tests__/Recuperacion.test.js) | 9 |
 | NO-xx | [notificaciones-service/__tests__/NotificacionesService.test.js](../notificaciones-service/__tests__/NotificacionesService.test.js) | 10 |
@@ -304,7 +321,13 @@ verificar el mapeo abriendo cada archivo (ver "Mapa a archivos").
 | AR-xx | [reportes-service/__tests__/AuditoriaConsulta.test.js](../reportes-service/__tests__/AuditoriaConsulta.test.js) | 10 |
 | SQA 22/23 | [reportes-service/__tests__/ReportesExport.test.js](../reportes-service/__tests__/ReportesExport.test.js) | 11 |
 | Bloque 3 | [reportes-service/__tests__/ReportesRango.test.js](../reportes-service/__tests__/ReportesRango.test.js) | 8 |
-| | **Total** | **293** |
+| Auditoría | [farmacia-service/__tests__/ValidacionMedicamento.test.js](../farmacia-service/__tests__/ValidacionMedicamento.test.js) | 15 |
+| Auditoría | [financiero-service/__tests__/ValidacionValores.test.js](../financiero-service/__tests__/ValidacionValores.test.js) | 27 |
+| Auditoría | [pacientes-service/__tests__/ValidacionEntradas.test.js](../pacientes-service/__tests__/ValidacionEntradas.test.js) | 16 |
+| Auditoría | [notificaciones-service/__tests__/rbac.test.js](../notificaciones-service/__tests__/rbac.test.js) | 11 |
+| Auditoría | [auth-service/__tests__/ManejoErrores.test.js](../auth-service/__tests__/ManejoErrores.test.js) | 13 |
+| Auditoría | [frontend/__tests__/esc.test.js](../frontend/__tests__/esc.test.js) | 3 |
+| | **Total** | **382** |
 
 ## Lo que todavia NO esta automatizado
 
@@ -319,14 +342,17 @@ verificar el mapeo abriendo cada archivo (ver "Mapa a archivos").
   un JWT ya emitido sigue valido hasta su exp (8 h) en los demas
   servicios. Es una limitacion conocida, no un caso de prueba.
 - **RBAC de visitas** (`PATCH /api/visitas/:id`, examenes, prescripciones,
-  completar: solo `medico_especialista`) no tiene prueba de rechazo; el
-  e2e solo recorre el camino permitido.
+  completar: solo `medico_especialista`) no tiene prueba unitaria de
+  rechazo; desde el 26 oct lo cubre `npm run test:hostil` contra el stack.
 - **Envio real por Brevo** (casos 10 y 11): las pruebas simulan `fetch`
   (incluido el `messageId` de Brevo) y el e2e corre en simulacion
   (`idMensajeProveedor = sim-...`). Nunca se envio un correo real; el procedimiento manual esta en
   [notificaciones-service/README.md](../notificaciones-service/README.md).
-- **Frontend**: sin pruebas automatizadas. Se verifica a mano en el
-  navegador por rol (ver el manual de usuario).
+- **Frontend**: una sola prueba automatizada (`frontend/__tests__/esc.test.js`,
+  el escape de HTML). Lo demas se verifica en el navegador por rol: el 26 oct
+  con Chrome y scripts en la pagina (secciones, consola, textos, 390 px,
+  dialogo de egreso, recuperar y restablecer contrasena). Las capturas de
+  pantalla no se pudieron tomar (la extension no capturaba la ventana).
 
 ## Suite de integracion E2E (scripts/e2e-smoke.js)
 

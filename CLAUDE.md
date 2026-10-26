@@ -222,6 +222,35 @@ También sirve **`GET /api/auditoria`** (solo admin, solo lectura):
 `AuditoriaController/Service/Repository`, filtros `desde`, `hasta`
 (YYYY-MM-DD inclusivo o instante ISO), `entidad`, `idEntidad`, `limite`.
 
+### Auditoría SQA final (26 oct 2026) — reglas nuevas
+- **Errores 5xx sin detalle**: `middleware/manejoErrores.js` (copia
+  idéntica en los 7, instalado tras `express.json()` y después de las rutas
+  `/api`): cualquier 5xx responde "Ocurrió un error interno…" y el detalle
+  queda en el log; JSON malformado → 400 JSON (antes la página HTML de
+  Express con la traza), cuerpo grande → 413.
+- **Notificaciones**: `POST /api/notificaciones/solicitud` solo
+  `medico_general` (antes cualquier autenticado podía mandar un correo a
+  cualquier dirección).
+- **Pacientes**: fecha de nacimiento real (existe en el calendario, no
+  futura, ≥ 1900); la cita no puede ser anterior a hoy (Guatemala) y el
+  médico debe ser especialista activo; una prescripción con `idMedicamento`
+  exige medicamento existente (400) y activo (409).
+- **Farmacia**: stock entero 0..1 000 000, precio > 0 con 2 decimales, sin
+  dos activos con el mismo nombre + presentación (409); el PUT conserva lo
+  que no se envía.
+- **Financiero**: `services/reglasValores.js` — monto > 0, 2 decimales,
+  tope DECIMAL(10,2) (antes "cien" o 1e15 daban 500 con el mensaje de SQL);
+  año 2000-2100; fechas que existan; correo y teléfono del donante con
+  formato; estado de cuenta de un paciente inexistente → 404.
+- **Auth**: login sin correo o contraseña → 400 (no 401) y no suma al
+  límite de intentos.
+- **Reportes**: "Cobros por rango" y "Entradas de dinero" incluyen los
+  **abonos a cargos** (antes ningún reporte de ingresos los mostraba).
+- **Frontend**: `esc()` escapa comillas (había XSS almacenado en los
+  diálogos de edición: un apellido con `"` inyectaba `onfocus`).
+- Mensajes del backend con tildes; seed y e2e calculan la fecha de la cita
+  (hoy + N días) en lugar de fechas fijas.
+
 ### Borrado lógico y auditoría (20 oct 2026)
 - `activo BIT NOT NULL DEFAULT 1` (ALTER idempotente) en `pacientes`,
   `usuarios`, `medicamentos`, `donantes`. No hay DELETE físico en ellas.
@@ -374,9 +403,17 @@ operativos (exámenes, medicamentos) → últimos 30 días; análisis
 
 ### Pruebas automatizadas — ✅
 Suite jest+supertest a nivel raíz. Comando: `npm run test:todo` o
-`scripts/run-all-tests.sh|.ps1`. Última ejecución (24 oct 2026, stack
-recién creado con `down -v` + `bootstrap.ps1`): **293/293** en 38
-archivos. `express`, `jsonwebtoken`, `bcryptjs`, `exceljs` y `pdfkit` son
+`scripts/run-all-tests.sh|.ps1`. Última ejecución (26 oct 2026, auditoría
+final, stack recién creado con `down -v` + `bootstrap.ps1`): **382/382** en
+44 archivos (incluye `frontend/__tests__/esc.test.js`, la primera prueba del
+frontend).
+**Auditoría SQA (26 oct)**: `npm run test:sqa` (23 casos del plan uno por
+uno contra el stack, evidencia en `docs/verificacion-plan-sqa.json`),
+`npm run test:caso11` (con `scripts/override-brevo-caido.yml`, Brevo en
+127.0.0.1:9), `npm run test:hostil` (matriz rol × escritura según §3.3 +
+validaciones: 363 comprobaciones) y `npm run test:integridad` (18 consultas
+de consistencia en la BD). Solo stack local: crean registros "SQA …" y usan
+`docker exec`. Última: todo en 0 fallas. `express`, `jsonwebtoken`, `bcryptjs`, `exceljs` y `pdfkit` son
 devDependencies de la raíz para que las pruebas no dependan de los
 `node_modules` de cada servicio.
 E2E (`npm run test:e2e`, stack arriba): **62/62**. El paso de RF-42 lee
@@ -386,8 +423,8 @@ toca registros que crea** (pacientes "E2E …", medicamento "E2E
 medicamento <ts>", precio "E2E examen (no usar)", donantes y cuentas
 "e2e.*"); los datos existentes solo se leen.
 Carga (`npm run test:carga`, `USUARIOS=20..50`): login, listar pacientes,
-crear y listar solicitudes; falla si una petición supera 3 s. Última (24
-oct, desde cero): 50 usuarios, 600 peticiones, máx. 899 ms, p95 608 ms.
+crear y listar solicitudes; falla si una petición supera 3 s. Última (26
+oct, desde cero): 50 usuarios, 600 peticiones, máx. 911 ms, p95 626 ms.
 Resultado del plan oficial del SQA (25 casos):
 [`docs/RESULTADOS_PLAN_SQA.csv`](docs/RESULTADOS_PLAN_SQA.csv); nombres
 del plan ↔ código en [`docs/EQUIVALENCIAS.md`](docs/EQUIVALENCIAS.md).
@@ -477,16 +514,29 @@ conocidos y aceptados para la entrega académica.
    correos de recuperación, que se oculta).
 10. **Reportes**: los gastos operativos no aparecen en ninguno de los 7
     reportes; no hay paginación.
-11. **Frontend sin pruebas automatizadas**; en esta ronda la UI nueva
-    (diálogo de egreso, recuperación de contraseña) no se pudo revisar en
-    el navegador (la extensión de Chrome no estaba conectada): solo se
-    verificaron sus llamadas a la API.
+11. **Frontend casi sin pruebas automatizadas** (solo `esc()`). El 26 oct
+    se recorrió en Chrome con los 7 roles y a 390 px (sin errores de
+    consola, sin desborde), y se probaron el diálogo de egreso, recuperar y
+    restablecer contraseña, pero por scripts en la página: la extensión no
+    pudo tomar capturas de pantalla.
 12. **Entrega impresa incompleta**: el manual tiene 30 marcadores
     `[CAPTURA: ...]` sin imagen y los diagramas `.mmd` no están
     renderizados a PNG.
 13. **Dependencias sin lockfile** en laboratorio, financiero, reportes y
     notificaciones (el build resuelve versiones nuevas; aviso
     `EBADENGINE` con Node 20).
+14. **Lecturas abiertas a cualquier usuario autenticado** (decisión de
+    diseño de §3.3, no un error): farmacia o laboratorio pueden consultar
+    por API el estado de cuenta de un paciente, donantes, donaciones,
+    gastos, los 7 reportes (incluidos los financieros) y el log de
+    notificaciones. La UI oculta esas secciones, pero el backend responde.
+15. **El médico general elige el destinatario del correo de solicitud**:
+    `POST /api/notificaciones/solicitud` acepta el `familiarEmail` que
+    llega en el cuerpo; notificaciones no lo compara con el familiar
+    registrado del paciente.
+16. **Acciones de tabla por debajo de 44 px** de alto (Editar, Familiar,
+    Desactivar…): el sistema de diseño pide controles ≥ 44 px; los
+    botones y campos sí cumplen.
 
 ## Reglas de negocio críticas (no romper al tocar código existente)
 
