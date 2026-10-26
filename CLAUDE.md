@@ -337,6 +337,13 @@ y `VisitaMedica.etiquetaEstado`. `styles.css` empieza con `@charset "UTF-8"`
 y nginx envía `charset=utf-8` en HTML/CSS/JS (sin eso los símbolos de los
 chips salían como "âœ•").
 
+**Rutas por sección (26 oct)**: cada sección tiene su dirección
+(`#/pacientes`, `#/farmacia`…; `cambiarTab(tab, 'push'|'replace'|'ninguno')`
++ `tabDeRuta()` en `app.js`). Recargar conserva la sección, Atrás/Adelante
+funcionan y una ruta que el rol no puede ver (o que no existe) cae al panel
+y corrige la dirección. Cerrar sesión limpia la ruta. `#restablecer=<token>`
+no es una ruta. Verificado en Chrome con admin y farmacia.
+
 **Secciones solo admin**: **Usuarios** (lista con estado, desactivar /
 reactivar, alta de cuenta) y **Auditoría** (rango + entidad; los límites
 del día local se mandan como instantes ISO). Pacientes, inventario y

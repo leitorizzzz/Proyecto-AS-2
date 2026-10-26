@@ -348,6 +348,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   $('#btnSalir').addEventListener('click', onLogout);
   $$('.tab').forEach(b => b.addEventListener('click', () => cambiarTab(b.dataset.tab)));
+  // Atras/Adelante o direccion escrita a mano. Los dos eventos pueden
+  // llegar juntos: si la seccion ya es esa, no se vuelve a cargar.
+  const seguirRuta = () => {
+    if (!state.token) return;
+    const tab = tabDeRuta();
+    if (!tab) return cambiarTab(state.tabActual || 'dashboard', 'replace');
+    if (tab !== state.tabActual) cambiarTab(tab, 'ninguno');
+  };
+  window.addEventListener('popstate', seguirRuta);
+  window.addEventListener('hashchange', seguirRuta);
 
   // Formularios que existen desde el inicio
   $('#formPaciente').addEventListener('submit', onCrearPaciente);
@@ -501,7 +511,9 @@ function onLogout() {
   detenerControlInactividad();
   localStorage.removeItem('asilo.token');
   localStorage.removeItem(CLAVE_ULTIMA_ACTIVIDAD);
-  state.token = null; state.usuario = null;
+  state.token = null; state.usuario = null; state.tabActual = null;
+  // La pantalla de acceso no lleva ruta: el siguiente usuario entra al panel.
+  history.replaceState(null, '', window.location.pathname + window.location.search);
   if ($('#dlg').open) $('#dlgCancelar').click();   // cierra cualquier dialogo pendiente
   $('#vistaApp').classList.add('hidden');
   $('#vistaLogin').classList.remove('hidden');
@@ -617,7 +629,9 @@ function abrirApp() {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
   filtrarMenuPorRol();
-  cambiarTab('dashboard');
+  // Al recargar o al entrar con una direccion como #/farmacia se abre esa
+  // seccion (si el rol la puede ver; si no, el panel).
+  cambiarTab(tabDeRuta() || 'dashboard', 'replace');
   iniciarControlInactividad();
 }
 
@@ -658,8 +672,28 @@ const CARGADORES = {
   auditoria:    cargarAuditoria
 };
 
-function cambiarTab(tab) {
-  if (!tabVisible(tab)) tab = 'dashboard';
+/* Rutas: cada seccion tiene su direccion (#/pacientes, #/farmacia...), asi
+   recargar la pagina conserva la seccion y Atras/Adelante del navegador
+   funcionan. #restablecer=<token> (recuperacion) no es una ruta. */
+function tabDeRuta() {
+  const m = window.location.hash.match(/^#\/([a-z]+)$/);
+  return m && CARGADORES[m[1]] ? m[1] : null;
+}
+
+/** historial: 'push' agrega una entrada, 'replace' corrige la actual,
+    'ninguno' cuando la direccion ya cambio (Atras/Adelante). */
+function cambiarTab(tab, historial = 'push') {
+  if (!CARGADORES[tab] || !tabVisible(tab)) {
+    tab = 'dashboard';
+    if (historial === 'ninguno') historial = 'replace';   // corrige la direccion
+  }
+  const ruta = `#/${tab}`;
+  if (historial !== 'ninguno' && window.location.hash !== ruta) {
+    const url = window.location.pathname + window.location.search + ruta;
+    if (historial === 'replace') history.replaceState(null, '', url);
+    else history.pushState(null, '', url);
+  }
+  state.tabActual = tab;
   $$('.tab').forEach(b => b.classList.toggle('activo', b.dataset.tab === tab));
   $$('main.stage > section').forEach(s => s.classList.add('hidden'));
   const seccion = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
