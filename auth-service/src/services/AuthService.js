@@ -53,7 +53,11 @@ class AuthService {
   }
 
   async login({ email, password }) {
-    if (!email || !password) throw new Error('Email y password son requeridos');
+    // 400 (no 401): una peticion incompleta no es un intento de contrasena
+    // y no debe sumar al limite de intentos.
+    if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
+      throw Object.assign(new Error('Escriba su correo y su contraseña'), { status: 400 });
+    }
 
     const usuario = await this.usuarioRepo.obtenerPorEmail(email);
     if (!usuario) throw new Error('Credenciales invalidas');

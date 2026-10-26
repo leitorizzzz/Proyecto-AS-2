@@ -50,6 +50,14 @@ describe('AuthService', () => {
     await expect(svc.login({ email: 'x@asilo.gt', password: 'otra' })).rejects.toThrow('Credenciales invalidas');
   });
 
+  // Auditoria SQA: una peticion sin correo o sin contrasena es 400 (no 401),
+  // asi no suma al limite de intentos.
+  test.each([[{}], [{ email: 'x@asilo.gt' }], [{ password: 'Demo1234' }], [{ email: ['x'], password: 'Demo1234' }]])
+  ('login incompleto %j -> 400', async cuerpo => {
+    const { svc } = nuevoServicio();
+    await expect(svc.login(cuerpo)).rejects.toMatchObject({ status: 400 });
+  });
+
   test('login OK emite JWT con sub, email y rol', async () => {
     const passwordHash = await bcrypt.hash('Demo1234', 4);
     const { svc } = nuevoServicio({ existente: new Usuario({ id: 9, email: 'x@asilo.gt', passwordHash, rol: 'laboratorio' }) });
