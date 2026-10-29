@@ -195,7 +195,7 @@ async function inicializarEsquema() {
   await pool.request().query(`
     IF NOT EXISTS (SELECT 1 FROM tarifas_servicio WHERE codigo = 'consulta_especialista')
     INSERT INTO tarifas_servicio (codigo, descripcion, precioBase)
-    VALUES ('consulta_especialista', 'Consulta con medico especialista de la fundacion', 150.00);
+    VALUES ('consulta_especialista', N'Consulta con médico especialista de la fundación', 150.00);
   `);
 
   // Caso 21: vencimiento de la cuota. Las existentes vencen el ultimo dia

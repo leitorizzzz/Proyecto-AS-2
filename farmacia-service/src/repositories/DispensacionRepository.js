@@ -105,7 +105,7 @@ class DispensacionRepository {
         const deVisita = (await rq().input('idVisita', sql.Int, idVisita).query(
           "SELECT idFamiliar FROM cargos_servicio WHERE idVisita = @idVisita AND origen = 'visita'"
         )).recordset[0];
-        const concepto = `Farmacia despues del cierre de la visita #${idVisita}: ${cantidad} x ${medicamento}`;
+        const concepto = `Farmacia después del cierre de la visita #${idVisita}: ${cantidad} x ${medicamento}`;
         cargoComplementario = (await rq()
           .input('idPaciente', sql.Int, idPaciente)
           .input('concepto', sql.NVarChar(300), concepto)

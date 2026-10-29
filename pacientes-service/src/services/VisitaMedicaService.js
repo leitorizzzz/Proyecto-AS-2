@@ -240,7 +240,7 @@ class VisitaMedicaService {
       idPaciente: visita.idPaciente,
       idVisita: visita.id,
       idFamiliar: familiar ? familiar.id : null,
-      concepto: `Visita medica #${visita.id}: consulta + ${nEx} examen(es) + ${nRx} dispensacion(es), con descuento fundacion`,
+      concepto: `Visita médica #${visita.id}: consulta + ${nEx} examen(es) + ${nRx} despacho(s) de farmacia, con descuento de la fundación`,
       monto,
       detalles
     });
