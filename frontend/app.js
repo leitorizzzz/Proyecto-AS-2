@@ -352,6 +352,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   $('#btnSalir').addEventListener('click', onLogout);
   $$('.tab').forEach(b => b.addEventListener('click', () => cambiarTab(b.dataset.tab)));
+  iniciarMenuMovil();
+  iniciarEtiquetasTablas();
   // Atras/Adelante o direccion escrita a mano. Los dos eventos pueden
   // llegar juntos: si la seccion ya es esa, no se vuelve a cargar.
   const seguirRuta = () => {
@@ -519,6 +521,7 @@ function onLogout() {
   // La pantalla de acceso no lleva ruta: el siguiente usuario entra al panel.
   history.replaceState(null, '', window.location.pathname + window.location.search);
   if ($('#dlg').open) $('#dlgCancelar').click();   // cierra cualquier dialogo pendiente
+  cerrarMenuMovil({ devolverFoco: false });
   $('#vistaApp').classList.add('hidden');
   $('#vistaLogin').classList.remove('hidden');
 }
@@ -698,11 +701,90 @@ function cambiarTab(tab, historial = 'push') {
     else history.pushState(null, '', url);
   }
   state.tabActual = tab;
-  $$('.tab').forEach(b => b.classList.toggle('activo', b.dataset.tab === tab));
+  $$('.tab').forEach(b => {
+    b.classList.toggle('activo', b.dataset.tab === tab);
+    if (b.dataset.tab === tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  });
   $$('main.stage > section').forEach(s => s.classList.add('hidden'));
   const seccion = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
   if (seccion) seccion.classList.remove('hidden');
+  // Vista movil: nombre de la seccion en la barra superior y el menu se cierra.
+  const boton = document.querySelector(`.tab[data-tab="${tab}"]`);
+  if (boton) $('#seccionActual').textContent = boton.textContent.trim();
+  cerrarMenuMovil({ devolverFoco: false });
+  if (historial === 'push') window.scrollTo(0, 0);
   (CARGADORES[tab] || (() => {}))();
+}
+
+/* ============================================================
+ *   VISTA MOVIL: menu deslizante y tablas como tarjetas
+ * ============================================================ */
+
+/** Bajo 960px el menu lateral es un panel que se abre con "Menu". */
+function abrirMenuMovil() {
+  $('#vistaApp').classList.add('menu-abierto');
+  $('#veloMenu').hidden = false;
+  $('#btnMenu').setAttribute('aria-expanded', 'true');
+  document.body.classList.add('menu-movil-abierto');
+  // Despues de la transicion de visibilidad: el foco va a la seccion actual.
+  setTimeout(() => (document.querySelector('.tab.activo') || $('#btnCerrarMenu')).focus(), 50);
+}
+function cerrarMenuMovil({ devolverFoco = true } = {}) {
+  const shell = $('#vistaApp');
+  if (!shell || !shell.classList.contains('menu-abierto')) return;
+  shell.classList.remove('menu-abierto');
+  $('#veloMenu').hidden = true;
+  $('#btnMenu').setAttribute('aria-expanded', 'false');
+  document.body.classList.remove('menu-movil-abierto');
+  if (devolverFoco) $('#btnMenu').focus();
+}
+function iniciarMenuMovil() {
+  $('#btnMenu').addEventListener('click', abrirMenuMovil);
+  $('#btnCerrarMenu').addEventListener('click', () => cerrarMenuMovil());
+  $('#veloMenu').addEventListener('click', () => cerrarMenuMovil());
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && $('#vistaApp').classList.contains('menu-abierto') && !$('#dlg').open) cerrarMenuMovil();
+  });
+  // Al pasar a escritorio (girar la tablet, agrandar la ventana) se cierra.
+  window.matchMedia('(min-width: 961px)').addEventListener('change', e => { if (e.matches) cerrarMenuMovil({ devolverFoco: false }); });
+}
+
+/**
+ * Bajo 720px cada fila de tabla se ve como tarjeta (styles.css). Cada celda
+ * necesita el nombre de su columna en data-label; se toma del encabezado.
+ * Las tablas se redibujan seguido (innerHTML), asi que un MutationObserver
+ * re-etiqueta en el siguiente cuadro.
+ */
+function etiquetarTablas(raiz = document) {
+  raiz.querySelectorAll('.tabla-wrap table').forEach(tabla => {
+    const titulos = [];
+    tabla.querySelectorAll('thead tr:first-child th').forEach(th => {
+      for (let i = 0; i < (th.colSpan || 1); i++) titulos.push(th.textContent.trim());
+    });
+    if (!titulos.length) return;
+    tabla.querySelectorAll('tbody tr, tfoot tr').forEach(tr => {
+      let col = 0;
+      [...tr.children].forEach(td => {
+        if (td.colSpan > 1) { td.removeAttribute('data-label'); col += td.colSpan; return; }
+        const etiqueta = titulos[col] === '#' ? 'N.º' : (titulos[col] || '');
+        td.setAttribute('data-label', etiqueta);
+        // Una etiqueta larga ("Otros cargos (Q)") no cabe al lado del valor:
+        // va arriba, para no montarse sobre la fila siguiente.
+        td.classList.toggle('etiqueta-arriba', etiqueta.length > 13);
+        col += 1;
+      });
+    });
+  });
+}
+function iniciarEtiquetasTablas() {
+  const stage = document.querySelector('main.stage');
+  let pendiente = false;
+  new MutationObserver(() => {
+    if (pendiente) return;
+    pendiente = true;
+    requestAnimationFrame(() => { pendiente = false; etiquetarTablas(stage); });
+  }).observe(stage, { childList: true, subtree: true });
+  etiquetarTablas(stage);
 }
 
 /* ============================================================

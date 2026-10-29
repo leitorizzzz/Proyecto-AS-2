@@ -351,8 +351,11 @@ verificar el mapeo abriendo cada archivo (ver "Mapa a archivos").
 - **Frontend**: una sola prueba automatizada (`frontend/__tests__/esc.test.js`,
   el escape de HTML). Lo demas se verifica en el navegador por rol: el 26 oct
   con Chrome y scripts en la pagina (secciones, consola, textos, 390 px,
-  dialogo de egreso, recuperar y restablecer contrasena). Las capturas de
-  pantalla no se pudieron tomar (la extension no capturaba la ventana).
+  dialogo de egreso, recuperar y restablecer contrasena). La **vista movil**
+  (28 oct) se reviso con capturas en Chrome a 390 x 844 y 768 x 1024 en las
+  10 secciones, el login y el menu deslizante (Esc, velo, foco), con un
+  barrido por script: sin desborde horizontal y todos los controles de al
+  menos 44 px. No se probo en un telefono fisico.
 
 ## Suite de integracion E2E (scripts/e2e-smoke.js)
 

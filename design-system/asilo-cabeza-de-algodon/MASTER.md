@@ -102,6 +102,26 @@ Para evitar look de plantilla:
 5. **Iconografia SVG** inline (sin emojis). 20x20, trazo 1.5, color
    `currentColor`.
 
+## Vista movil (28 oct 2026)
+
+Misma identidad, otra composicion; el escritorio no cambia.
+
+- **< 960 px**: barra superior blanca fija de 56 px con la regleta
+  magenta (sombra interna de 3 px a la izquierda), boton "Menu" con
+  borde, marca en Libre Bodoni y la seccion actual en mayusculas magenta.
+  La sidebar (misma regleta y numerales romanos) se abre como panel
+  deslizante de `min(300px, 86vw)` sobre un velo `rgba(9,9,11,.5)`.
+- **< 900 px**: las tablas pasan a tarjetas: borde `--line-weak`, una
+  linea por campo con la etiqueta en micro mayusculas `--text-mute` a la
+  izquierda (34 %) y el valor a la derecha; separador punteado entre
+  campos; las acciones van en una fila al pie. Entre 641 y 900 px, dos
+  tarjetas por fila.
+- **< 640 px**: KPIs 2 x 2 con el hero a lo ancho (sigue siendo el
+  "numero gigante", 56 px); login reducido a marca + mark de 24 px +
+  formulario.
+- **Tactil**: toda accion (incluidos enlaces de tabla y `.btn.small`)
+  con 44 px de alto.
+
 ## Microinteracciones
 
 - Transiciones 150-220ms, `ease-out`.

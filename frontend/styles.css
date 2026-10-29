@@ -160,13 +160,8 @@ aside.sidebar::before {
   left: 0; top: 28px; bottom: 24px; width: 2px;
   background: var(--accent);
 }
-@media (max-width: 960px) {
-  aside.sidebar {
-    position: static; height: auto; border-right: 0;
-    border-bottom: 1px solid var(--line-weak);
-  }
-  aside.sidebar::before { top: 0; bottom: 0; }
-}
+/* Bajo 960px el menu es un panel deslizante (ver "VISTA MOVIL"); antes se
+   apilaba arriba y en un telefono ocupaba toda la primera pantalla. */
 
 .brand {
   display: block;
@@ -819,11 +814,187 @@ dialog.dialogo #dlgCuerpo table { margin-top: 8px; }
   .dialogo-acciones .btn { flex: 1 1 100%; }
 }
 
+/* ============ VISTA MOVIL ============
+   < 960px: barra superior fija + menu como panel deslizante.
+   < 900px: cada fila de tabla se muestra como tarjeta "etiqueta: valor"
+            (data-label lo pone app.js desde el encabezado de la tabla).
+   < 640px: indicadores en 2 columnas, titulos y margenes compactos.
+   Puntero tactil: enlaces de accion con area de 44px. */
+.barra-movil, .velo-menu, .btn-cerrar-menu { display: none; }
+
+@media (max-width: 960px) {
+  .barra-movil {
+    position: sticky; top: 0; z-index: 40;
+    display: flex; align-items: center; gap: 12px;
+    min-height: 56px;
+    padding: 6px 16px 6px 8px;
+    background: var(--surface-card);
+    border-bottom: 1px solid var(--line-weak);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+  .btn-menu {
+    display: inline-flex; align-items: center; gap: 8px;
+    min-height: 44px; min-width: 44px; padding: 0 12px;
+    background: none; border: 1px solid var(--line); border-radius: var(--radius);
+    color: var(--text-strong); font: inherit; font-size: var(--fs-meta); font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-menu:hover { border-color: var(--text-strong); }
+  .btn-menu:focus-visible, .btn-cerrar-menu:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+  .barra-titulo { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+  .barra-marca {
+    font-family: var(--font-serif); font-size: 15px; color: var(--text-strong);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .barra-seccion {
+    font-size: var(--fs-micro); font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--accent);
+  }
+
+  aside.sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 60;
+    width: min(300px, 86vw); height: 100vh; height: 100dvh;
+    border-right: 1px solid var(--line-weak);
+    box-shadow: 0 0 40px rgba(9, 9, 11, 0.28);
+    transform: translateX(-105%);
+    visibility: hidden;            /* cerrado: fuera del orden de Tab */
+    transition: transform var(--t-base) ease, visibility 0s linear var(--t-base);
+  }
+  .app-shell.menu-abierto aside.sidebar {
+    transform: none; visibility: visible;
+    transition: transform var(--t-base) ease, visibility 0s;
+  }
+  .velo-menu {
+    display: block; position: fixed; inset: 0; z-index: 50;
+    background: rgba(9, 9, 11, 0.5);
+  }
+  .velo-menu[hidden] { display: none; }
+  .brand { position: relative; padding-right: 48px; }
+  .btn-cerrar-menu {
+    display: inline-flex; align-items: center; justify-content: center;
+    position: absolute; right: -8px; top: -10px;
+    width: 44px; height: 44px;
+    background: none; border: 0; border-radius: var(--radius);
+    color: var(--text-strong); cursor: pointer;
+  }
+  body.menu-movil-abierto { overflow: hidden; }
+
+  main.stage { padding-top: 24px; }
+}
+
+@media (max-width: 900px) {
+  /* Tablas como tarjetas: sin scroll lateral y con las acciones a la vista. */
+  main .tabla-wrap { overflow: visible; }
+  main .tabla-wrap table,
+  main .tabla-wrap tbody,
+  main .tabla-wrap tfoot,
+  main .tabla-wrap tr,
+  main .tabla-wrap td { display: block; width: 100%; }
+  /* El encabezado sigue disponible para lectores de pantalla. */
+  main .tabla-wrap thead {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+  main .tabla-wrap tbody tr,
+  main .tabla-wrap tfoot tr {
+    border: 1px solid var(--line-weak);
+    border-radius: var(--radius);
+    padding: 8px 14px;
+    margin-bottom: 10px;
+    background: var(--surface-card);
+  }
+  main .tabla-wrap tfoot tr { border-color: var(--text-strong); }
+  main .tabla-wrap tbody tr:hover td { background: none; }
+  main .tabla-wrap tbody td,
+  main .tabla-wrap tfoot td {
+    position: relative;
+    min-height: 0;
+    /* !important: en escritorio hay reglas por id (#tbodyPacientes td...)
+       que ajustan el relleno y le ganarian a esta en especificidad. */
+    padding: 7px 0 7px 38% !important;
+    border: 0;
+    text-align: left;
+    white-space: normal;
+  }
+  main .tabla-wrap td + td { border-top: 1px dashed var(--line-weak); }
+  main .tabla-wrap td[data-label]::before {
+    content: attr(data-label);
+    position: absolute; left: 0; top: 8px; width: 34%;
+    font-family: var(--font-sans);
+    font-size: var(--fs-micro); font-weight: 700;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--text-mute);
+    white-space: normal;
+  }
+  main .tabla-wrap td.etiqueta-arriba { padding-left: 0 !important; }
+  main .tabla-wrap td.etiqueta-arriba::before { position: static; display: block; width: auto; margin-bottom: 2px; }
+  /* Celdas sin etiqueta (mensajes de "sin datos", celdas vacias de totales). */
+  main .tabla-wrap td:not([data-label]),
+  main .tabla-wrap td[data-label=""] { padding-left: 0 !important; }
+  main .tabla-wrap td[data-label=""]::before { content: none; }
+  main .tabla-wrap tfoot td:empty { display: none; }
+  /* Acciones: fila de botones a todo el ancho, sin etiqueta. */
+  main .tabla-wrap td.col-acciones,
+  main .tabla-wrap td[data-label="Acciones"] {
+    padding-left: 0 !important;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px;
+  }
+  main .tabla-wrap td.col-acciones::before,
+  main .tabla-wrap td[data-label="Acciones"]::before { content: none; }
+}
+
+/* Tablet en vertical: dos tarjetas por fila. */
+@media (min-width: 641px) and (max-width: 900px) {
+  main .tabla-wrap tbody { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
+  main .tabla-wrap tbody tr { margin-bottom: 0; }
+  main .tabla-wrap tbody tr:has(> td[colspan]) { grid-column: 1 / -1; }
+  main .tabla-wrap tfoot { margin-top: 10px; }
+}
+
+@media (max-width: 640px) {
+  main.stage { padding: 20px 16px 64px; }
+  .stage > header.stage-head { margin-bottom: 20px; }
+  .stage-head h1 { font-size: 28px; }
+  .stage-head p.lede { font-size: var(--fs-body); }
+  .card { padding: 18px 16px; }
+
+  /* Indicadores 2 x 2; el principal ocupa la fila completa. */
+  .panel-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .panel-grid .kpi.hero { grid-column: 1 / -1; }
+  /* Hero + 3: el tercero compacto quedaria solo con media fila vacia. */
+  .panel-grid > .kpi:nth-child(even):last-child { grid-column: 1 / -1; }
+  .kpi { padding: 14px 16px; gap: 6px; }
+  .kpi .kpi-label { font-size: 10px; letter-spacing: 0.1em; }
+  .kpi .kpi-value { font-size: 32px; }
+  .kpi.hero .kpi-value { font-size: 56px; }
+  .kpi.hero::after { width: 110px; height: 110px; right: -34px; top: -34px; }
+  .kpi.hero .kpi-badge { right: 14px; top: 14px; }
+  #estadoCuentaBox .kpi .kpi-value { font-size: 20px; }
+  #estadoCuentaBox .kpi.hero .kpi-value { font-size: 32px; }
+
+  /* Acceso: la presentacion se reduce a marca + titulo; el formulario
+     queda a la vista sin desplazarse. */
+  .login-side { padding: 22px 20px; gap: 12px; }
+  .login-side .hero-title .mark { font-size: 24px; }
+  .login-side .hero-title .lede, .login-side .foot { display: none; }
+  .login-form-wrap { padding: 16px; }
+  .login-card { padding: 24px 20px 20px; }
+}
+
+/* Pantallas tactiles: area de toque de 44px en los enlaces de accion. */
+@media (pointer: coarse), (max-width: 900px) {
+  .btn-link {
+    display: inline-flex; align-items: center;
+    min-height: 44px; padding: 0 2px;
+  }
+  .btn.small { min-height: 44px; }
+}
+
 /* ============ Iconos ============ */
 .ico { stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 
 /* ============ Print ============ */
 @media print {
-  aside.sidebar, .btn, .btn-link { display: none !important; }
+  aside.sidebar, .barra-movil, .velo-menu, .btn, .btn-link { display: none !important; }
   main.stage { padding: 0; }
 }

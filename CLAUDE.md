@@ -331,7 +331,7 @@ Plex Sans — no reintroducir esos colores.
   shell con sidebar de 248px (regleta magenta, grupos I. Cuidado /
   II. Servicios / III. Administración) y `main.stage` con ancho
   máximo 1280px. Panel con un KPI "hero" oscuro + 3 compactos.
-  Controles ≥ 44px, foco visible. Bajo 960px el sidebar pasa arriba.
+  Controles ≥ 44px, foco visible. Bajo 960px: vista móvil (abajo).
 - `nginx.conf` sirve `index.html` con `no-store` y `*.css`/`*.js` con
   `no-cache` (no llevan hash en el nombre; sin eso un redeploy
   mezclaba HTML nuevo con CSS/JS viejos). Además es el **proxy** hacia
@@ -372,6 +372,27 @@ chips salían como "âœ•").
 funcionan y una ruta que el rol no puede ver (o que no existe) cae al panel
 y corrige la dirección. Cerrar sesión limpia la ruta. `#restablecer=<token>`
 no es una ruta. Verificado en Chrome con admin y farmacia.
+
+**Vista móvil (28 oct)**: bloque "VISTA MOVIL" al final de `styles.css`.
+- **< 960 px**: barra superior fija (`.barra-movil`: botón "Menú" + marca +
+  sección actual en `#seccionActual`) y el menú lateral es un panel
+  deslizante (`.app-shell.menu-abierto`, `#veloMenu`). Cerrado queda con
+  `visibility: hidden` (fuera del Tab); se cierra con Esc, tocando el velo,
+  con la X o al elegir sección; el foco vuelve a "Menú".
+  `abrirMenuMovil()` / `cerrarMenuMovil()` / `iniciarMenuMovil()` en `app.js`.
+  Antes el menú se apilaba y ocupaba toda la primera pantalla del teléfono.
+- **< 900 px**: las tablas de `main .tabla-wrap` se muestran como tarjetas
+  "etiqueta: valor" (2 por fila entre 641 y 900 px). `etiquetarTablas()`
+  copia el texto de cada `th` al `data-label` de sus celdas y un
+  `MutationObserver` sobre `main.stage` lo repite cada vez que una tabla se
+  redibuja. Etiqueta > 13 caracteres → `.etiqueta-arriba`; columna
+  "Acciones" → fila de botones sin etiqueta; el `thead` queda oculto a la
+  vista pero disponible para lectores de pantalla.
+- **< 640 px**: indicadores 2 × 2 (el principal a lo ancho), márgenes y
+  títulos compactos; login reducido a marca + título + formulario.
+- **Táctil o < 900 px**: `.btn-link` y `.btn.small` con 44 px de alto.
+- Verificado en Chrome (iframe de 390 × 844 y 768 × 1024, capturas) en las
+  10 secciones: sin desborde horizontal; escritorio sin cambios.
 
 **Secciones solo admin**: **Usuarios** (lista con estado, desactivar /
 reactivar, alta de cuenta) y **Auditoría** (rango + entidad; los límites
@@ -515,10 +536,11 @@ conocidos y aceptados para la entrega académica.
 10. **Reportes**: los gastos operativos no aparecen en ninguno de los 7
     reportes; no hay paginación.
 11. **Frontend casi sin pruebas automatizadas** (solo `esc()`). El 26 oct
-    se recorrió en Chrome con los 7 roles y a 390 px (sin errores de
-    consola, sin desborde), y se probaron el diálogo de egreso, recuperar y
-    restablecer contraseña, pero por scripts en la página: la extensión no
-    pudo tomar capturas de pantalla.
+    se recorrió en Chrome con los 7 roles (sin errores de consola) y se
+    probaron el diálogo de egreso, recuperar y restablecer contraseña por
+    scripts en la página; el 28 oct la vista móvil se revisó con capturas
+    a 390 y 768 px. No hay pruebas visuales automáticas ni en un teléfono
+    físico.
 12. **Entrega impresa incompleta**: el manual tiene 30 marcadores
     `[CAPTURA: ...]` sin imagen y los diagramas `.mmd` no están
     renderizados a PNG.
@@ -534,9 +556,9 @@ conocidos y aceptados para la entrega académica.
     `POST /api/notificaciones/solicitud` acepta el `familiarEmail` que
     llega en el cuerpo; notificaciones no lo compara con el familiar
     registrado del paciente.
-16. **Acciones de tabla por debajo de 44 px** de alto (Editar, Familiar,
-    Desactivar…): el sistema de diseño pide controles ≥ 44 px; los
-    botones y campos sí cumplen.
+16. ~~Acciones de tabla por debajo de 44 px~~: resuelto el 28 oct con la
+    vista móvil (44 px en pantallas táctiles y bajo 900 px; en escritorio
+    con mouse siguen como enlaces de texto).
 
 ## Reglas de negocio críticas (no romper al tocar código existente)
 
