@@ -1531,6 +1531,34 @@ function mostrarPrecioExamen() {
     : '<span class="falta-aviso">✕ Sin precio en el catálogo de laboratorio: no se puede ordenar. Elija uno de la lista.</span>';
 }
 
+/**
+ * Casos 18 y 19: costos de la visita. Abierta: lo acumulado con descuento
+ * (laboratorio y farmacia despachada), que se cobra al finalizar. Cerrada:
+ * el total cobrado al familiar por servicio y lo que queda por cobrar
+ * cuando farmacia despache.
+ */
+async function pintarCostosVisita(v) {
+  const caja = $('#costosVisita');
+  if (v.estado !== 'completada') {
+    caja.innerHTML = `<p class="tiny">Costo acumulado con descuento (se cobra al finalizar la visita):
+      laboratorio <strong class="num">${money(v.costoLaboratorio || 0)}</strong>,
+      farmacia despachada <strong class="num">${money(v.costoFarmacia || 0)}</strong> + la consulta del especialista.</p>`;
+    return;
+  }
+  try {
+    const c = await api(API.financiero, `/api/financiero/estado-cuenta/${v.idPaciente}`);
+    if (state.visitaSeleccionada !== v.id) return;
+    const cargos = c.cargos.filter(x => x.idVisita === v.id);
+    const desglose = { consulta: 0, laboratorio: 0, farmacia: 0, otros: 0 };
+    cargos.forEach(x => (x.detalles || []).forEach(d => { desglose[desglose[d.rubro] != null ? d.rubro : 'otros'] += Number(d.monto) || 0; }));
+    const pendientes = (c.porCobrarFarmacia || []).filter(x => x.idVisita === v.id);
+    caja.innerHTML = bloqueCobrado(desglose, `Total cobrado al familiar por esta visita${cargos.length > 1 ? ` (${cargos.length} cargos: cierre y despachos posteriores)` : ''}`) +
+      (pendientes.length ? bloquePorCobrar(pendientes, pendientes.reduce((a, x) => a + (x.montoEstimado || 0), 0)) : '');
+  } catch (err) {
+    caja.innerHTML = `<p class="tiny">No se pudo leer el cargo de la visita: ${esc(err.message)}</p>`;
+  }
+}
+
 /** Lo que esta escrito en la pantalla y aun no se agrego (caso 14). */
 function pendientesEnPantalla() {
   const examen = $('#exTipo').value.trim() || null;
@@ -1576,8 +1604,8 @@ async function cargarDetalleVisita() {
     const nombrePaciente = state.mapaPacientes?.[v.idPaciente] || `Paciente #${v.idPaciente}`;
     $('#visitaMeta').textContent =
       `${nombrePaciente} · Fecha ${fechaHora(v.fecha)}` +
-      (v.idFichaMedica ? ` · Ficha médica #${v.idFichaMedica}` : '') +
-      ` · Costo acumulado con descuento: laboratorio ${money(v.costoLaboratorio || 0)}, farmacia ${money(v.costoFarmacia || 0)}`;
+      (v.idFichaMedica ? ` · Ficha médica #${v.idFichaMedica}` : '');
+    pintarCostosVisita(v);
     $('#vDiagnostico').value = v.diagnostico || '';
     $('#vObservaciones').value = v.observaciones || '';
 
@@ -2241,6 +2269,8 @@ async function cargarEstadoCuenta() {
     $('#kpiCantCargos').textContent = `${c.cargos.length} cargos`;
     $('#kpiCantCuotas').textContent = `${c.cuotas.length} cuotas`;
     $('#kpiAlerta').innerHTML = c.alerta ? `${chipAlerta(c.alerta)} ${esc(c.alerta.motivos.join('; '))}` : 'Sin alertas';
+    $('#desgloseCuenta').innerHTML = bloqueCobrado(c.desglose, 'Total cobrado a la cuenta, por servicio') +
+      bloquePorCobrar(c.porCobrarFarmacia, c.totalPorCobrar);
     const ultMovEl = $('#kpiUltMov');
     if (ultMovEl) {
       const movs = [
@@ -2271,6 +2301,33 @@ async function cargarEstadoCuenta() {
         <td class="right num">${money(x.monto)}</td>
       </tr>`).join('') || `<tr><td colspan="5" class="tiny">Sin cuotas.</td></tr>`;
   } catch (err) { console.error(err); }
+}
+
+/**
+ * Caso 19 del SQA: total cobrado por servicio (consulta, laboratorio,
+ * farmacia y otros), siempre con los tres rubros aunque alguno sea cero.
+ */
+function bloqueCobrado(desglose, titulo) {
+  const d = desglose || {};
+  const filas = [['Consulta con especialista', d.consulta], ['Laboratorio', d.laboratorio], ['Farmacia', d.farmacia]];
+  if (d.otros) filas.push(['Otros cargos', d.otros]);
+  const total = filas.reduce((a, [, v]) => a + (Number(v) || 0), 0);
+  return `<div class="bloque-cobro"><h4>${esc(titulo)}</h4>
+    <table class="tabla-dato"><tbody>${filas.map(([n, v]) => `<tr><th>${n}</th><td class="right num">${money(v || 0)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><th>Total cobrado (con 20 % de la fundación)</th><td class="right num"><strong>${money(total)}</strong></td></tr></tfoot></table></div>`;
+}
+
+/** Caso 19: medicamentos prescritos aun sin entregar: se cobran al despachar. */
+function bloquePorCobrar(items, total) {
+  if (!items || !items.length) return `<div class="bloque-cobro"><h4>Pendiente de cobrar al despachar</h4><p class="tiny">✓ Nada pendiente: todo lo prescrito ya se entregó y se cobró.</p></div>`;
+  return `<div class="bloque-cobro por-cobrar"><h4>Pendiente de cobrar al despachar</h4>
+    <p class="tiny">Medicamentos prescritos en visitas ya cerradas que farmacia aún no entrega. No son deuda todavía:
+      el cargo se suma solo a esta cuenta en el momento del despacho.</p>
+    <ul class="lista-rx">${items.map(x => `<li><strong>${esc(x.medicamento)}</strong> · visita #${x.idVisita}
+      <div class="tiny">Entregado ${x.cantidadEntregada} de ${x.cantidadPrescrita} · faltan ${x.cantidadRestante}${
+        x.sinInventario ? ' · sin medicamento de inventario: farmacia no puede despacharlo'
+          : ` · se cobrará al despachar ${money(x.montoEstimado)} (${money(x.montoBase)} − 20 %)`}</div></li>`).join('')}</ul>
+    ${total ? `<p class="tiny">Total estimado por cobrar: <strong class="num">${money(total)}</strong></p>` : ''}</div>`;
 }
 
 /** Caso 20: abono a un cargo; el sistema rechaza montos mayores al saldo. */

@@ -9,6 +9,7 @@ const DonanteRepository = require('./repositories/DonanteRepository');
 const MovimientosRepository = require('./repositories/MovimientosRepository');
 const FinancieroService = require('./services/FinancieroService');
 const FamiliarReadRepository = require('./repositories/FamiliarReadRepository');
+const PrescripcionPorCobrarRepository = require('./repositories/PrescripcionPorCobrarRepository');
 const FinancieroController = require('./controllers/FinancieroController');
 const AuditoriaRepository = require('./repositories/AuditoriaRepository');
 const AuditoriaService = require('./services/AuditoriaService');
@@ -18,7 +19,8 @@ const { ocultarErrores500, manejadorErrores } = require('./middleware/manejoErro
 const cuentaRepo = new CuentaRepository();
 const donanteRepo = new DonanteRepository();
 const movimientosRepo = new MovimientosRepository();
-const financieroService = new FinancieroService(cuentaRepo, donanteRepo, movimientosRepo, new FamiliarReadRepository());
+const financieroService = new FinancieroService(cuentaRepo, donanteRepo, movimientosRepo, new FamiliarReadRepository(),
+  new PrescripcionPorCobrarRepository());
 const financieroController = new FinancieroController(financieroService, new AuditoriaService(new AuditoriaRepository()));
 
 const app = express();

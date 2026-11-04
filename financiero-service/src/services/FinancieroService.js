@@ -16,8 +16,9 @@ const V = require('./reglasValores');
  * - Alertas de cobro naranja / roja por saldo y cuotas vencidas (caso 21).
  */
 class FinancieroService {
-  constructor(cuentaRepo, donanteRepo, movimientosRepo, familiarRepo) {
+  constructor(cuentaRepo, donanteRepo, movimientosRepo, familiarRepo, prescripcionRepo = null) {
     this.cuentaRepo = cuentaRepo;
+    this.prescripcionRepo = prescripcionRepo;
     this.donanteRepo = donanteRepo;
     this.movimientosRepo = movimientosRepo;
     this.familiarRepo = familiarRepo;
@@ -43,9 +44,46 @@ class FinancieroService {
     const saldoTotal = this._r(saldoCargos + saldoCuotas);
     const alerta = this.generarAlertaSaldo(saldoTotal, cuotas);
     const familiar = this.familiarRepo ? await this.familiarRepo.obtenerPrincipal(idPaciente) : null;
+    const porCobrar = await this.porCobrarFarmacia(idPaciente);
     return { idPaciente, saldoCargos: this._r(saldoCargos), saldoCuotas: this._r(saldoCuotas),
              saldoTotal, alerta, familiar, cargos,
+             desglose: this.desgloseRubros(cargos),
+             porCobrarFarmacia: porCobrar,
+             totalPorCobrar: this._r(porCobrar.reduce((a, x) => a + (x.montoEstimado || 0), 0)),
              cuotas: cuotas.map(c => ({ ...c, diasMora: alertasCobro.diasMora(c, this.hoy()) })) };
+  }
+
+  /**
+   * Caso 19 del SQA: total cobrado por rubro (consulta, laboratorio,
+   * farmacia, otros) sumando el desglose de todos los cargos de la cuenta.
+   */
+  desgloseRubros(cargos) {
+    const t = { consulta: 0, laboratorio: 0, farmacia: 0, otros: 0 };
+    for (const c of cargos || []) {
+      const det = c.detalles || [];
+      if (!det.length) { t.otros += Number(c.monto) || 0; continue; }
+      for (const d of det) t[t[d.rubro] != null ? d.rubro : 'otros'] += Number(d.monto) || 0;
+    }
+    return Object.fromEntries(Object.entries(t).map(([k, v]) => [k, this._r(v)]));
+  }
+
+  /**
+   * Caso 19: medicamentos prescritos en visitas ya cerradas que aun no se
+   * entregan. No es deuda todavia: farmacia genera el cargo (con el 20 %)
+   * en el momento de despachar. Se muestra para que quede claro que falta.
+   */
+  async porCobrarFarmacia(idPaciente) {
+    if (!this.prescripcionRepo) return [];
+    const pct = Number(process.env.DESCUENTO_FUNDACION || 0.20);
+    return (await this.prescripcionRepo.pendientesDePaciente(idPaciente)).map(p => {
+      const restante = p.cantidadPrescrita - p.cantidadEntregada;
+      const precio = p.precioUnitario != null ? Number(p.precioUnitario) : null;
+      const base = precio != null ? this._r(precio * restante) : null;
+      return { idPrescripcion: p.idPrescripcion, idVisita: p.idVisita, medicamento: p.medicamento,
+               cantidadPrescrita: p.cantidadPrescrita, cantidadEntregada: p.cantidadEntregada, cantidadRestante: restante,
+               sinInventario: p.idMedicamento == null, montoBase: base,
+               montoEstimado: base != null ? this._r(base * (1 - pct)) : null };
+    });
   }
 
   /** Caso 21: cuentas con alerta naranja o roja, las rojas primero. */
