@@ -19,7 +19,7 @@ function app() {
   const ctrlStub = {
     estadoCuenta: (_r, res) => res.json({}),
     crearCargo: creado, registrarPago: creado, abonarCargo: creado,
-    alertas: lista, emitirCuota: creado,
+    alertas: lista, alertasPorCuota: lista, emitirCuota: creado,
     listarDonantes: lista, crearDonante: creado,
     desactivarDonante: (_r, res) => res.json({}), reactivarDonante: (_r, res) => res.json({}),
     listarDonaciones: lista, registrarDonacion: creado,

@@ -118,6 +118,15 @@ async function seccion(page, tab) {
   if (await page.isVisible('#btnMenu')) { await page.click('#btnMenu'); await page.waitForTimeout(250); }
   await page.click(`.tab[data-tab="${tab}"]`);
   await page.waitForTimeout(1500);
+  // Estructura: todas las secciones dentro de main.stage y solo una visible
+  // (un </div> de mas dejo Financiero pegado debajo del Panel).
+  const estructura = await page.evaluate(() => ({
+    fuera: [...document.querySelectorAll('#vistaApp section')].filter(s => !s.closest('main.stage')).map(s => s.id),
+    visibles: [...document.querySelectorAll('#vistaApp section')].filter(s => !s.classList.contains('hidden')).map(s => s.id)
+  }));
+  if (estructura.fuera.length || estructura.visibles.length !== 1) {
+    throw new Error(`estructura rota al abrir ${tab}: fuera de main ${estructura.fuera.join(',') || '—'}; visibles ${estructura.visibles.join(',')}`);
+  }
 }
 async function captura(page, caso, paso, opciones = {}) {
   fs.mkdirSync(DIR, { recursive: true });

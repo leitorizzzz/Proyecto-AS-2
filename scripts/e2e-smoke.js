@@ -949,7 +949,8 @@ function familiarE2E(dpi) {
     await req('POST', `${API.financiero}/api/financiero/cuotas`, {
       body: { idPaciente: pacR.id, mes: 2, anio: 2025, monto: 300, fechaVencimiento: diaGt(40) }, token: adminToken, esperarStatus: 201
     });
-    if (qN.estado !== 'pendiente') throw new Error(`cuota emitida en estado ${qN.estado}`);
+    // Emitida con vencimiento pasado: nace vencida (caso 21).
+    if (qN.estado !== 'vencida') throw new Error(`cuota emitida en estado ${qN.estado}`);
     // Emitir dos veces el mismo periodo -> 409; coordinador no emite (403).
     await req('POST', `${API.financiero}/api/financiero/cuotas`, {
       body: { idPaciente: pacN.id, mes: 1, anio: 2025, monto: 300 }, token: adminToken, esperarStatus: 409

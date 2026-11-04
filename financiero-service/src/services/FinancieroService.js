@@ -35,6 +35,7 @@ class FinancieroService {
     if (this.familiarRepo?.existePaciente && !(await this.familiarRepo.existePaciente(idPaciente))) {
       throw Object.assign(new Error('Paciente no encontrado'), { status: 404 });
     }
+    await this.marcarCuotasVencidas();
     const [cargos, cuotas, saldoCargos, saldoCuotas] = await Promise.all([
       this.cuentaRepo.listarCargosPorPaciente(idPaciente),
       this.cuentaRepo.cuotasPorPaciente(idPaciente),
@@ -86,8 +87,43 @@ class FinancieroService {
     });
   }
 
+  /**
+   * Caso 21: pasa a 'vencida' toda cuota pendiente cuya fecha de
+   * vencimiento ya paso. Se llama al consultar cuentas y alertas y desde el
+   * proceso periodico de app.js. Nunca rompe la consulta.
+   */
+  async marcarCuotasVencidas() {
+    if (!this.cuentaRepo.marcarVencidas) return 0;
+    try { return await this.cuentaRepo.marcarVencidas(this.hoy()); }
+    catch (err) { console.warn(`[financiero] no se pudieron marcar cuotas vencidas: ${err.message}`); return 0; }
+  }
+
+  /**
+   * Caso 21 del SQA ("indicador naranja/roja ... por cuota en estado
+   * vencida"): una fila por cuota vencida, con familiar, paciente, monto y
+   * dias de mora. Roja si la mora pasa de DIAS_MORA_ROJA; si no, naranja.
+   */
+  async alertasPorCuota() {
+    await this.marcarCuotasVencidas();
+    const hoy = this.hoy();
+    const filas = await this.cuentaRepo.cuotasVencidas();
+    return filas.map(c => {
+      const dias = alertasCobro.diasMora({ ...c, estado: 'vencida' }, hoy);
+      return {
+        idCuota: c.idCuota, idPaciente: c.idPaciente, paciente: `${c.nombres} ${c.apellidos}`, activo: c.activo !== false,
+        familiar: c.famNombres ? `${c.famNombres} ${c.famApellidos}` : null, parentesco: c.parentesco || null,
+        telefonoFamiliar: c.famTelefono || null,
+        mes: c.mes, anio: c.anio, monto: this._r(c.monto), estado: c.estado,
+        fechaVencimiento: c.fechaVencimiento instanceof Date ? c.fechaVencimiento.toISOString().slice(0, 10) : String(c.fechaVencimiento).slice(0, 10),
+        diasMora: dias,
+        nivel: dias > this.configAlertas.diasMoraRoja ? 'roja' : 'naranja'
+      };
+    }).sort((a, b) => (a.nivel === b.nivel ? b.diasMora - a.diasMora : a.nivel === 'roja' ? -1 : 1));
+  }
+
   /** Caso 21: cuentas con alerta naranja o roja, las rojas primero. */
   async alertasCobro() {
+    await this.marcarCuotasVencidas();
     const hoy = this.hoy();
     const cuentas = await this.cuentaRepo.cuentasPorCobrar();
     const orden = { roja: 0, naranja: 1 };
@@ -118,7 +154,9 @@ class FinancieroService {
       throw Object.assign(new Error(`La cuota ${mes}/${anio} del paciente ${idPaciente} ya existe`), { status: 409 });
     return this.cuentaRepo.guardarCuota(new CuotaMensual({
       idPaciente: Number(idPaciente), mes: Number(mes), anio: Number(anio), monto: Number(monto),
-      estado: CuotaMensual.ESTADOS.PENDIENTE,
+      // Emitida con una fecha de vencimiento ya pasada: nace vencida.
+      estado: (fechaVencimiento || alertasCobro.vencimientoPorDefecto(mes, anio)) < this.hoy()
+        ? CuotaMensual.ESTADOS.VENCIDA : CuotaMensual.ESTADOS.PENDIENTE,
       fechaVencimiento: fechaVencimiento || alertasCobro.vencimientoPorDefecto(mes, anio)
     }));
   }

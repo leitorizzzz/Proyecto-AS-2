@@ -136,10 +136,10 @@ class CuentaRepository {
                           SUM(CASE WHEN estado = 'pagado' THEN 0 ELSE monto - montoPagado END) AS saldo
                    FROM cargos_servicio GROUP BY idPaciente) c ON c.idPaciente = p.id
         LEFT JOIN (SELECT idPaciente, SUM(monto) AS saldo
-                   FROM cuotas_mensuales WHERE estado = 'pendiente' GROUP BY idPaciente) q ON q.idPaciente = p.id
+                   FROM cuotas_mensuales WHERE estado IN ('pendiente', 'vencida') GROUP BY idPaciente) q ON q.idPaciente = p.id
         WHERE ISNULL(c.saldo, 0) > 0 OR ISNULL(q.saldo, 0) > 0
       `),
-      pool.request().query(`SELECT * FROM cuotas_mensuales WHERE estado = 'pendiente'`)
+      pool.request().query(`SELECT * FROM cuotas_mensuales WHERE estado IN ('pendiente', 'vencida')`)
     ]);
     const pendientes = cuotas.recordset.map(r => new CuotaMensual(r));
     return cuentas.recordset.map(r => ({
@@ -190,9 +190,37 @@ class CuentaRepository {
       .query(`
         SELECT ISNULL(SUM(monto),0) AS saldo
         FROM cuotas_mensuales
-        WHERE idPaciente=@idPaciente AND estado='pendiente'
+        WHERE idPaciente=@idPaciente AND estado IN ('pendiente', 'vencida')
       `);
     return Number(result.recordset[0].saldo);
+  }
+
+  /**
+   * Caso 21: las cuotas pendientes cuya fecha de vencimiento ya paso (hoy en
+   * Guatemala, YYYY-MM-DD) pasan a estado 'vencida'. Devuelve cuantas cambiaron.
+   */
+  async marcarVencidas(hoy) {
+    const pool = await getPool();
+    const r = await pool.request()
+      .input('hoy', sql.Date, hoy)
+      .query(`UPDATE cuotas_mensuales SET estado = 'vencida'
+              WHERE estado = 'pendiente' AND fechaVencimiento IS NOT NULL AND fechaVencimiento < @hoy`);
+    return r.rowsAffected[0] || 0;
+  }
+
+  /** Caso 21: cada cuota vencida con su paciente y su familiar responsable. */
+  async cuotasVencidas() {
+    const pool = await getPool();
+    const r = await pool.request().query(`
+      SELECT cm.id AS idCuota, cm.idPaciente, cm.mes, cm.anio, cm.monto, cm.estado, cm.fechaVencimiento,
+             p.nombres, p.apellidos, p.activo,
+             f.nombres AS famNombres, f.apellidos AS famApellidos, f.parentesco, f.telefono AS famTelefono
+      FROM cuotas_mensuales cm
+      INNER JOIN pacientes p ON p.id = cm.idPaciente
+      LEFT JOIN familiares f ON f.idPaciente = cm.idPaciente AND f.principal = 1 AND f.activo = 1
+      WHERE cm.estado = 'vencida'
+      ORDER BY cm.fechaVencimiento ASC`);
+    return r.recordset;
   }
 
   // --- Ingresos por rango de fecha (para reportes) ---

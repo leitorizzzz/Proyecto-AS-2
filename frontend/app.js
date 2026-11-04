@@ -927,25 +927,38 @@ async function cargarAlertasCobro() {
     return;
   }
   try {
-    const lista = await api(API.financiero, '/api/financiero/alertas');
-    const rojas = lista.filter(a => a.alerta.nivel === 'roja').length;
-    const naranjas = lista.length - rojas;
-    $('#kpiAlertasSaldo').textContent = rojas;
-    $('#kpiAlertasHint').textContent = `▲ ${rojas} roja${rojas === 1 ? '' : 's'} · ◆ ${naranjas} naranja${naranjas === 1 ? '' : 's'}`;
+    // Caso 21: una alerta por cuota vencida (familiar, paciente, monto, mora).
+    const [cuotas, cuentas] = await Promise.all([
+      api(API.financiero, '/api/financiero/alertas/cuotas'),
+      api(API.financiero, '/api/financiero/alertas')
+    ]);
+    const rojas = cuotas.filter(a => a.nivel === 'roja').length;
+    const naranjas = cuotas.length - rojas;
+    $('#kpiAlertasSaldo').textContent = cuotas.length;
+    $('#kpiAlertasHint').textContent = `cuotas vencidas · ▲ ${rojas} roja${rojas === 1 ? '' : 's'} · ◆ ${naranjas} naranja${naranjas === 1 ? '' : 's'}`;
     box.classList.add(rojas ? 'error' : naranjas ? 'warn' : 'ok');
-    $('#contadorAlertasCobro').textContent = `${lista.length} cuenta${lista.length === 1 ? '' : 's'}`;
-    $('#tbodyAlertasCobro').innerHTML = lista.map(a => `
+    $('#contadorAlertasCobro').textContent = `${cuotas.length} cuota${cuotas.length === 1 ? '' : 's'}`;
+    $('#cardAlertasCobro').classList.toggle('con-rojas', rojas > 0);
+    $('#tbodyAlertasCobro').innerHTML = cuotas.map(a => `
+      <tr class="fila-alerta-${a.nivel}">
+        <td>${chipAlerta({ nivel: a.nivel })}</td>
+        <td>${a.familiar ? `<strong>${esc(a.familiar)}</strong><div class="tiny">${esc(a.parentesco || '')}${a.telefonoFamiliar ? ' · ' + esc(a.telefonoFamiliar) : ''}</div>` : '<span class="falta-aviso">✕ Sin familiar responsable</span>'}</td>
+        <td>${esc(a.paciente)}${a.activo ? '' : ' <span class="tiny">(egresado)</span>'}</td>
+        <td class="num">${a.mes}/${a.anio} ${chip(a.estado)}</td>
+        <td class="right num">${money(a.monto)}</td>
+        <td class="tiny">${fechaCorta(a.fechaVencimiento)}</td>
+        <td class="right num"><strong>${a.diasMora} d</strong></td>
+      </tr>`).join('') || '<tr><td colspan="7" class="tiny">✓ Ok — no hay cuotas vencidas.</td></tr>';
+    $('#tbodyAlertasSaldo').innerHTML = cuentas.map(a => `
       <tr class="fila-alerta-${a.alerta.nivel}">
         <td>${chipAlerta(a.alerta)}</td>
         <td>${esc(a.paciente)}${a.activo ? '' : ' <span class="tiny">(egresado)</span>'}</td>
         <td class="tiny">${esc(a.alerta.motivos.join('; '))}</td>
-        <td class="right num">${a.alerta.cuotasVencidas}</td>
-        <td class="right num">${a.alerta.diasMoraMax ? `${a.alerta.diasMoraMax} d` : '—'}</td>
         <td class="right num">${money(a.saldoTotal)}</td>
-      </tr>`).join('') || '<tr><td colspan="6" class="tiny">✓ Ok — ninguna cuenta con alerta.</td></tr>';
+      </tr>`).join('') || '<tr><td colspan="4" class="tiny">✓ Ok — ninguna cuenta con saldo alto.</td></tr>';
   } catch (err) {
     $('#kpiAlertasSaldo').textContent = '—';
-    $('#tbodyAlertasCobro').innerHTML = `<tr><td colspan="6"><div class="msg error">No se pudieron cargar las alertas: ${esc(err.message)}</div></td></tr>`;
+    $('#tbodyAlertasCobro').innerHTML = `<tr><td colspan="7"><div class="msg error">No se pudieron cargar las alertas: ${esc(err.message)}</div></td></tr>`;
   }
 }
 
@@ -2399,7 +2412,9 @@ async function onEmitirCuota() {
   };
   try {
     const c = await api(API.financiero, '/api/financiero/cuotas', { method: 'POST', body });
-    ok(msg, `Cuota ${c.mes}/${c.anio} emitida como pendiente; vence el ${fechaCorta(c.fechaVencimiento)}.`);
+    ok(msg, c.estado === 'vencida'
+      ? `Cuota ${c.mes}/${c.anio} emitida: ya está VENCIDA (venció el ${fechaCorta(c.fechaVencimiento)}) y aparece en las alertas del panel.`
+      : `Cuota ${c.mes}/${c.anio} emitida como pendiente; vence el ${fechaCorta(c.fechaVencimiento)}.`);
     form.reset();
     if (Number($('#fPaciente').value) === body.idPaciente) cargarEstadoCuenta();
   } catch (err) { error(msg, err.message); }

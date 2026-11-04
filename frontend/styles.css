@@ -858,6 +858,14 @@ tbody tr.fila-resaltada td:first-child { box-shadow: inset 4px 0 0 var(--accent)
 .precio-examen { margin: 6px 0 0; }
 .item-examen + .item-examen { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line-weak); }
 
+/* Caso 21: alertas de cuotas vencidas en el panel, prominentes. El chip
+   dice "Roja" / "Naranja" con mayuscula (los demas chips van en minuscula). */
+.chip.alerta-roja, .chip.alerta-naranja { text-transform: none; font-weight: 700; }
+.alertas-cuotas { border-top: 4px solid var(--naranja); }
+.alertas-cuotas.con-rojas { border-top-color: var(--err); }
+.fila-alerta-roja td:first-child { box-shadow: inset 4px 0 0 var(--err); }
+.fila-alerta-naranja td:first-child { box-shadow: inset 4px 0 0 var(--naranja); }
+
 /* Caso 19: lo cobrado por servicio y lo pendiente de cobrar al despachar. */
 .desglose-cuenta { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 18px; }
 .costos-visita { margin-top: 10px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }

@@ -43,6 +43,11 @@ class FinancieroController {
     catch (error) { this._fallo(res, error); }
   };
 
+  alertasPorCuota = async (req, res) => {
+    try { res.json(await this.service.alertasPorCuota()); }
+    catch (error) { this._fallo(res, error); }
+  };
+
   alertas = async (req, res) => {
     try { res.json(await this.service.alertasCobro()); }
     catch (error) { this._fallo(res, error); }

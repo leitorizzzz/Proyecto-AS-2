@@ -73,6 +73,7 @@ describe('Alertas de cobro (caso 21)', () => {
     };
     const familiarRepo = { obtenerPrincipal: jest.fn(async () => familiar) };
     const svc = new FinancieroService(cuentaRepo, {}, {}, familiarRepo);
+    svc.hoy = () => '2026-09-15';   // antes del vencimiento: nace pendiente
     const c = await svc.emitirCuota({ idPaciente: 1, mes: 9, anio: 2026, monto: 800 });
     expect(c).toMatchObject({ estado: 'pendiente', fechaVencimiento: '2026-09-30' });
     await expect(svc.emitirCuota({ idPaciente: 1, mes: 9, anio: 2026, monto: 0 })).rejects.toMatchObject({ status: 400 });

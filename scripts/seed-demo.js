@@ -102,7 +102,7 @@ async function login(email, password) {
   for (const u of USUARIOS) {
     const r = await peticion('POST', `${API.auth}/api/auth/register`, { body: u, token: adminToken });
     if (r.ok) log(`creado ${u.email} (${u.rol})`);
-    else if (String(r.data?.error || '').includes('ya existe')) log(`existe ${u.email}`);
+    else if (/ya existe/i.test(String(r.data?.error || ''))) log(`existe ${u.email}`);
     else warn(`${u.email}: ${JSON.stringify(r.data)}`);
   }
 
@@ -270,6 +270,27 @@ async function login(email, password) {
       });
       log(`cuota ${mes}/${anio} Q800 pagada`);
     } else log(`existe cuota ${mes}/${anio}`);
+  }
+
+  // Caso 21: una cuota vencida naranja (10 dias de mora) y una roja (45 dias),
+  // para que las alertas se vean en el panel del administrador al entrar.
+  const vencidas = [
+    { nombre: 'Pedro',   dias: 10, monto: 800, nivel: 'naranja' },
+    { nombre: 'Dolores', dias: 45, monto: 850, nivel: 'roja' }
+  ];
+  for (const v of vencidas) {
+    const pac = Object.values(porDpi).find(p => p.nombres === v.nombre);
+    if (!pac) continue;
+    const vence = new Date(Date.now() - 6 * 3600e3 - v.dias * 864e5);
+    const mesV = vence.getUTCMonth() + 1, anioV = vence.getUTCFullYear();
+    const ecV = (await peticion('GET', `${API.financiero}/api/financiero/estado-cuenta/${pac.id}`, { token: adminToken })).data;
+    if (ecV && ecV.cuotas.some(c => c.mes === mesV && c.anio === anioV)) { log(`existe cuota vencida ${mesV}/${anioV} de ${v.nombre}`); continue; }
+    const r = await peticion('POST', `${API.financiero}/api/financiero/cuotas`, {
+      body: { idPaciente: pac.id, mes: mesV, anio: anioV, monto: v.monto, fechaVencimiento: vence.toISOString().slice(0, 10) },
+      token: adminToken
+    });
+    if (r.ok) log(`cuota ${mesV}/${anioV} Q${v.monto} de ${v.nombre} vencida hace ${v.dias} días (alerta ${v.nivel})`);
+    else warn(`cuota vencida de ${v.nombre}: ${JSON.stringify(r.data)}`);
   }
 
   // Gasto operativo + pago a fundacion

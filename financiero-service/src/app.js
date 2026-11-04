@@ -51,6 +51,12 @@ async function arrancar() {
       app.listen(PORT, () => {
         console.log(`Microservicio Financiero corriendo en http://localhost:${PORT}`);
       });
+      // Caso 21: las cuotas pendientes cuya fecha ya paso pasan a 'vencida'
+      // al arrancar y cada hora (ademas de al consultar cuentas y alertas).
+      const marcar = () => financieroService.marcarCuotasVencidas()
+        .then(n => { if (n) console.log(`[financiero] ${n} cuota(s) pasaron a vencida`); });
+      marcar();
+      setInterval(marcar, Number(process.env.CUOTAS_VENCIDAS_INTERVALO_MIN || 60) * 60 * 1000).unref();
       return;
     } catch (err) {
       const motivo = String(err.message || err).split('\n')[0];

@@ -183,13 +183,23 @@
         </div>
       </div>
 
-      <div class="card hidden" style="margin-top:22px" id="cardAlertasCobro">
-        <h3>Alertas de cobro <span class="contador" id="contadorAlertasCobro"></span></h3>
-        <p class="hint">▲ Roja: saldo sobre el umbral o cuota con más de 30 días de mora. ◆ Naranja: saldo cerca del umbral o cuota recién vencida.</p>
+      <!-- Caso 21: alertas por cuota vencida, prominentes en el panel de quienes llevan la caja. -->
+      <div class="card hidden alertas-cuotas" style="margin-top:22px" id="cardAlertasCobro">
+        <h3>Alertas de cobro: cuotas vencidas <span class="contador" id="contadorAlertasCobro"></span></h3>
+        <p class="hint">▲ <strong>Roja</strong>: la cuota lleva más de 30 días vencida. ◆ <strong>Naranja</strong>: cuota vencida hace 30 días o menos.
+          Al registrar el pago (Financiero → Emitir / pagar cuota) la alerta desaparece.</p>
         <div class="tabla-wrap">
           <table>
-            <thead><tr><th>Nivel</th><th>Paciente</th><th>Motivo</th><th class="right">Cuotas vencidas</th><th class="right">Mora máx.</th><th class="right">Saldo</th></tr></thead>
-            <tbody id="tbodyAlertasCobro"><tr><td colspan="6"><span class="cargando">Cargando</span></td></tr></tbody>
+            <thead><tr><th>Nivel</th><th>Familiar responsable</th><th>Paciente</th><th>Cuota</th><th class="right">Monto</th><th>Venció</th><th class="right">Días de mora</th></tr></thead>
+            <tbody id="tbodyAlertasCobro"><tr><td colspan="7"><span class="cargando">Cargando</span></td></tr></tbody>
+          </table>
+        </div>
+        <h4 style="margin-top:20px">Cuentas con saldo alto</h4>
+        <p class="hint">Saldo total del familiar (cargos y cuotas sin pagar) sobre el umbral.</p>
+        <div class="tabla-wrap">
+          <table>
+            <thead><tr><th>Nivel</th><th>Paciente</th><th>Motivo</th><th class="right">Saldo</th></tr></thead>
+            <tbody id="tbodyAlertasSaldo"></tbody>
           </table>
         </div>
       </div>

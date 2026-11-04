@@ -39,7 +39,7 @@ function _fecha(f) {
 
 /** Dias de mora de una cuota pendiente a la fecha hoy (0 si no vencio). */
 function diasMora(cuota, hoy) {
-  if (cuota.estado !== 'pendiente') return 0;
+  if (cuota.estado !== 'pendiente' && cuota.estado !== 'vencida') return 0;
   const vence = _fecha(cuota.fechaVencimiento) || vencimientoPorDefecto(cuota.mes, cuota.anio);
   const d = Math.round((Date.parse(hoy) - Date.parse(vence)) / MS_DIA);
   return d > 0 ? d : 0;

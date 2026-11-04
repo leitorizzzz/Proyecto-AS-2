@@ -17,5 +17,8 @@ class CuotaMensual {
       : (fechaVencimiento ? String(fechaVencimiento).slice(0, 10) : null);
   }
 }
-CuotaMensual.ESTADOS = Object.freeze({ PENDIENTE: 'pendiente', PAGADA: 'pagada' });
+// Caso 21: 'vencida' = pendiente cuya fecha de vencimiento ya paso (se
+// marca al consultar y con un proceso periodico); al pagarse pasa a 'pagada'.
+CuotaMensual.ESTADOS = Object.freeze({ PENDIENTE: 'pendiente', VENCIDA: 'vencida', PAGADA: 'pagada' });
+CuotaMensual.POR_COBRAR = Object.freeze(['pendiente', 'vencida']);
 module.exports = CuotaMensual;

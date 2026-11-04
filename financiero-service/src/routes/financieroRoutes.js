@@ -11,6 +11,8 @@ function crearRutasFinanciero(ctrl) {
   router.get('/estado-cuenta/:idPaciente', ctrl.estadoCuenta);
   // Caso 21: panel de alertas de cobro (quienes llevan la caja).
   router.get('/alertas', autorizarRoles('admin', 'coordinador_fundacion', 'fundacion'), ctrl.alertas);
+  // Caso 21: una alerta (naranja / roja) por cada cuota vencida.
+  router.get('/alertas/cuotas', autorizarRoles('admin', 'coordinador_fundacion', 'fundacion'), ctrl.alertasPorCuota);
   router.post('/cuotas', soloAdmin, ctrl.emitirCuota);
   router.post('/cargos', soloAdmin, ctrl.crearCargo);
   router.post('/cargos/:id/abonos', soloAdmin, ctrl.abonarCargo);
