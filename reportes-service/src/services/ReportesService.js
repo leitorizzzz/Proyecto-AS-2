@@ -221,59 +221,135 @@ class ReportesService {
 
   // ---------- Export ----------
 
+  /**
+   * PDF con tabla de verdad (caso 22 del SQA: "aparece todo revuelto; los
+   * numeros no estan tabulados"). Antes cada fila se escribia con
+   * continued:true y anchos iguales: encabezados escalonados, numeros en
+   * zigzag y montos partidos ("Q" en una linea, la cifra en otra).
+   *  - anchos por columna calculados del contenido: montos, fechas y
+   *    numeros nunca se parten; el texto se reparte el resto y se ajusta
+   *    dentro de su celda;
+   *  - numeros y montos alineados a la derecha; linea separadora por fila;
+   *  - encabezado de tabla repetido en cada pagina, filas sin cortar entre
+   *    paginas, fila de totales alineada a sus columnas;
+   *  - horizontal si hay mas de 5 columnas; pie "Pagina N de M".
+   */
   async exportarPDF(reporte, stream) {
-    const doc = new PdfKit({ size: 'LETTER', margin: 48 });
+    const horizontal = reporte.columnas.length > 5;
+    const doc = new PdfKit({ size: 'LETTER', layout: horizontal ? 'landscape' : 'portrait', margin: 40, bufferPages: true });
     doc.pipe(stream);
+    const M = ReportesService.MARCA;
+    const izq = doc.page.margins.left;
+    const ancho = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const PAD = 4, F_CUERPO = 8.5, F_CAB = 7.5;
 
     // Cabecera institucional (mismo acento de marca que la UI).
-    doc.rect(0, 0, doc.page.width, 6).fill(ReportesService.MARCA.acento);
-    doc.fillColor(ReportesService.MARCA.acento).fontSize(9).font('Helvetica-Bold')
-      .text(ReportesService.MARCA.institucion.toUpperCase(), { characterSpacing: 1 });
-    doc.fillColor('#09090B').fontSize(18).font('Helvetica-Bold').text(reporte.titulo);
-    doc.moveDown(0.3);
-    doc.fontSize(9).font('Helvetica').fillColor('#555')
-      .text(`${ReportesService.MARCA.sistema} - generado ${new Date(reporte.generadoEn).toLocaleString('es-GT')}`);
+    doc.rect(0, 0, doc.page.width, 6).fill(M.acento);
+    doc.fillColor(M.acento).fontSize(9).font('Helvetica-Bold').text(M.institucion.toUpperCase(), izq, 28, { characterSpacing: 1 });
+    doc.fillColor('#09090B').fontSize(17).font('Helvetica-Bold').text(reporte.titulo);
+    doc.moveDown(0.2);
+    doc.fontSize(9).font('Helvetica').fillColor('#52525B')
+      .text(`${M.sistema} - generado ${new Date(reporte.generadoEn).toLocaleString('es-GT')}`);
     if (reporte.filtros?.desde || reporte.filtros?.hasta) {
       doc.text(`Periodo: ${this._fecha(reporte.filtros.desde)} a ${this._fecha(reporte.filtros.hasta)}`);
     }
-    doc.fillColor('#000');
-    doc.moveDown(1);
+    doc.moveDown(0.8);
 
-    // Cabecera
-    const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-    const colWidth = pageWidth / reporte.columnas.length;
-    doc.fontSize(10).font('Helvetica-Bold');
-    reporte.columnas.forEach((c, i) => {
-      doc.text(c.label, doc.page.margins.left + i * colWidth, doc.y, { width: colWidth, continued: i < reporte.columnas.length - 1 });
+    // --- Columnas: alineacion y ancho segun el contenido ---
+    const HOLGURA = 3;   // redondeo de pdfkit: sin esto "16" se partia en "1 / 6"
+    const cols = reporte.columnas.map((c, idx) => {
+      const valores = reporte.filas.map(fl => this._textoCelda(fl[c.key], c));
+      const numerica = c.tipo === 'moneda' || (reporte.filas.length > 0 && reporte.filas.every(fl => fl[c.key] == null || typeof fl[c.key] === 'number'));
+      const fija = numerica || c.tipo === 'fecha';
+      doc.font('Helvetica').fontSize(F_CUERPO);
+      let natural = Math.max(0, ...valores.map(v => doc.widthOfString(v)));
+      if (reporte.totales && reporte.totales[c.key] != null) {
+        doc.font('Helvetica-Bold'); natural = Math.max(natural, doc.widthOfString(this._textoCelda(reporte.totales[c.key], c)));
+      }
+      if (reporte.totales && idx === 0 && reporte.totales[c.key] == null) {
+        doc.font('Helvetica-Bold'); natural = Math.max(natural, doc.widthOfString('Total'));
+      }
+      doc.font('Helvetica-Bold').fontSize(F_CAB);
+      // El encabezado se dibuja en mayusculas: se mide asi, palabra por palabra.
+      const palabraCab = Math.max(...c.label.toUpperCase().split(/\s+/).map(p => doc.widthOfString(p)));
+      const min = Math.max(palabraCab, fija ? natural : 40) + 2 * PAD + HOLGURA;
+      return { ...c, numerica, fija, natural: natural + 2 * PAD + HOLGURA, min, ancho: 0 };
     });
-    doc.moveDown(0.5);
-    doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).stroke();
-    doc.moveDown(0.3);
+    const fijo = cols.filter(c => c.fija).reduce((a, c) => a + c.min, 0);
+    const texto = cols.filter(c => !c.fija);
+    const resto = ancho - fijo;
+    const deseo = texto.reduce((a, c) => a + Math.max(c.natural, c.min), 0);
+    for (const c of cols) {
+      if (c.fija) c.ancho = c.min;
+      else c.ancho = Math.max(c.min, deseo > 0 ? resto * Math.max(c.natural, c.min) / deseo : resto / texto.length);
+    }
+    // Si sobra espacio (todo numerico) o falta (minimos), se reparte en proporcion.
+    const suma = cols.reduce((a, c) => a + c.ancho, 0);
+    if (Math.abs(suma - ancho) > 0.5) cols.forEach(c => { c.ancho = c.ancho * ancho / suma; });
 
-    doc.font('Helvetica').fontSize(9);
-    for (const fila of reporte.filas) {
-      if (doc.y > doc.page.height - 80) doc.addPage();
-      const yStart = doc.y;
-      reporte.columnas.forEach((c, i) => {
-        const val = this._formatValor(fila[c.key], c.tipo);
-        doc.text(String(val ?? ''), doc.page.margins.left + i * colWidth, yStart,
-          { width: colWidth, continued: i < reporte.columnas.length - 1 });
+    const xs = []; cols.reduce((x, c) => { xs.push(x); return x + c.ancho; }, izq);
+    const limite = () => doc.page.height - doc.page.margins.bottom - 22;   // deja lugar al pie
+
+    const altoFila = (textos, fuente, tam) => {
+      doc.font(fuente).fontSize(tam);
+      return Math.max(...textos.map((t, i) => doc.heightOfString(t || ' ', { width: cols[i].ancho - 2 * PAD }))) + 2 * PAD;
+    };
+    const pintarFila = (textos, y, { fuente = 'Helvetica', tam = F_CUERPO, color = '#18181B', fondo = null, lineaArriba = null, lineaAbajo = '#E4E4E7' } = {}) => {
+      const h = altoFila(textos, fuente, tam);
+      if (fondo) doc.rect(izq, y, ancho, h).fill(fondo);
+      if (lineaArriba) doc.moveTo(izq, y).lineTo(izq + ancho, y).lineWidth(1).strokeColor(lineaArriba).stroke();
+      doc.font(fuente).fontSize(tam).fillColor(color);
+      textos.forEach((t, i) => {
+        doc.text(t || '', xs[i] + PAD, y + PAD, { width: cols[i].ancho - 2 * PAD, align: cols[i].numerica ? 'right' : 'left', lineBreak: true });
       });
-      doc.moveDown(0.4);
+      if (lineaAbajo) doc.moveTo(izq, y + h).lineTo(izq + ancho, y + h).lineWidth(lineaAbajo === '#09090B' ? 1 : 0.5).strokeColor(lineaAbajo).stroke();
+      return y + h;
+    };
+    const encabezado = y => pintarFila(cols.map(c => c.label.toUpperCase()), y,
+      { fuente: 'Helvetica-Bold', tam: F_CAB, color: '#3F3F46', fondo: '#F4F4F5', lineaAbajo: '#09090B' });
+
+    let y = encabezado(doc.y);
+    if (!reporte.filas.length) {
+      doc.font('Helvetica').fontSize(F_CUERPO).fillColor('#52525B').text('Sin datos en el rango elegido.', izq + PAD, y + 8);
+      y += 26;
+    }
+    for (const fila of reporte.filas) {
+      const textos = cols.map(c => this._textoCelda(fila[c.key], c));
+      const h = altoFila(textos, 'Helvetica', F_CUERPO);
+      if (y + h > limite()) {               // la fila no se corta: pagina nueva con encabezado
+        doc.addPage();
+        y = encabezado(doc.page.margins.top);
+      }
+      y = pintarFila(textos, y);
     }
 
     if (reporte.totales) {
-      doc.moveDown(0.5);
-      doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).stroke();
-      doc.moveDown(0.3);
-      doc.font('Helvetica-Bold');
-      const totalesText = reporte.columnas.map(c =>
-        reporte.totales[c.key] != null ? `${c.label}: ${this._formatValor(reporte.totales[c.key], c.tipo)}` : ''
-      ).filter(Boolean).join('    ');
-      doc.text(totalesText);
+      const textos = cols.map((c, i) => reporte.totales[c.key] != null
+        ? this._textoCelda(reporte.totales[c.key], c)
+        : (i === 0 ? 'Total' : ''));
+      if (y + altoFila(textos, 'Helvetica-Bold', F_CUERPO) > limite()) { doc.addPage(); y = encabezado(doc.page.margins.top); }
+      pintarFila(textos, y, { fuente: 'Helvetica-Bold', color: '#09090B', fondo: '#FAFAFA', lineaArriba: '#09090B', lineaAbajo: '#09090B' });
     }
 
+    // Pie en cada pagina.
+    const rango = doc.bufferedPageRange();
+    for (let i = 0; i < rango.count; i++) {
+      doc.switchToPage(rango.start + i);
+      const yPie = doc.page.height - doc.page.margins.bottom - 10;
+      doc.font('Helvetica').fontSize(7.5).fillColor('#71717A');
+      doc.text(M.institucion, izq, yPie, { width: ancho / 2, lineBreak: false });
+      doc.text(`Página ${i + 1} de ${rango.count}`, izq + ancho / 2, yPie, { width: ancho / 2, align: 'right', lineBreak: false });
+    }
     doc.end();
+  }
+
+  /** Texto de una celda del PDF: montos, fechas y codigos legibles. */
+  _textoCelda(v, col) {
+    if (v == null || v === '') return '';
+    const t = this._formatValor(v, col.tipo);
+    // Codigos internos (pendiente, entregado, dinero, cuota...) con mayuscula inicial.
+    if (typeof t === 'string' && /^[a-z_]+$/.test(t)) return (t.charAt(0).toUpperCase() + t.slice(1)).replace(/_/g, ' ');
+    return String(t);
   }
 
   /** Celdas de Excel con formula real y su resultado precalculado. */
@@ -386,10 +462,19 @@ class ReportesService {
     return String(v);
   }
 
+  /**
+   * Dia de Guatemala de un valor. "YYYY-MM-DD" y las columnas DATE (que
+   * llegan como medianoche UTC) se muestran tal cual; un instante (DATETIME2
+   * en UTC) se pasa a UTC-6: un movimiento de las 21:00 del 3 de noviembre no
+   * debe salir como 4 de noviembre.
+   */
   _fecha(v) {
     if (!v) return '';
+    if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
     const d = new Date(v);
-    return isNaN(d) ? String(v) : d.toISOString().slice(0, 10);
+    if (isNaN(d)) return String(v);
+    const soloFecha = d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0 && d.getUTCMilliseconds() === 0;
+    return (soloFecha ? d : new Date(d.getTime() - ReportesService.DESFASE_GT_MS)).toISOString().slice(0, 10);
   }
 }
 

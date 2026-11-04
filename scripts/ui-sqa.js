@@ -540,8 +540,9 @@ CASO[22] = async () => {
     const p1 = items.filter(i => i.p === 1);
     // 1) Encabezado: la primera palabra de cada columna en la misma linea.
     const ys = rep.columnas.map(c => {
-      const primera = c.label.split(/\s+/)[0];
-      const cand = p1.filter(i => i.s.trim().startsWith(primera)).sort((a, b) => b.y - a.y);
+      // El encabezado va en mayusculas; se toma la aparicion mas alta (no la fila de totales).
+      const primera = c.label.split(/\s+/)[0].toUpperCase();
+      const cand = p1.filter(i => i.s.trim().toUpperCase().split(/\s+/)[0] === primera).sort((a, b) => b.y - a.y);
       return cand.length ? cand[0].y : null;
     }).filter(y => y != null);
     if (ys.length && Math.max(...ys) - Math.min(...ys) > 2) f.push(`PDF ${t}: los encabezados de columna no están en una misma línea (escalonados ${Math.round(Math.max(...ys) - Math.min(...ys))} pt)`);
@@ -559,7 +560,17 @@ CASO[22] = async () => {
       const b2 = new Set(nums.map(i => Math.round((i.x + i.w) / 3)));
       if (b2.size > enteros.length + 2) f.push(`PDF ${t}: las cantidades no están alineadas por columna (${b2.size} bordes para ${enteros.length} columnas)`);
     }
-    // 4) Nada encimado ni fuera del margen.
+    // 4) Ninguna palabra del encabezado ni "Total" partida a la mitad.
+    const textosPdf = new Set(items.map(i => i.s.trim()));
+    for (const c of rep.columnas) {
+      for (const palabra of c.label.toUpperCase().split(/\s+/)) {
+        if (![...textosPdf].some(t => t.split(/\s+/).includes(palabra))) { f.push(`PDF ${t}: la palabra "${palabra}" del encabezado quedó partida`); break; }
+      }
+    }
+    if (rep.totales && !textosPdf.has('Total') && rep.totales[rep.columnas[0].key] == null) f.push(`PDF ${t}: la palabra "Total" quedó partida`);
+    const numerosPartidos = items.filter(i => /^\d$/.test(i.s.trim())).filter(i => items.some(o => o !== i && o.p === i.p && /^\d$/.test(o.s.trim()) && Math.abs(o.x - i.x) < 1 && Math.abs(o.y - i.y) < 14 && o.y !== i.y)).length;
+    if (numerosPartidos) f.push(`PDF ${t}: ${numerosPartidos} números partidos en dos líneas`);
+    // 5) Nada encimado ni fuera del margen.
     const porLinea = {};
     for (const it of items) (porLinea[`${it.p}:${Math.round(it.y)}`] ||= []).push(it);
     let encimados = 0;
