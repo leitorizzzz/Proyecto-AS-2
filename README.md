@@ -111,6 +111,23 @@ una cuenta, Brevo real no verificado, comunicación mixta entre servicios
 `localStorage` y otras: lista completa y honesta en
 [CLAUDE.md](CLAUDE.md#desviaciones-respecto-al-análisis).
 
+### Nombres del Análisis en la base: son VISTAS
+
+Las tablas tienen los nombres del código (`pacientes`, `visita_examenes`,
+`dispensaciones`...). Para inspeccionar la base con los nombres del
+Análisis hay **vistas de solo lectura**: `internos`,
+`familiares_responsables`, `examenes_laboratorio`, `despachos_farmacia`,
+`cargos_servicios_medicos`, `log_notificaciones` y `log_auditoria`. Las crea
+reportes-service al arrancar y `bootstrap`
+(`docker compose exec -T reportes-service npm run vistas`, que además
+muestra cuántas filas tiene cada una). Columnas y estados equivalentes en
+[docs/EQUIVALENCIAS.md](docs/EQUIVALENCIAS.md).
+
+```sql
+SELECT * FROM examenes_laboratorio WHERE estado = 'pendiente';
+SELECT * FROM log_auditoria ORDER BY fecha DESC;
+```
+
 ## Pruebas
 
 ```bash

@@ -91,6 +91,25 @@ async function medicamento(etiqueta, precio = 2.5, stock = 100) {
     { nombre: `UI ${etiqueta} ${TS}`, presentacion: 'tableta', stock, precioUnitario: precio }, 201);
 }
 
+/**
+ * SELECT sobre una vista con los nombres del Analisis (internos,
+ * examenes_laboratorio, log_auditoria...), como lo hace el SQA. Devuelve el
+ * numero de filas que cumplen la condicion. Solo stack local (docker exec).
+ */
+const { execFileSync } = require('child_process');
+function filasVista(vista, donde) {
+  const q = `SET NOCOUNT ON; SELECT COUNT(*) FROM dbo.${vista} WHERE ${donde}`;
+  const out = execFileSync('docker', ['exec', 'asilo-sqlserver', 'sh', '-c',
+    '/opt/mssql-tools18/bin/sqlcmd -b -I -C -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -d AsiloCabezaAlgodon -h -1 -W -Q "$0"', q],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  return Number(out.trim().split('\n')[0]);
+}
+function exigirVista(f, vista, donde, que) {
+  try {
+    if (!(filasVista(vista, donde) > 0)) f.push(`SELECT sobre la vista ${vista} no devuelve ${que}`);
+  } catch (e) { f.push(`la vista ${vista} no existe o falló (${(e.stdout || e.message).split('\n')[0]})`); }
+}
+
 // ---------------------------------------------------------------- navegador
 let browser;
 async function pagina({ movil = false } = {}) {
@@ -259,6 +278,10 @@ CASO[9] = async () => {
     }
   }
   if (page.errores.length) f.push(`errores en consola: ${page.errores.slice(0, 2).join(' | ')}`);
+  // Vista con los nombres del Analisis (como inspecciona el SQA).
+  exigirVista(f, 'internos', `id_interno = ${p.id} AND estado = 'activo'`, 'el interno registrado');
+  exigirVista(f, 'familiares_responsables', `id_interno = ${p.id} AND es_principal = 1`, 'su familiar responsable principal');
+  exigirVista(f, 'log_notificaciones', `destinatario = 'ui.familiar9@example.com' AND estado_envio = 'enviado'`, 'la notificación enviada al familiar');
   return { f, ev };
 };
 
@@ -324,6 +347,8 @@ CASO[14] = async () => {
     if (!(v2.prescripciones || []).some(x => x.cantidadPrescrita === 30)) f.push('la prescripción completada no se guardó al finalizar');
   }
   if (page.errores.length) f.push(`errores en consola: ${page.errores.slice(0, 2).join(' | ')}`);
+  // Vista con los nombres del Analisis (como inspecciona el SQA).
+  exigirVista(f, 'examenes_laboratorio', `id_visita = ${visita.id} AND estado = 'pendiente'`, 'el examen ordenado al finalizar');
   return { f, ev };
 };
 
@@ -361,6 +386,8 @@ CASO[15] = async () => {
   if (filaRep && (Number(filaRep.precioBase) !== 200 || Number(filaRep.costo) !== 160)) f.push('el reporte de exámenes no trae 200 / 160');
   const v = await exigirApi('GET', `pacientes/api/visitas/${visita.id}`, 'esp');
   void paciente; void v;
+  // Vista con los nombres del Analisis (como inspecciona el SQA).
+  exigirVista(f, 'examenes_laboratorio', `id_interno = ${paciente.id} AND estado = 'pendiente' AND precio_base = 200 AND costo_con_descuento = 160`, 'la orden pendiente con precio base 200 y costo con descuento 160');
   return { f, ev };
 };
 
@@ -397,6 +424,8 @@ CASO[18] = async () => {
   if (!/farmacia\D*8\.00/i.test(meta)) f.push('la visita no muestra el costo de farmacia acumulado (Q8.00)');
   if (!/parcial/i.test(meta) || !/4 de 10/.test(meta)) f.push('la visita no muestra la prescripción "Parcial · 4 de 10"');
   void paciente;
+  // Vista con los nombres del Analisis (como inspecciona el SQA).
+  exigirVista(f, 'despachos_farmacia', `id_visita = ${visita.id} AND cantidad_despachada = 4 AND estado_prescripcion = 'parcial' AND costo_con_descuento = 8`, 'el despacho parcial de 4 con costo 8.00');
   return { f, ev };
 };
 
@@ -463,6 +492,10 @@ CASO[19] = async () => {
   const vA = await texto(esp, '#detalleVisita');
   if (!/completada/i.test(vA)) f.push('la visita no muestra el estado COMPLETA');
   if (!/total cobrado/i.test(vA)) f.push('la visita no muestra el total cobrado');
+  // Vista con los nombres del Analisis (como inspecciona el SQA).
+  exigirVista(f, 'cargos_servicios_medicos', `id_visita = ${escenarios.A.visita.id} AND tipo_cargo = 'farmacia' AND monto = 24`, 'el cargo de farmacia (A) de 24.00');
+  exigirVista(f, 'cargos_servicios_medicos', `id_visita = ${escenarios.B.visita.id} AND tipo_cargo = 'farmacia' AND monto = 24`, 'el cargo de farmacia (B) de 24.00');
+  exigirVista(f, 'cargos_servicios_medicos', `id_visita = ${escenarios.A.visita.id} AND tipo_cargo = 'consulta' AND monto = 120 AND estado_cobro = 'pendiente'`, 'el cargo de consulta de 120.00');
   return { f, ev };
 };
 
@@ -617,6 +650,8 @@ CASO[24] = async () => {
   const cabecera = await page.$$eval('#tabAuditoria thead th', ths => ths.map(th => th.textContent.trim()).join(' | '));
   for (const c of ['Usuario', 'IP', 'Módulo', 'Acción']) if (!cabecera.includes(c)) f.push(`la tabla de auditoría no tiene la columna ${c}`);
   void p;
+  // Vista con los nombres del Analisis (como inspecciona el SQA).
+  exigirVista(f, 'log_auditoria', `entidad = 'paciente' AND id_entidad = ${p.id} AND accion = 'modificar' AND ip IS NOT NULL AND modulo IS NOT NULL AND datos_anteriores LIKE '%55550000%' AND datos_nuevos LIKE '%55557777%'`, 'el registro con usuario, IP, módulo y datos anteriores / nuevos');
   return { f, ev };
 };
 

@@ -63,6 +63,9 @@ ok "dependencias al dia"
 info "7/7 Semilla de datos de demo"
 npm run seed:demo || warn "seed:demo devolvio error (puede ser idempotente)"
 
+info "Vistas de solo lectura con los nombres del Analisis (internos, log_auditoria...)"
+docker compose exec -T reportes-service npm run vistas || warn "no se crearon todas las vistas (reportes-service las reintenta al arrancar)"
+
 cat <<'EOF'
 
 Listo. El sistema esta corriendo en:

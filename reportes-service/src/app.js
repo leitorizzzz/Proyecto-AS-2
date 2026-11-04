@@ -13,6 +13,7 @@ const AuditoriaService = require('./services/AuditoriaService');
 const AuditoriaController = require('./controllers/AuditoriaController');
 const crearRutasAuditoria = require('./routes/auditoriaRoutes');
 const { ocultarErrores500, manejadorErrores } = require('./middleware/manejoErrores');
+const VistasAnalisisRepository = require('./repositories/VistasAnalisisRepository');
 
 const repo = new ReportesRepository();
 const service = new ReportesService(repo);
@@ -50,6 +51,7 @@ async function arrancar() {
       app.listen(PORT, () => {
         console.log(`Microservicio de Reportes corriendo en http://localhost:${PORT}`);
       });
+      crearVistasAnalisis();
       return;
     } catch (err) {
       const motivo = String(err.message || err).split('\n')[0];
@@ -62,4 +64,20 @@ async function arrancar() {
     }
   }
 }
+/**
+ * Vistas de solo lectura con los nombres del Analisis (internos,
+ * examenes_laboratorio, log_auditoria...). Las tablas las crean los demas
+ * servicios: se reintenta cada 10 s hasta que existan todas.
+ */
+async function crearVistasAnalisis(intento = 1) {
+  try {
+    const { creadas, pendientes } = await new VistasAnalisisRepository().crearTodas();
+    if (!pendientes.length) return console.log(`[vistas] ${creadas.length} vistas del Analisis listas`);
+    if (intento >= 30) return console.warn(`[vistas] sin crear: ${pendientes.map(p => p.vista).join(', ')}`);
+  } catch (err) {
+    if (intento >= 30) return console.warn(`[vistas] ${err.message}`);
+  }
+  setTimeout(() => crearVistasAnalisis(intento + 1), 10000).unref();
+}
+
 arrancar();

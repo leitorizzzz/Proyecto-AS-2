@@ -90,3 +90,24 @@ minúsculas con guion bajo.
 | Error interno del servidor | Cualquier 5xx responde «Ocurrió un error interno…»; el detalle queda en el log del contenedor (`middleware/manejoErrores.js`, copia idéntica en los 7) |
 | Cita médica | `fechaCita` ≥ hoy (Guatemala) y `idMedicoEspecialista` = usuario activo con rol `medico_especialista` / `especialista` |
 | Prescripción asociada al inventario | `visita_prescripciones.idMedicamento` debe existir en `medicamentos` y estar activo (400 / 409) |
+
+## Vistas de solo lectura con los nombres del Análisis (3 nov 2026)
+
+El SQA inspecciona la base con los nombres del Análisis. **Las tablas no se
+renombraron**: estas son **vistas** (`CREATE OR ALTER VIEW`, solo lectura,
+idempotentes) que traducen tabla, columnas y estados. Las crea
+reportes-service al arrancar (reintenta hasta que existan las tablas) y
+`scripts/bootstrap.*` con `docker compose exec -T reportes-service npm run vistas`.
+Se puede escribir en las tablas reales, nunca en las vistas.
+
+| Vista (Análisis) | Tabla real | Columnas y estados equivalentes |
+|---|---|---|
+| `internos` | `pacientes` | `id_interno`, `fecha_nacimiento`, `fecha_ingreso`, `estado` = `activo` / `inactivo` (de `activo` BIT), `fecha_egreso`, `motivo_egreso` |
+| `familiares_responsables` | `familiares` | `id_familiar`, `id_interno`, `correo`, `es_principal`, `estado` |
+| `examenes_laboratorio` | `visita_examenes` + `visitas_medicas` | `id_examen`, `id_interno`, `tipo_examen`, `estado` (`pendiente` / `disponible`), `precio_base`, `descuento_preferencial`, `costo_con_descuento`, `fecha_solicitud` |
+| `despachos_farmacia` | `dispensaciones` (+ medicamento y prescripción) | `id_despacho`, `id_prescripcion`, `cantidad_despachada`, `monto_base`, `descuento_preferencial`, `costo_con_descuento`, `estado_prescripcion` (`pendiente` / `parcial` / `dispensada`) |
+| `cargos_servicios_medicos` | `cargos_servicio` + `cargos_detalle` | una fila por concepto: `tipo_cargo` (`consulta` / `laboratorio` / `farmacia` / `otros`), `monto`, `estado_cobro` (`pendiente` / `abonado` / `pagado`), `id_familiar`, `id_visita`, `origen` |
+| `log_notificaciones` | `notificaciones` | `estado_envio` (`enviado` / `pendiente` / `error`; `error` agrupa `fallida` y `fallida_definitiva`, que siguen en `estado_detalle`), `intentos`, `mensaje_error`, `id_mensaje_proveedor`. **Sin el cuerpo del correo** (el de recuperación lleva el enlace) |
+| `log_auditoria` | `auditoria` | `id_log`, `usuario`, `ip`, `modulo`, `accion`, `entidad`, `id_entidad`, `datos_anteriores`, `datos_nuevos` (JSON) |
+
+Estado de cuota (caso 21): `cuotas_mensuales.estado` = `pendiente` / `vencida` / `pagada`.

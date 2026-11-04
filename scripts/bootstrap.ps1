@@ -82,6 +82,10 @@ Info "7/7 Semilla de datos de demo"
 Nativo { npm run seed:demo }
 if ($LASTEXITCODE -ne 0) { Warn "seed:demo devolvio error (puede ser idempotente, revisa salida)" }
 
+Info "Vistas de solo lectura con los nombres del Analisis (internos, log_auditoria...)"
+Nativo { docker compose exec -T reportes-service npm run vistas }
+if ($LASTEXITCODE -ne 0) { Warn "no se crearon todas las vistas (reportes-service las reintenta al arrancar)" } else { OK "vistas creadas" }
+
 Write-Host "`nListo. El sistema esta corriendo en:" -ForegroundColor Green
 Write-Host "  Frontend:        http://localhost:8090" -ForegroundColor Green
 Write-Host "  Auth API:        http://localhost:3000" -ForegroundColor DarkGray
