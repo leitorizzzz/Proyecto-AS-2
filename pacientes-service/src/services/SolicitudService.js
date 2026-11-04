@@ -35,6 +35,22 @@ class SolicitudService {
     return u;
   }
 
+  /** Datos de la solicitud activa que bloquea una duplicada (RN-02). */
+  async _detalleActiva(s) {
+    const nombre = async id => {
+      if (!id || !this.usuarioRepo) return null;
+      try { return (await this.usuarioRepo.obtenerPorId(Number(id)))?.nombre || null; } catch { return null; }
+    };
+    return {
+      id: s.id, estado: s.estado, estadoTexto: SolicitudReferencia.etiquetaEstado(s.estado),
+      especialidad: s.especialidad || null, motivo: s.motivo || null,
+      fechaCreacion: s.fechaCreacion || null,
+      fechaCita: s.fechaCita || null, horaCita: s.horaCita || null,
+      medicoGeneral: await nombre(s.idMedicoGeneral),
+      medicoEspecialista: await nombre(s.idMedicoEspecialista)
+    };
+  }
+
   listar() {
     return this.repo.obtenerTodas();
   }
@@ -77,9 +93,10 @@ class SolicitudService {
     const duplicada = await this.repo.existeSolicitudActiva(Number(idPaciente), especialidad);
     if (duplicada) {
       const ref = duplicada.id ? ` (solicitud #${duplicada.id}, ${SolicitudReferencia.etiquetaEstado(duplicada.estado)})` : '';
+      // Caso 9 del SQA: la alerta de la pantalla muestra la solicitud que bloquea.
       throw Object.assign(
         new Error(`Este paciente ya tiene una solicitud activa en la especialidad "${especialidad}"${ref}. Espere a que se complete o cancélela antes de crear otra.`),
-        { status: 409, solicitudActiva: duplicada.id ? { id: duplicada.id, estado: duplicada.estado } : null }
+        { status: 409, solicitudActiva: duplicada.id ? await this._detalleActiva(duplicada) : null }
       );
     }
 

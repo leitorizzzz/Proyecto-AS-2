@@ -1227,6 +1227,9 @@ async function cargarSolicitudes() {
     const mapa = Object.fromEntries(pacientes.map(p => [p.id, `${p.nombres} ${p.apellidos}`]));
     state.solicitudes = solicitudes;
     state.mapaPacientes = mapa;
+    // La lista de "Nueva solicitud" se llena aqui: antes solo al visitar
+    // Pacientes, y entrando directo a Solicitudes aparecia vacia.
+    llenarSelectPacientes($('#sPaciente'), pacientes);
     $('#contadorSolicitudes').textContent = `${solicitudes.length} en total`;
 
     const puedeAsignar   = puedeAccion('asignarCita');
@@ -1246,8 +1249,8 @@ async function cargarSolicitudes() {
         ? `${fechaCorta(s.fechaCita)}${s.horaCita ? ' · ' + formatoHora(s.horaCita) : ''}`
         : '<span class="tiny">Sin asignar</span>';
 
-      return `<tr>
-        <td>${esc(mapa[s.idPaciente] || `#${s.idPaciente}`)}</td>
+      return `<tr data-solicitud="${s.id}">
+        <td>${esc(mapa[s.idPaciente] || `#${s.idPaciente}`)}<div class="tiny num">Solicitud #${s.id}</div></td>
         <td>${esc(etiqueta(s.especialidad))}<div class="tiny">${esc(s.motivo)}</div></td>
         <td>${chip(s.estado)}</td>
         <td>${cita}</td>
@@ -1299,7 +1302,49 @@ async function onCrearSolicitud(e) {
     cargarSolicitudes();
   } catch (err) {
     error(msg, err.message);
+    // RN-02 (caso 9): alerta visible con la solicitud activa que bloquea.
+    if (err.status === 409 && err.body?.solicitudActiva) alertaSolicitudDuplicada(err.body.solicitudActiva, body);
   }
+}
+
+/**
+ * Caso 9 del SQA: "se despliega alerta indicando solicitud activa existente".
+ * Dialogo con los datos de la solicitud que bloquea y "Ver solicitud activa",
+ * que la resalta en la bandeja.
+ */
+async function alertaSolicitudDuplicada(a, intento) {
+  const paciente = state.mapaPacientes?.[intento.idPaciente] || `Paciente #${intento.idPaciente}`;
+  const cita = a.fechaCita
+    ? `${fechaCorta(a.fechaCita)}${a.horaCita ? ' · ' + formatoHora(a.horaCita) : ''}${a.medicoEspecialista ? ` con ${esc(a.medicoEspecialista)}` : ''}`
+    : 'Sin asignar';
+  const espera = avisar('Ya existe una solicitud activa', `
+    <div class="msg warn">No se creó la nueva solicitud: ${esc(paciente)} ya tiene una referencia activa a
+      <strong>${esc(etiqueta(a.especialidad || intento.especialidad))}</strong>. Solo puede haber una por especialidad
+      hasta que se complete o se cancele.</div>
+    <table class="tabla-dato"><tbody>
+      <tr><th>Solicitud</th><td class="num">#${a.id}</td></tr>
+      <tr><th>Especialidad</th><td>${esc(etiqueta(a.especialidad || intento.especialidad))}</td></tr>
+      <tr><th>Estado</th><td>${chip(a.estado)}</td></tr>
+      <tr><th>Fecha de solicitud</th><td>${a.fechaCreacion ? fechaHora(a.fechaCreacion) : '—'}</td></tr>
+      <tr><th>Médico que refirió</th><td>${esc(a.medicoGeneral || '—')}</td></tr>
+      <tr><th>Cita</th><td>${cita}</td></tr>
+      ${a.motivo ? `<tr><th>Motivo</th><td>${esc(a.motivo)}</td></tr>` : ''}
+    </tbody></table>
+    <p><button type="button" class="btn-link" data-ver-solicitud="${a.id}">Ver solicitud activa</button></p>`,
+    { eyebrow: 'Solicitud duplicada' });
+  const ver = $('#dlgCuerpo [data-ver-solicitud]');
+  if (ver) ver.addEventListener('click', () => { $('#dlgConfirmar').click(); resaltarSolicitud(a.id); });
+  await espera;
+}
+
+/** Desplaza la bandeja hasta la solicitud y la resalta unos segundos. */
+function resaltarSolicitud(id) {
+  const fila = document.querySelector(`#tbodySolicitudes tr[data-solicitud="${id}"]`);
+  if (!fila) return;
+  $$('#tbodySolicitudes tr.fila-resaltada').forEach(tr => tr.classList.remove('fila-resaltada'));
+  fila.classList.add('fila-resaltada');
+  fila.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => fila.classList.remove('fila-resaltada'), 8000);
 }
 
 async function onAccionSolicitud(accion, id) {

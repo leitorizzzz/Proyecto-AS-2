@@ -40,7 +40,8 @@ class SolicitudRepository {
       .input('idPaciente', sql.Int, idPaciente)
       .input('especialidad', sql.NVarChar(100), especialidad)
       .query(`
-        SELECT TOP 1 id, estado, fechaCreacion FROM solicitudes_referencia
+        SELECT TOP 1 id, estado, especialidad, motivo, fechaCreacion, fechaCita, horaCita,
+               idMedicoGeneral, idMedicoEspecialista FROM solicitudes_referencia
         WHERE idPaciente = @idPaciente
           AND especialidad = @especialidad
           AND estado IN ('pendiente_asignacion', 'cita_asignada', 'en_atencion')

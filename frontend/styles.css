@@ -814,6 +814,21 @@ dialog.dialogo #dlgCuerpo table { margin-top: 8px; }
   .dialogo-acciones .btn { flex: 1 1 100%; }
 }
 
+/* Fila a la que lleva un enlace ("Ver solicitud activa"): fondo tint y
+   regleta magenta, no solo color. */
+tbody tr.fila-resaltada td { background: var(--accent-tint); }
+tbody tr.fila-resaltada td:first-child { box-shadow: inset 4px 0 0 var(--accent); }
+
+/* Tabla "dato: valor" dentro de un dialogo. */
+table.tabla-dato { margin: 12px 0 4px; }
+table.tabla-dato th {
+  text-align: left; width: 42%; padding: 7px 10px 7px 0;
+  font-size: var(--fs-micro); font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--text-mute);
+  border-bottom: 1px solid var(--line-weak); vertical-align: top;
+}
+table.tabla-dato td { padding: 7px 0; border-bottom: 1px solid var(--line-weak); }
+
 /* ============ VISTA MOVIL ============
    < 960px: barra superior fija + menu como panel deslizante.
    < 900px: cada fila de tabla se muestra como tarjeta "etiqueta: valor"
