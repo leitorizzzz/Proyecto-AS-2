@@ -234,7 +234,13 @@ class FarmaciaService {
   }
 
   async historialPorPaciente(idPaciente) {
-    const dispensaciones = await this.dispensacionRepo.obtenerPorPaciente(idPaciente);
+    // Precio base y descuento de cada despacho (los anteriores sin montoBase
+    // se reconstruyen con el precio unitario).
+    const dispensaciones = (await this.dispensacionRepo.obtenerPorPaciente(idPaciente)).map(d => {
+      const base = d.montoBase != null ? Number(d.montoBase)
+        : (d.precioUnitario != null ? Math.round(d.precioUnitario * d.cantidad * 100) / 100 : null);
+      return { ...d, montoBase: base, descuento: base != null ? Math.round((base - Number(d.costoTotal)) * 100) / 100 : null };
+    });
     const totalGastado = dispensaciones.reduce((acc, d) => acc + Number(d.costoTotal), 0);
     return {
       dispensaciones,

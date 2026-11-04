@@ -1894,6 +1894,7 @@ async function cargarPrescripcionesPendientes() {
   if (!id) {
     sel.innerHTML = `<option value="">— selecciona paciente primero —</option>`;
     hint.textContent = '';
+    $('#listaPrescripcionesPaciente').innerHTML = '<li class="tiny">Elija un paciente.</li>';
     return;
   }
   try {
@@ -1913,13 +1914,21 @@ async function cargarPrescripcionesPendientes() {
       $('#btnDispensar').disabled = !puedeDisp;
       sel.innerHTML = `<option value="">Elegir…</option>` + prescripciones.map(p => {
         const sinMed = p.idMedicamento == null;
+        const entregado = p.cantidadPrescrita != null ? p.cantidadPrescrita - (p.cantidadRestante ?? p.cantidadPrescrita) : null;
         const pendiente = p.cantidadRestante != null
-          ? ` · faltan ${p.cantidadRestante} de ${p.cantidadPrescrita}${p.estado === 'parcial' ? ' (parcial)' : ''}` : '';
-        const etiqueta = `${esc(p.medicamento)}${p.dosis ? ' · ' + esc(p.dosis) : ''}${pendiente}${sinMed ? ' (sin medicamento de inventario)' : ''}`;
-        return `<option value="${p.id}" data-sinmed="${sinMed}" data-restante="${p.cantidadRestante ?? ''}">${etiqueta}</option>`;
+          ? ` · ${etiqueta(p.estado || 'pendiente')} · ${entregado} de ${p.cantidadPrescrita} entregadas (faltan ${p.cantidadRestante})` : '';
+        const textoOpcion = `${esc(p.medicamento)}${p.dosis ? ' · ' + esc(p.dosis) : ''}${pendiente}${sinMed ? ' (sin medicamento de inventario)' : ''}`;
+        return `<option value="${p.id}" data-sinmed="${sinMed}" data-restante="${p.cantidadRestante ?? ''}">${textoOpcion}</option>`;
       }).join('');
       hint.textContent = `${prescripciones.length} prescripción(es) pendiente(s) para este paciente.`;
     }
+    // Caso 18: avance de cada prescripcion, a la vista (no solo en el selector).
+    $('#listaPrescripcionesPaciente').innerHTML = prescripciones.map(p => {
+      const entregado = p.cantidadPrescrita != null ? p.cantidadPrescrita - (p.cantidadRestante ?? p.cantidadPrescrita) : null;
+      return `<li><strong>${esc(p.medicamento)}</strong>${p.dosis ? ' · ' + esc(p.dosis) : ''} ${chip(p.estado || 'pendiente')}
+        <div class="tiny">${entregado != null ? `Entregado <strong class="num">${entregado} de ${p.cantidadPrescrita}</strong> · faltan ${p.cantidadRestante}` : 'Sin cantidad prescrita'}
+        ${p.idMedicamento == null ? ' · sin medicamento de inventario (no se puede dispensar)' : ''}</div></li>`;
+    }).join('') || '<li class="tiny">Sin prescripciones pendientes.</li>';
   } catch (err) {
     sel.innerHTML = `<option value="">— error al cargar —</option>`;
     hint.textContent = err.message;
@@ -1938,9 +1947,12 @@ async function cargarHistorialFarmacia() {
     $('#tbodyHistorial').innerHTML = dispensaciones.map(d => `
       <tr>
         <td class="tiny">${fechaHora(d.fecha)}</td>
-        <td>Medicamento #${d.idMedicamento}</td>
-        <td class="num">${d.cantidad}</td>
-        <td class="right num">${money(d.costoTotal)}</td>
+        <td><strong>${esc(d.medicamento || `Medicamento #${d.idMedicamento}`)}</strong>${d.presentacion ? `<div class="tiny">${esc(d.presentacion)}</div>` : ''}</td>
+        <td>${d.estadoPrescripcion ? `${chip(d.estadoPrescripcion)}<div class="tiny">${d.cantidadEntregada ?? '—'} de ${d.cantidadPrescrita ?? '—'}</div>` : '<span class="tiny">—</span>'}</td>
+        <td class="num right">${d.cantidad}</td>
+        <td class="right num">${d.montoBase != null ? money(d.montoBase) : '—'}</td>
+        <td class="right num">${d.descuento != null ? '− ' + money(d.descuento) : '—'}</td>
+        <td class="right num"><strong>${money(d.costoTotal)}</strong></td>
       </tr>`).join('');
     $('#vacioHistorial').classList.toggle('hidden', dispensaciones.length > 0);
   } catch (err) { console.error(err); }
@@ -1964,6 +1976,7 @@ async function onDispensar(e) {
       (d.estadoPrescripcion === 'parcial'
         ? ` Despacho parcial: faltan ${d.cantidadRestante} de ${d.cantidadPrescrita}.`
         : ' Prescripción completa.') +
+      (d.idVisita && !d.cargoComplementario ? ` Se sumó ${money(d.costoTotal)} al costo de farmacia de la visita #${d.idVisita}; se cobra al cerrarla.` : '') +
       (d.cargoComplementario ? ` La visita ya estaba cerrada: cargo #${d.cargoComplementario.id} a la cuenta del familiar.` : ''));
   } catch (err) { error(msg, err.message); }
 }

@@ -479,15 +479,19 @@
             <div id="msgDispensar" role="status" aria-live="polite"></div>
             <p class="tiny" id="hintPrescripcion"></p>
           </form>
+          <!-- Caso 18: avance de cada prescripcion del paciente (entregado de prescrito). -->
+          <h4 style="margin-top:18px">Prescripciones pendientes del paciente</h4>
+          <ul class="lista-rx" id="listaPrescripcionesPaciente"><li class="tiny">Elija un paciente.</li></ul>
         </div>
       </div>
 
       <div class="card" style="margin-top:20px">
-        <h3>Historial del paciente seleccionado <span class="contador" id="totalGastado"></span></h3>
+        <h3>Despachos del paciente seleccionado <span class="contador" id="totalGastado"></span></h3>
+        <p class="hint">Cada despacho con su precio base, el descuento de la fundación y el costo que se suma a la visita.</p>
         <div class="tabla-wrap">
           <table>
             <thead>
-              <tr><th>Fecha</th><th>Medicamento</th><th class="num right">Cantidad</th><th class="right">Costo (Q)</th></tr>
+              <tr><th>Fecha</th><th>Medicamento</th><th>Prescripción</th><th class="num right">Cantidad</th><th class="right">Precio base</th><th class="right">Descuento 20 %</th><th class="right">Costo con descuento</th></tr>
             </thead>
             <tbody id="tbodyHistorial"></tbody>
           </table>

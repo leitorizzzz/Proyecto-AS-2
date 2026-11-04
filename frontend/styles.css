@@ -858,6 +858,11 @@ tbody tr.fila-resaltada td:first-child { box-shadow: inset 4px 0 0 var(--accent)
 .precio-examen { margin: 6px 0 0; }
 .item-examen + .item-examen { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line-weak); }
 
+/* Caso 18: avance de las prescripciones del paciente en Farmacia. */
+.lista-rx { list-style: none; margin: 8px 0 0; padding: 0; }
+.lista-rx li { padding: 8px 0; border-top: 1px dashed var(--line-weak); }
+.lista-rx li:first-child { border-top: 0; }
+
 /* Tabla "dato: valor" dentro de un dialogo. */
 table.tabla-dato { margin: 12px 0 4px; }
 table.tabla-dato th {

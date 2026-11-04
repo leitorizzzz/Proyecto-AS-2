@@ -157,8 +157,21 @@ class DispensacionRepository {
     const pool = await getPool();
     const result = await pool.request()
       .input('idPaciente', sql.Int, idPaciente)
-      .query('SELECT * FROM dispensaciones WHERE idPaciente = @idPaciente ORDER BY fecha DESC');
-    return result.recordset.map(f => new Dispensacion(f));
+      // Caso 18 del SQA: nombre del medicamento y avance de la prescripcion.
+      .query(`
+        SELECT d.*, m.nombre AS medicamentoNombre, m.presentacion, m.precioUnitario,
+               p.cantidadPrescrita, p.cantidadEntregada, p.estado AS estadoPrescripcion
+        FROM dispensaciones d
+        LEFT JOIN medicamentos m ON m.id = d.idMedicamento
+        LEFT JOIN visita_prescripciones p ON p.id = d.idPrescripcion
+        WHERE d.idPaciente = @idPaciente
+        ORDER BY d.fecha DESC`);
+    return result.recordset.map(f => Object.assign(new Dispensacion(f), {
+      medicamento: f.medicamentoNombre || null, presentacion: f.presentacion || null,
+      precioUnitario: f.precioUnitario != null ? Number(f.precioUnitario) : null,
+      cantidadPrescrita: f.cantidadPrescrita ?? null, cantidadEntregada: f.cantidadEntregada ?? null,
+      estadoPrescripcion: f.estadoPrescripcion || null
+    }));
   }
 }
 
