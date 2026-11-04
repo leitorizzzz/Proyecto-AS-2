@@ -311,9 +311,11 @@ main.stage {
    todo el ancho y el formulario va debajo, con ancho de lectura. */
 #tabPacientes .grid-split,
 #tabFarmacia .grid-split:first-of-type,
+#tabLaboratorio .grid-split:first-of-type,
 #tabUsuarios .grid-split { grid-template-columns: minmax(0, 1fr); }
 #tabPacientes .grid-split > .card:last-child,
 #tabFarmacia .grid-split:first-of-type > .card:last-child,
+#tabLaboratorio .grid-split:first-of-type > .card:last-child,
 #tabUsuarios .grid-split > .card:last-child { max-width: 760px; }
 /* Tablas con columnas de Estado/Acciones: celdas mas compactas. */
 #tbodyPacientes td, #tbodyMedicamentos td, #tbodyDonantes td, #tbodyUsuarios td {
@@ -843,6 +845,18 @@ tbody tr.fila-resaltada td:first-child { box-shadow: inset 4px 0 0 var(--accent)
   .barra-finalizar { grid-template-columns: 1fr; }
   .barra-finalizar-botones .btn { flex: 1 1 100%; }
 }
+
+/* Caso 15: precio base, descuento y costo de un examen (o despacho). */
+.desglose-costo {
+  display: grid; grid-template-columns: repeat(3, auto); gap: 4px 18px; justify-content: start;
+  margin: 6px 0 2px; font-size: var(--fs-tiny);
+}
+.desglose-costo div { display: flex; flex-direction: column; }
+.desglose-costo dt { color: var(--text-mute); font-weight: 600; }
+.desglose-costo dd { margin: 0; color: var(--text-body); }
+.desglose-costo .total dd { font-weight: 700; color: var(--text-strong); }
+.precio-examen { margin: 6px 0 0; }
+.item-examen + .item-examen { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line-weak); }
 
 /* Tabla "dato: valor" dentro de un dialogo. */
 table.tabla-dato { margin: 12px 0 4px; }

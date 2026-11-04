@@ -21,8 +21,22 @@ class LaboratorioService {
     this.descuento = Number(process.env.DESCUENTO_FUNDACION || 0.20);
   }
 
-  ordenesPendientes() {
-    return this.repo.listarOrdenesPendientes();
+  /**
+   * Caso 15 del SQA: cada orden pendiente lleva precio base, descuento de la
+   * fundacion y costo con descuento (los registrados al ordenar; si la orden
+   * es anterior a ese cambio, se calculan con el catalogo actual).
+   */
+  async ordenesPendientes() {
+    const ordenes = await this.repo.listarOrdenesPendientes();
+    return ordenes.map(o => {
+      const registrado = o.precioBase != null && o.costo != null;
+      const base = registrado ? Number(o.precioBase) : (o.precioCatalogo != null ? Number(o.precioCatalogo) : null);
+      const descuento = registrado ? Number(o.descuento) : (base != null ? this._r(base * this.descuento) : null);
+      const costo = registrado ? Number(o.costo) : (base != null ? this._r(base - descuento) : null);
+      const { precioCatalogo, ...resto } = o;
+      return { ...resto, estado: o.estadoOrden || 'pendiente', precioBase: base, descuento, costo,
+               porcentajeDescuento: this.descuento, registradoAlOrdenar: registrado };
+    });
   }
 
   async identificarPaciente(dpi) {

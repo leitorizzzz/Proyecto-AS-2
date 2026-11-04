@@ -163,7 +163,17 @@ class ReportesService {
 
   async _examenes(filtros) {
     const rango = this._rango(filtros);
-    const filas = await this.repo.examenes(this._limites(rango));
+    // Caso 15 del SQA: precio base, descuento de la fundacion y costo de cada
+    // examen (los registrados al ordenar; ordenes anteriores, el catalogo).
+    const pct = Number(process.env.DESCUENTO_FUNDACION || 0.20);
+    const filas = (await this.repo.examenes(this._limites(rango))).map(f => {
+      const registrado = f.precioBase != null && f.costo != null;
+      const base = registrado ? Number(f.precioBase) : (f.precioCatalogo != null ? Number(f.precioCatalogo) : null);
+      const descuento = registrado ? Number(f.descuento) : (base != null ? Math.round(base * pct * 100) / 100 : null);
+      const costo = registrado ? Number(f.costo) : (base != null ? Math.round((base - descuento) * 100) / 100 : null);
+      const { precioCatalogo, ...resto } = f;
+      return { ...resto, estado: f.estado || 'pendiente', precioBase: base, descuento, costo };
+    });
     return new Reporte({
       tipo: Reporte.TIPOS.EXAMENES,
       titulo: 'Exámenes solicitados',
@@ -173,9 +183,14 @@ class ReportesService {
         { key: 'fechaSolicitud', label: 'Fecha', tipo: 'fecha' },
         { key: 'tipo', label: 'Tipo de examen' },
         { key: 'paciente', label: 'Paciente' },
+        { key: 'estado', label: 'Estado' },
+        { key: 'precioBase', label: 'Precio base (Q)', tipo: 'moneda' },
+        { key: 'descuento', label: `Descuento ${Math.round(pct * 100)} % (Q)`, tipo: 'moneda' },
+        { key: 'costo', label: 'Costo con descuento (Q)', tipo: 'moneda' },
         { key: 'estadoResultado', label: 'Resultado' }
       ],
-      filas
+      filas,
+      totales: this._sumar(filas, ['precioBase', 'descuento', 'costo'])
     });
   }
 

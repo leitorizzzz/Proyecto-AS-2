@@ -165,11 +165,14 @@ class ReportesRepository {
           ex.tipo,
           ex.estado,
           (p.nombres + ' ' + p.apellidos) AS paciente,
-          CASE WHEN r.id IS NULL THEN 'pendiente' ELSE 'entregado' END AS estadoResultado
+          CASE WHEN r.id IS NULL THEN 'pendiente' ELSE 'entregado' END AS estadoResultado,
+          ex.precioBase, ex.descuento, ex.costo,       -- congelados al ordenar (caso 15)
+          ep.precioBase AS precioCatalogo              -- ordenes anteriores sin precio congelado
         FROM visita_examenes ex
         INNER JOIN visitas_medicas vm ON vm.id = ex.idVisita
         INNER JOIN pacientes p ON p.id = vm.idPaciente
         LEFT JOIN resultados_examenes r ON r.idExamen = ex.id
+        LEFT JOIN examenes_precios ep ON ep.tipo = ex.tipo
         WHERE ex.fechaSolicitud >= @desde AND ex.fechaSolicitud < @hasta
         ORDER BY ex.fechaSolicitud DESC
       `);

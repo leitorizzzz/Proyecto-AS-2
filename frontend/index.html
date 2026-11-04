@@ -509,13 +509,13 @@
       <div class="grid-split">
         <div class="card">
           <h3>Órdenes pendientes <span class="contador" id="contadorOrdenes"></span></h3>
-          <p class="hint">Exámenes sin resultado registrado.</p>
+          <p class="hint">Exámenes sin resultado registrado, con su precio base, el descuento de la fundación y el costo que se cobra.</p>
           <div class="tabla-wrap">
             <table>
               <thead>
-                <tr><th class="num">#</th><th>Paciente</th><th>Examen</th><th>Solicitado</th><th>Acciones</th></tr>
+                <tr><th class="num">#</th><th>Paciente</th><th>Examen</th><th>Estado</th><th class="right">Precio base</th><th class="right">Descuento 20 %</th><th class="right">Costo con descuento</th><th>Solicitado</th><th>Acciones</th></tr>
               </thead>
-              <tbody id="tbodyOrdenes"><tr><td colspan="5"><span class="cargando">Cargando</span></td></tr></tbody>
+              <tbody id="tbodyOrdenes"><tr><td colspan="9"><span class="cargando">Cargando</span></td></tr></tbody>
             </table>
           </div>
           <div id="vacioOrdenes" class="vacio hidden">No hay órdenes pendientes.</div>

@@ -21,11 +21,16 @@ class ResultadoExamenRepository {
         vm.idPaciente    AS idPaciente,
         p.nombres        AS pacienteNombres,
         p.apellidos      AS pacienteApellidos,
-        p.dpi            AS pacienteDpi
+        p.dpi            AS pacienteDpi,
+        ex.precioBase    AS precioBase,     -- congelados al ordenar (caso 15)
+        ex.descuento     AS descuento,
+        ex.costo         AS costo,
+        ep.precioBase    AS precioCatalogo  -- ordenes anteriores sin precio congelado
       FROM visita_examenes ex
       INNER JOIN visitas_medicas vm ON vm.id = ex.idVisita
       INNER JOIN pacientes p        ON p.id = vm.idPaciente
       LEFT JOIN resultados_examenes r ON r.idExamen = ex.id
+      LEFT JOIN examenes_precios ep ON ep.tipo = ex.tipo
       WHERE r.id IS NULL
       ORDER BY ex.fechaSolicitud DESC
     `);

@@ -441,6 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#btnGuardarAvance').addEventListener('click', onGuardarAvance);
   $('#btnFinalizarVisita').addEventListener('click', onFinalizarVisita);
   $('#btnAgregarExamen').addEventListener('click', onAgregarExamen);
+  $('#exTipo').addEventListener('input', mostrarPrecioExamen);
   $('#btnAgregarPrescripcion').addEventListener('click', onAgregarPrescripcion);
   $('#btnRepVer').addEventListener('click', () => generarReporte('json'));
   $('#btnRepPdf').addEventListener('click', () => generarReporte('pdf'));
@@ -1506,6 +1507,30 @@ function mostrarFaltantes(lista, { incompleta = true } = {}) {
   if (primero) setTimeout(() => $(primero).focus({ preventScroll: true }), 350);
 }
 
+/**
+ * Caso 15: precio base, descuento de la fundacion y costo con descuento, en
+ * el mismo formato en la visita, al ordenar y en laboratorio.
+ */
+function desgloseCosto(base, descuento, costo, pct = 0.2) {
+  return `<dl class="desglose-costo">
+    <div><dt>Precio base</dt><dd class="num">${money(base)}</dd></div>
+    <div><dt>Descuento ${Math.round(pct * 100)} % fundación</dt><dd class="num">− ${money(descuento)}</dd></div>
+    <div class="total"><dt>Costo con descuento</dt><dd class="num">${money(costo)}</dd></div>
+  </dl>`;
+}
+
+/** Vista previa del costo mientras se escribe el examen (antes de ordenarlo). */
+function mostrarPrecioExamen() {
+  const caja = $('#precioExamen');
+  if (!caja) return;
+  const tipo = $('#exTipo').value.trim();
+  if (!tipo) { caja.innerHTML = ''; return; }
+  const p = (state.preciosCatalogo || []).find(x => x.tipo.toLowerCase() === tipo.toLowerCase());
+  caja.innerHTML = p
+    ? `Al ordenarlo quedará en estado <strong>pendiente</strong> con este costo:${desgloseCosto(p.precioBase, p.precioBase - p.precioConDescuento, p.precioConDescuento, p.porcentajeDescuento ?? 0.2)}`
+    : '<span class="falta-aviso">✕ Sin precio en el catálogo de laboratorio: no se puede ordenar. Elija uno de la lista.</span>';
+}
+
 /** Lo que esta escrito en la pantalla y aun no se agrego (caso 14). */
 function pendientesEnPantalla() {
   const examen = $('#exTipo').value.trim() || null;
@@ -1571,9 +1596,11 @@ async function cargarDetalleVisita() {
     ['#exTipo', '#rxIdMedicamento', '#rxMedicamento', '#rxDosis', '#rxIndicaciones', '#rxCantidad']
       .forEach(sel => { $(sel).disabled = !puedeEditar; });
 
+    // Caso 15: cada examen con su estado, precio base, descuento y costo.
     $('#listaExamenes').innerHTML = (v.examenes || []).map(ex =>
-      `<li>${esc(ex.tipo)} ${chip(ex.estado)}<div class="tiny">${fechaHora(ex.fechaSolicitud)}${ex.costo != null
-        ? ` · costo registrado ${money(ex.precioBase)} − ${money(ex.descuento)} = <strong class="num">${money(ex.costo)}</strong>` : ''}</div>${
+      `<li class="item-examen"><strong>${esc(ex.tipo)}</strong> ${chip(ex.estado || 'pendiente')}
+        <div class="tiny">Solicitado ${fechaHora(ex.fechaSolicitud)}</div>
+        ${ex.costo != null ? desgloseCosto(ex.precioBase, ex.descuento, ex.costo) : '<div class="tiny">Sin costo registrado al ordenar.</div>'}${
         ex.estado === 'disponible' ? `<button class="btn-link" data-resultado="${ex.id}">Ver resultado</button>` : ''}</li>`
     ).join('') || `<li class="tiny">Sin exámenes solicitados.</li>`;
 
@@ -1592,8 +1619,10 @@ async function cargarDetalleVisita() {
     if (puedeEditar) {
       api(API.laboratorio, '/api/laboratorio/precios')
         .then(precios => {
+          state.preciosCatalogo = precios;
           $('#catalogoExamenes').innerHTML =
             precios.map(p => `<option value="${esc(p.tipo)}">`).join('');
+          mostrarPrecioExamen();
         })
         .catch(() => { /* sin catalogo, el campo sigue siendo texto libre */ });
     }
@@ -1965,7 +1994,7 @@ async function cargarLaboratorio() {
     $('#contadorOrdenes').textContent = '';
     $('#vacioOrdenes').classList.add('hidden');
     $('#tbodyOrdenes').innerHTML =
-      `<tr><td colspan="5" class="tiny">Las órdenes pendientes solo las ve el personal de laboratorio. El estado de cada examen aparece en la visita.</td></tr>`;
+      `<tr><td colspan="9" class="tiny">Las órdenes pendientes solo las ve el personal de laboratorio. El estado de cada examen aparece en la visita.</td></tr>`;
     return;
   }
 
@@ -1977,6 +2006,10 @@ async function cargarLaboratorio() {
         <td class="num">${o.idExamen}</td>
         <td>${esc(o.pacienteNombres)} ${esc(o.pacienteApellidos)}<div class="tiny">${esc(o.pacienteDpi)}</div></td>
         <td>${esc(o.tipo)}</td>
+        <td>${chip(o.estado || 'pendiente')}</td>
+        <td class="right num">${o.precioBase != null ? money(o.precioBase) : '—'}</td>
+        <td class="right num">${o.descuento != null ? '− ' + money(o.descuento) : '—'}</td>
+        <td class="right num"><strong>${o.costo != null ? money(o.costo) : '—'}</strong></td>
         <td class="tiny">${fechaHora(o.fechaSolicitud)}</td>
         <td>
           <button class="btn-link" data-idx="${o.idExamen}" data-action="preparar">Seleccionar</button> ·
