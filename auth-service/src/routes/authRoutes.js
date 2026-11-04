@@ -15,6 +15,8 @@ function crearRutasAuth(authController) {
   router.post('/recuperar', authController.recuperar);
   router.post('/restablecer', authController.restablecer);
   router.get('/me', autenticar, authController.me);
+  // Cierre de sesion: revoca el token actual en los 7 servicios (caso 1).
+  router.post('/logout', autenticar, authController.logout);
   // Cambio de contrasena del propio usuario (misma regla que alta y restablecer).
   router.post('/cambiar-password', autenticar, authController.cambiarPassword);
 

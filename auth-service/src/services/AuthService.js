@@ -1,6 +1,7 @@
 const HashPool = require('./hashPool');
 const { validarPassword } = require('./reglasPassword');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const Usuario = require('../models/Usuario');
 
 const ROLES_VALIDOS = [
@@ -23,8 +24,9 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * login (verificacion + emision de JWT) y validacion de tokens.
  */
 class AuthService {
-  constructor(usuarioRepository, hasher = AuthService.hasherCompartido()) {
+  constructor(usuarioRepository, hasher = AuthService.hasherCompartido(), tokenRevocadoRepository = null) {
     this.usuarioRepo = usuarioRepository;
+    this.tokensRevocados = tokenRevocadoRepository;
     // bcrypt en hilos de trabajo (caso 25); mismo algoritmo y costo.
     this.hasher = hasher;
     this.jwtSecret = process.env.JWT_SECRET;
@@ -75,7 +77,8 @@ class AuthService {
     const token = jwt.sign(
       { sub: usuario.id, email: usuario.email, rol: usuario.rol },
       this.jwtSecret,
-      { expiresIn: this.jwtExpiresIn }
+      // jti: identifica el token para poder revocarlo al cerrar sesion (caso 1).
+      { expiresIn: this.jwtExpiresIn, jwtid: crypto.randomUUID() }
     );
 
     return { token, usuario: usuario.toPublic() };
@@ -133,6 +136,18 @@ class AuthService {
     }
     await this.usuarioRepo.actualizarPassword(usuario.id, await this.hasher.hash(passwordNueva, 10));
     return usuario.toPublic();
+  }
+
+  /**
+   * Cierre de sesion (caso 1 del SQA): revoca el token actual. Un JWT
+   * copiado antes de salir deja de servir en los 7 servicios aunque su exp
+   * no haya vencido. Tokens sin jti (anteriores a este cambio) no se pueden
+   * revocar y vencen solos.
+   */
+  async cerrarSesion({ jti, exp } = {}) {
+    if (!jti || !this.tokensRevocados) return { revocado: false };
+    await this.tokensRevocados.revocar(jti, new Date(exp * 1000));
+    return { revocado: true };
   }
 
   async obtenerPerfil(idUsuario) {

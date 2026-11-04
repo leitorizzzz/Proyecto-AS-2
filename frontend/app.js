@@ -153,7 +153,11 @@ async function api(base, path, opts = {}) {
     let msg = (body && body.error) || (typeof body === 'string' ? body : `HTTP ${resp.status}`);
     // Los mensajes tecnicos de sesion y permisos (token, lista de roles)
     // no se muestran tal cual.
-    if (resp.status === 401 && /token/i.test(msg)) msg = 'Su sesión expiró o no es válida. Vuelva a iniciar sesión.';
+    if (resp.status === 401 && /token/i.test(msg)) {
+      msg = 'Su sesión expiró o no es válida. Vuelva a iniciar sesión.';
+      // Token revocado (salida en otra pestana) o vencido: se cierra aqui tambien.
+      if (state.token) onLogout({ motivo: 'revocada' });
+    }
     else if (resp.status === 403 && /^Acceso denegado/.test(msg)) msg = 'Su usuario no tiene permiso para realizar esta acción.';
     else if (!body || typeof body === 'string' && /<html/i.test(body)) msg = 'El servicio no respondió. Intente de nuevo en unos momentos.';
     const err = new Error(msg);
@@ -320,7 +324,21 @@ function puedeAccion(nombre) {
  *   AUTENTICACION Y ARRANQUE
  * ============================================================ */
 
+// Atras/Adelante con la pagina en cache (bfcache): si ya no hay sesion, se
+// recarga para no mostrar una pantalla protegida de la sesion cerrada.
+window.addEventListener('pageshow', e => {
+  let hay = null;
+  try { hay = localStorage.getItem('asilo.token'); } catch { /* modo privado */ }
+  if (e.persisted && !hay) window.location.reload();
+});
+
 document.addEventListener('DOMContentLoaded', () => {
+  // Salida automatica (inactividad, sesion revocada): aviso sin guardar nada.
+  const motivoSalida = (window.location.hash.match(/^#sesion=(\w+)$/) || [])[1];
+  if (motivoSalida) {
+    history.replaceState(null, '', window.location.pathname);
+    if (mensajeSalida(motivoSalida)) warn($('#msgLogin'), mensajeSalida(motivoSalida));
+  }
   // RF-42: el enlace del correo trae el token en el fragmento (#restablecer=...).
   const tokenRestablecer = (window.location.hash.match(/^#restablecer=([A-Za-z0-9_-]+)$/) || [])[1];
   // Rehidratacion de sesion
@@ -350,7 +368,7 @@ document.addEventListener('DOMContentLoaded', () => {
     history.replaceState(null, '', window.location.pathname);
     mostrarFormAcceso('restablecer');
   }
-  $('#btnSalir').addEventListener('click', onLogout);
+  $('#btnSalir').addEventListener('click', () => onLogout());
   $$('.tab').forEach(b => b.addEventListener('click', () => cambiarTab(b.dataset.tab)));
   iniciarMenuMovil();
   iniciarEtiquetasTablas();
@@ -468,6 +486,8 @@ async function onLogin(e) {
     state.token = resp.token;
     state.usuario = decodificarJWT(resp.token);
     localStorage.setItem('asilo.token', resp.token);
+    // La contrasena no se queda en el DOM durante la sesion.
+    $('#password').value = '';
     abrirApp();
   } catch (err) {
     error(msg, err.message || 'No se pudo iniciar sesión');
@@ -513,17 +533,38 @@ async function onRestablecer(e, token) {
   finally { btn.disabled = false; }
 }
 
-function onLogout() {
+/**
+ * Cierre de sesion (caso 1 del SQA: "al cerrar sesion no se borran las
+ * credenciales"). Revoca el token en el servidor, vacia localStorage y
+ * sessionStorage, y RECARGA la pagina: asi no queda nada en memoria (token,
+ * usuario, listas de pacientes) ni en el DOM oculto, y el formulario de
+ * acceso aparece vacio. location.replace no deja la pantalla protegida en el
+ * historial del boton Atras. motivo: 'inactividad' | 'revocada' | undefined.
+ */
+let saliendo = false;
+async function onLogout({ motivo } = {}) {
+  if (saliendo) return;
+  saliendo = true;
   detenerControlInactividad();
-  localStorage.removeItem('asilo.token');
-  localStorage.removeItem(CLAVE_ULTIMA_ACTIVIDAD);
+  const token = state.token;
   state.token = null; state.usuario = null; state.tabActual = null;
-  // La pantalla de acceso no lleva ruta: el siguiente usuario entra al panel.
-  history.replaceState(null, '', window.location.pathname + window.location.search);
-  if ($('#dlg').open) $('#dlgCancelar').click();   // cierra cualquier dialogo pendiente
-  cerrarMenuMovil({ devolverFoco: false });
-  $('#vistaApp').classList.add('hidden');
-  $('#vistaLogin').classList.remove('hidden');
+  if (token && motivo !== 'revocada') {
+    // Revocar en el servidor; si tarda o falla, igual se sale (el token vence solo).
+    const corte = new AbortController();
+    setTimeout(() => corte.abort(), 2500);
+    try {
+      await fetch(API.auth + '/api/auth/logout', {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` }, signal: corte.signal
+      });
+    } catch { /* sin red: se cierra igual en este navegador */ }
+  }
+  try { localStorage.clear(); } catch { /* modo privado */ }
+  try { sessionStorage.clear(); } catch { /* modo privado */ }
+  $('#email').value = ''; $('#password').value = '';
+  // replaceState + reload: un replace que solo cambia el #fragmento no
+  // recargaria la pagina, y la sesion seguiria en memoria.
+  history.replaceState(null, '', window.location.pathname + (motivo ? `#sesion=${motivo}` : ''));
+  window.location.reload();
 }
 
 /* ============================================================
@@ -618,10 +659,17 @@ async function mostrarAvisoInactividad() {
 }
 
 function cerrarSesionPorInactividad() {
-  const minutos = Math.round(inactividad.limiteMs / 60000);
   inactividad.avisoAbierto = false;
-  onLogout();
-  warn($('#msgLogin'), `Sesión cerrada por inactividad${minutos ? ` (${minutos} min)` : ''}. Vuelva a iniciar sesión.`);
+  // El aviso se muestra al recargar (#sesion=inactividad), sin guardar nada.
+  onLogout({ motivo: 'inactividad' });
+}
+
+/** Mensaje en la pantalla de acceso tras una salida automatica. */
+function mensajeSalida(motivo) {
+  return {
+    inactividad: `Sesión cerrada por inactividad (${INACTIVIDAD_MIN} min). Vuelva a iniciar sesión.`,
+    revocada: 'La sesión se cerró (desde otra pestaña o venció). Vuelva a iniciar sesión.'
+  }[motivo] || null;
 }
 
 function abrirApp() {

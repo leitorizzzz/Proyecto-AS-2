@@ -11,6 +11,7 @@ const AuditoriaRepository = require('./repositories/AuditoriaRepository');
 const AuditoriaService = require('./services/AuditoriaService');
 const crearRutasAuth = require('./routes/authRoutes');
 const TokenRecuperacionRepository = require('./repositories/TokenRecuperacionRepository');
+const TokenRevocadoRepository = require('./repositories/TokenRevocadoRepository');
 const RecuperacionService = require('./services/RecuperacionService');
 const NotificacionesClient = require('./services/NotificacionesClient');
 const LimitadorIntentos = require('./services/LimitadorIntentos');
@@ -18,7 +19,8 @@ const { ocultarErrores500, manejadorErrores } = require('./middleware/manejoErro
 
 // --- Ensamblado de capas ---
 const usuarioRepository = new UsuarioRepository();
-const authService = new AuthService(usuarioRepository);
+const tokenRevocadoRepository = new TokenRevocadoRepository();
+const authService = new AuthService(usuarioRepository, AuthService.hasherCompartido(), tokenRevocadoRepository);
 const auditoriaService = new AuditoriaService(new AuditoriaRepository());
 const recuperacionService = new RecuperacionService(usuarioRepository, new TokenRecuperacionRepository(),
   AuthService.hasherCompartido(), new NotificacionesClient());
@@ -51,6 +53,7 @@ async function arrancar() {
   for (let i = 1; i <= MAX_INTENTOS; i++) {
     try {
       await inicializarEsquema();
+      await tokenRevocadoRepository.crearTabla();   // cierre de sesion (caso 1)
       app.listen(PORT, () => {
         console.log(`Microservicio de Autenticacion corriendo en http://localhost:${PORT}`);
       });

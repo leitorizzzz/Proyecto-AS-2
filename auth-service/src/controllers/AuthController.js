@@ -1,6 +1,7 @@
 const AuditoriaService = require('../services/AuditoriaService');
 const RecuperacionService = require('../services/RecuperacionService');
 const LimitadorIntentos = require('../services/LimitadorIntentos');
+const autenticar = require('../middleware/authMiddleware');
 
 /**
  * CAPA DE PRESENTACION (API REST)
@@ -139,6 +140,17 @@ class AuthController {
       const usuario = await this.service.cambiarPassword(req.usuario.sub, req.body || {});
       await this._auditar(req, 'modificar', 'usuario', usuario.id, 'contrasena cambiada por el propio usuario');
       res.json({ mensaje: 'Contraseña actualizada.' });
+    } catch (error) {
+      res.status(error.status || 500).json({ error: error.message });
+    }
+  };
+
+  /** POST /api/auth/logout: revoca el token con el que se hace la peticion. */
+  logout = async (req, res) => {
+    try {
+      const r = await this.service.cerrarSesion(req.usuario);
+      if (r.revocado && typeof autenticar.marcarRevocado === 'function') autenticar.marcarRevocado(req.usuario.jti, req.usuario.exp);
+      res.json({ mensaje: 'Sesión cerrada.', ...r });
     } catch (error) {
       res.status(error.status || 500).json({ error: error.message });
     }
