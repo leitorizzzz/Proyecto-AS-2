@@ -369,24 +369,20 @@
           <span class="chip" id="visitaEstadoChip">—</span>
         </h3>
         <p class="hint" id="visitaMeta"></p>
+        <div class="costos-visita" id="costosVisita"></div>
+        <!-- Caso 14: resumen de todo lo que falta, arriba y a la vista. -->
+        <div id="resumenFaltantes" class="resumen-faltantes hidden" role="alert" tabindex="-1"></div>
 
         <div class="visita-panel" style="margin-top:14px">
           <div>
             <div class="subcard">
               <h4>Notas clínicas</h4>
-              <label for="vDiagnostico">Diagnóstico <span class="falta-aviso hidden" id="faltaDiagnostico">✕ Obligatorio para cerrar</span></label>
+              <label for="vDiagnostico">Diagnóstico <span class="falta-aviso hidden" id="faltaDiagnostico">✕ Obligatorio para finalizar</span></label>
               <textarea id="vDiagnostico" rows="3"></textarea>
-              <label for="vObservaciones">Observaciones <span class="falta-aviso hidden" id="faltaObservaciones">✕ Obligatorio para cerrar</span></label>
+              <label for="vObservaciones">Observaciones <span class="falta-aviso hidden" id="faltaObservaciones">✕ Obligatorio para finalizar</span></label>
               <textarea id="vObservaciones" rows="3"></textarea>
-              <button class="btn" id="btnGuardarClinico">Guardar cambios</button>
+              <p class="tiny">Se guardan al pulsar «Finalizar visita» o «Guardar sin finalizar».</p>
               <div id="msgClinico" role="status" aria-live="polite"></div>
-            </div>
-
-            <div class="subcard" style="margin-top:16px">
-              <h4>Cerrar visita</h4>
-              <p class="tiny">Para completar: diagnóstico y observaciones no pueden estar vacíos. Al cerrar, la solicitud enlazada también se marca <em>completada</em>.</p>
-              <button class="btn sage" id="btnCompletarVisita">Marcar visita como completa</button>
-              <div id="msgCompletar" role="status" aria-live="polite"></div>
             </div>
           </div>
 
@@ -394,9 +390,10 @@
             <div class="subcard">
               <h4>Exámenes solicitados</h4>
               <ul id="listaExamenes"></ul>
-              <label for="exTipo">Nuevo examen</label>
+              <label for="exTipo">Nuevo examen <span class="falta-aviso hidden" id="faltaExamen">✕ Revise el examen</span></label>
               <input id="exTipo" list="catalogoExamenes" placeholder="Hematología completa, EKG, uroanálisis...">
               <datalist id="catalogoExamenes"></datalist>
+              <p class="precio-examen tiny" id="precioExamen" aria-live="polite"></p>
               <button class="btn ghost small" id="btnAgregarExamen" style="margin-top:10px">Agregar examen</button>
               <div id="msgExamen" role="status" aria-live="polite"></div>
             </div>
@@ -408,19 +405,34 @@
               <select id="rxIdMedicamento">
                 <option value="">— elegir del inventario —</option>
               </select>
-              <label for="rxMedicamento">Nombre y presentación</label>
+              <label for="rxMedicamento">Nombre y presentación <span class="falta-aviso hidden" id="faltaRxMedicamento">✕ Falta el medicamento</span></label>
               <input id="rxMedicamento" placeholder="Se completa al elegir del inventario">
               <div class="fila-2">
                 <div><label for="rxDosis">Dosis</label><input id="rxDosis" placeholder="1 tab / 24h"></div>
                 <div><label for="rxIndicaciones">Indicaciones</label><input id="rxIndicaciones" placeholder="Con agua, en ayunas"></div>
               </div>
-              <label for="rxCantidad">Cantidad prescrita (unidades)</label>
+              <label for="rxCantidad">Cantidad prescrita (unidades) <span class="falta-aviso hidden" id="faltaRxCantidad">✕ Falta la cantidad</span></label>
               <input type="number" id="rxCantidad" min="1" step="1" inputmode="numeric" placeholder="30">
               <button class="btn ghost small" id="btnAgregarPrescripcion" style="margin-top:10px">Agregar prescripción</button>
               <div id="msgRx" role="status" aria-live="polite"></div>
             </div>
           </div>
         </div>
+
+        <!-- Caso 14: un solo boton que toma todo lo escrito en la pantalla. -->
+        <div class="barra-finalizar">
+          <div>
+            <h4>Finalizar visita</h4>
+            <p class="tiny">Guarda la nota clínica, agrega el examen y la prescripción que estén escritos sin agregar,
+              revisa que no falte nada y cierra la visita. Al cerrarla, la solicitud queda <em>completada</em> y se genera el
+              cargo al familiar (consulta, laboratorio y farmacia, con el 20 % de la fundación).</p>
+          </div>
+          <div class="barra-finalizar-botones">
+            <button class="btn ghost" id="btnGuardarAvance" type="button">Guardar sin finalizar</button>
+            <button class="btn" id="btnFinalizarVisita" type="button">Finalizar visita</button>
+          </div>
+        </div>
+        <div id="msgCompletar" role="status" aria-live="polite"></div>
       </div>
     </section>
 

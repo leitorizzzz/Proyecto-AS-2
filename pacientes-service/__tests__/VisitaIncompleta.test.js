@@ -30,7 +30,7 @@ describe('Visita incompleta (caso 14)', () => {
   test('solo falta observaciones -> camposFaltantes = [observaciones]', async () => {
     const err = await new VisitaMedicaService(repoCon(visita({ diagnostico: 'HTA' })), {}, {}).completar(3).catch(e => e);
     expect(err.camposFaltantes).toEqual(['observaciones']);
-    expect(err.message).toMatch(/faltan observaciones/);
+    expect(err.message).toMatch(/faltan las observaciones/);
   });
 
   test('una visita incompleta se puede editar y luego cerrar', async () => {
@@ -48,5 +48,25 @@ describe('Visita incompleta (caso 14)', () => {
     await new VisitaMedicaController(svc, { registrar: jest.fn() }).completar({ params: { id: '3' }, usuario: {}, headers: {} }, res);
     expect(res.c).toBe(400);
     expect(res.b).toMatchObject({ camposFaltantes: ['diagnostico'], estadoVisita: 'incompleta' });
+  });
+
+  // Caso 14 del SQA (boton unico "Finalizar visita"): lo que la pantalla ve
+  // a medio llenar tambien impide el cierre y deja la visita incompleta.
+  test("con todo lleno pero una prescripcion a medio llenar -> 400, pendientes e incompleta", async () => {
+    const repo = repoCon(visita({ diagnostico: "HTA", observaciones: "Control" }));
+    const err = await new VisitaMedicaService(repo, {}, {})
+      .completar(3, { pendientes: ["prescripción a medio llenar (falta la cantidad)"] }).catch(e => e);
+    expect(err.status).toBe(400);
+    expect(err.camposFaltantes).toEqual([]);
+    expect(err.pendientes).toEqual(["prescripción a medio llenar (falta la cantidad)"]);
+    expect(err.message).toMatch(/prescripción a medio llenar/);
+    expect(repo.marcarIncompleta).toHaveBeenCalledWith(3);
+    expect(repo.completarConCargo).not.toHaveBeenCalled();
+  });
+
+  test("pendientes que no son texto se ignoran y la visita se cierra", async () => {
+    const repo = repoCon(visita({ diagnostico: "HTA", observaciones: "Control" }));
+    await expect(new VisitaMedicaService(repo, {}, {}).completar(3, { pendientes: [null, 5, "  "] }))
+      .resolves.toMatchObject({ estado: "completada" });
   });
 });

@@ -23,6 +23,7 @@ class VisitaMedicaController {
     if (error.camposFaltantes) {
       cuerpo.camposFaltantes = error.camposFaltantes;
       cuerpo.estadoVisita = error.estadoVisita;
+      if (error.pendientes?.length) cuerpo.pendientes = error.pendientes;
     }
     res.status(status).json(cuerpo);
   };
@@ -84,7 +85,7 @@ class VisitaMedicaController {
   completar = async (req, res) => {
     try {
       const antes = await this.service.obtener(Number(req.params.id));
-      const visita = await this.service.completar(Number(req.params.id));
+      const visita = await this.service.completar(Number(req.params.id), req.body || {});
       await this._auditar(req, 'modificar', 'visita', visita.id, 'completada',
         { estado: antes.estado }, { estado: visita.estado, fechaCompletada: visita.fechaCompletada });
       if (visita.cargo) {
@@ -95,7 +96,7 @@ class VisitaMedicaController {
     } catch (error) {
       if (error.camposFaltantes) {
         await this._auditar(req, 'modificar', 'visita', Number(req.params.id),
-          `intento de cierre: faltan ${error.camposFaltantes.join(', ')}`, null, { estado: error.estadoVisita });
+          `intento de cierre: faltan ${[...error.camposFaltantes, ...(error.pendientes || [])].join(', ')}`, null, { estado: error.estadoVisita });
       }
       this._fallo(res, error);
     }

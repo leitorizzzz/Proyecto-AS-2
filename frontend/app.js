@@ -428,15 +428,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
   $('#fPaciente').addEventListener('change', cargarEstadoCuenta);
-  $('#selectorVisita').addEventListener('change', cargarDetalleVisita);
+  $('#selectorVisita').addEventListener('change', () => {
+    mostrarFaltantes([]); limpiar($('#msgCompletar')); limpiarBorrador();
+    cargarDetalleVisita();
+  });
   ['#vDiagnostico', '#vObservaciones'].forEach(sel => $(sel).addEventListener('input', () => {
     if ($(sel).value.trim()) {
       $(sel).classList.remove('campo-faltante'); $(sel).removeAttribute('aria-invalid');
       $(sel === '#vDiagnostico' ? '#faltaDiagnostico' : '#faltaObservaciones').classList.add('hidden');
     }
   }));
-  $('#btnGuardarClinico').addEventListener('click', onGuardarClinico);
-  $('#btnCompletarVisita').addEventListener('click', onCompletarVisita);
+  $('#btnGuardarAvance').addEventListener('click', onGuardarAvance);
+  $('#btnFinalizarVisita').addEventListener('click', onFinalizarVisita);
   $('#btnAgregarExamen').addEventListener('click', onAgregarExamen);
   $('#btnAgregarPrescripcion').addEventListener('click', onAgregarPrescripcion);
   $('#btnRepVer').addEventListener('click', () => generarReporte('json'));
@@ -1458,7 +1461,7 @@ async function cargarVisitasTab() {
       ).join('');
     if (state.visitaSeleccionada && opciones.some(o => o.v.id === state.visitaSeleccionada)) {
       sel.value = state.visitaSeleccionada;
-      cargarDetalleVisita();
+      await cargarDetalleVisita();
     } else {
       $('#detalleVisita').classList.add('hidden');
     }
@@ -1467,11 +1470,15 @@ async function cargarVisitasTab() {
   }
 }
 
+/** Campo de la pantalla y su aviso, por nombre (los del backend y los de la pantalla). */
 const CAMPOS_VISITA = {
-  diagnostico: ['#vDiagnostico', '#faltaDiagnostico'],
-  observaciones: ['#vObservaciones', '#faltaObservaciones']
+  diagnostico: ['#vDiagnostico', '#faltaDiagnostico', 'el diagnóstico'],
+  observaciones: ['#vObservaciones', '#faltaObservaciones', 'las observaciones'],
+  examen: ['#exTipo', '#faltaExamen', 'el examen'],
+  rxMedicamento: ['#rxMedicamento', '#faltaRxMedicamento', 'el medicamento de la prescripción'],
+  rxCantidad: ['#rxCantidad', '#faltaRxCantidad', 'la cantidad de la prescripción']
 };
-/** Resalta (borde, fondo y texto, no solo color) los campos que faltan. */
+/** Resalta (borde, fondo y texto, no solo color) TODOS los campos que faltan. */
 function marcarCamposFaltantes(campos) {
   for (const [campo, [selCampo, selAviso]] of Object.entries(CAMPOS_VISITA)) {
     const falta = campos.includes(campo);
@@ -1480,6 +1487,51 @@ function marcarCamposFaltantes(campos) {
     else $(selCampo).removeAttribute('aria-invalid');
     $(selAviso).classList.toggle('hidden', !falta);
   }
+}
+
+/**
+ * Caso 14: resumen arriba ("Faltan: ...") + campos resaltados + desplazamiento
+ * al primero. lista = [{ campo?, texto }]. Vacia -> oculta el resumen.
+ */
+function mostrarFaltantes(lista, { incompleta = true } = {}) {
+  const caja = $('#resumenFaltantes');
+  marcarCamposFaltantes(lista.map(x => x.campo).filter(Boolean));
+  if (!lista.length) { caja.classList.add('hidden'); caja.innerHTML = ''; return; }
+  caja.innerHTML = `<strong>⚠ No se finalizó la visita.</strong> Faltan: ${lista.map(x => esc(x.texto)).join('; ')}.` +
+    (incompleta ? ` La visita queda en estado <strong>INCOMPLETA</strong>.` : '') +
+    `<div class="tiny">Complete lo resaltado y vuelva a pulsar «Finalizar visita».</div>`;
+  caja.classList.remove('hidden');
+  const primero = lista.map(x => x.campo && CAMPOS_VISITA[x.campo]?.[0]).find(Boolean);
+  caja.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (primero) setTimeout(() => $(primero).focus({ preventScroll: true }), 350);
+}
+
+/** Lo que esta escrito en la pantalla y aun no se agrego (caso 14). */
+function pendientesEnPantalla() {
+  const examen = $('#exTipo').value.trim() || null;
+  const idMed = Number($('#rxIdMedicamento').value) || null;
+  const rx = {
+    medicamento: $('#rxMedicamento').value.trim(),
+    dosis: $('#rxDosis').value.trim() || null,
+    indicaciones: $('#rxIndicaciones').value.trim() || null,
+    idMedicamento: idMed,
+    cantidadPrescrita: Number($('#rxCantidad').value)
+  };
+  const escrita = !!(idMed || rx.medicamento || rx.dosis || rx.indicaciones || $('#rxCantidad').value);
+  const faltan = [];
+  if (escrita && !rx.medicamento) faltan.push('rxMedicamento');
+  if (escrita && (!Number.isInteger(rx.cantidadPrescrita) || rx.cantidadPrescrita < 1)) faltan.push('rxCantidad');
+  return { examen, rx: escrita ? rx : null, rxFaltan: faltan };
+}
+/** Conserva lo escrito en examen y prescripcion al recargar la visita. */
+function leerBorrador() {
+  return ['#exTipo', '#rxIdMedicamento', '#rxMedicamento', '#rxDosis', '#rxIndicaciones', '#rxCantidad']
+    .map(sel => [sel, $(sel).value]);
+}
+function restaurarBorrador(borrador) { borrador.forEach(([sel, v]) => { $(sel).value = v; }); }
+function limpiarBorrador() {
+  ['#exTipo', '#rxIdMedicamento', '#rxMedicamento', '#rxDosis', '#rxIndicaciones', '#rxCantidad'].forEach(sel => { $(sel).value = ''; });
+  $('#precioExamen').textContent = '';
 }
 
 async function cargarDetalleVisita() {
@@ -1511,8 +1563,9 @@ async function cargarDetalleVisita() {
       : []);
     $('#vDiagnostico').disabled = !puedeEditar;
     $('#vObservaciones').disabled = !puedeEditar;
-    $('#btnGuardarClinico').disabled = !puedeEditar;
-    $('#btnCompletarVisita').disabled = !puedeEditar;
+    $('#btnGuardarAvance').disabled = !puedeEditar;
+    $('#btnFinalizarVisita').disabled = !puedeEditar;
+    $('.barra-finalizar').classList.toggle('hidden', !puedeEditar);
     $('#btnAgregarExamen').disabled = !puedeEditar;
     $('#btnAgregarPrescripcion').disabled = !puedeEditar;
     ['#exTipo', '#rxIdMedicamento', '#rxMedicamento', '#rxDosis', '#rxIndicaciones', '#rxCantidad']
@@ -1559,60 +1612,115 @@ async function cargarDetalleVisita() {
   }
 }
 
-async function onGuardarClinico() {
-  const msg = $('#msgClinico'); limpiar(msg);
-  try {
-    await api(API.pacientes, `/api/visitas/${state.visitaSeleccionada}`, {
-      method: 'PATCH',
-      body: {
-        diagnostico: $('#vDiagnostico').value,
-        observaciones: $('#vObservaciones').value
-      }
-    });
-    ok(msg, 'Notas guardadas.');
-    cargarDetalleVisita();
-  } catch (err) { error(msg, err.message); }
+/**
+ * Guarda todo lo escrito en la visita: notas clinicas, el examen y la
+ * prescripcion que esten escritos sin agregar. Devuelve los problemas
+ * encontrados ([{ campo, texto }]); no cierra la visita.
+ */
+async function guardarTodoLoEscrito() {
+  const id = state.visitaSeleccionada;
+  const problemas = [];
+  const p = pendientesEnPantalla();
+  await api(API.pacientes, `/api/visitas/${id}`, {
+    method: 'PATCH',
+    body: { diagnostico: $('#vDiagnostico').value, observaciones: $('#vObservaciones').value }
+  });
+  if (p.examen) {
+    try {
+      await api(API.pacientes, `/api/visitas/${id}/examenes`, { method: 'POST', body: { tipo: p.examen } });
+      $('#exTipo').value = ''; $('#precioExamen').textContent = '';
+    } catch (err) { problemas.push({ campo: 'examen', texto: `el examen «${p.examen}» no se pudo ordenar (${err.message})` }); }
+  }
+  if (p.rx && !p.rxFaltan.length) {
+    try {
+      await api(API.pacientes, `/api/visitas/${id}/prescripciones`, { method: 'POST', body: p.rx });
+      ['#rxIdMedicamento', '#rxMedicamento', '#rxDosis', '#rxIndicaciones', '#rxCantidad'].forEach(sel => { $(sel).value = ''; });
+    } catch (err) { problemas.push({ campo: 'rxCantidad', texto: `la prescripción no se pudo guardar (${err.message})` }); }
+  }
+  if (p.rx && p.rxFaltan.length) {
+    problemas.push(...p.rxFaltan.map(campo => ({
+      campo, texto: `prescripción a medio llenar: falta ${CAMPOS_VISITA[campo][2].replace(' de la prescripción', '')}`
+    })));
+  }
+  return problemas;
 }
 
-async function onCompletarVisita() {
+/** «Guardar sin finalizar»: guarda lo escrito y deja la visita abierta. */
+async function onGuardarAvance() {
   const msg = $('#msgCompletar'); limpiar(msg);
-  const idVisita = state.visitaSeleccionada;
-  let resultado = null;
-  let huboFaltantes = false;
-  const cerrada = await confirmar(
-    $('#visitaTitulo').textContent,
-    'La visita y su solicitud quedarán completadas y ya no se podrán editar. ' +
-    'Se usan el diagnóstico y las observaciones guardados: si cambió algo, use antes "Guardar cambios".',
-    {
-      eyebrow: 'Cerrar visita',
-      textoConfirmar: 'Marcar como completa',
-      textoCancelar: 'Volver',
-      alEnviar: async () => {
-        try {
-          resultado = await api(API.pacientes, `/api/visitas/${idVisita}/completar`, { method: 'POST' });
-        } catch (err) {
-          if (err.body?.camposFaltantes) {
-            marcarCamposFaltantes(err.body.camposFaltantes);
-            huboFaltantes = true;
-          }
-          throw err;
-        }
-      }
-    });
-  if (!cerrada) {
-    // Volver despues de un rechazo: la visita quedo incompleta.
-    if (huboFaltantes) {
-      await cargarDetalleVisita();
-      warn(msg, 'La visita quedó incompleta: complete los campos resaltados, guarde y vuelva a cerrarla.');
+  const btn = $('#btnGuardarAvance'); btn.disabled = true;
+  try {
+    const problemas = await guardarTodoLoEscrito();
+    const borrador = leerBorrador();
+    await cargarDetalleVisita();
+    restaurarBorrador(borrador);
+    if (problemas.length) {
+      mostrarFaltantes(problemas, { incompleta: false });
+      warn(msg, 'Se guardó la nota clínica; revise lo resaltado.');
+    } else {
+      mostrarFaltantes([]);
+      ok(msg, 'Avance guardado. La visita sigue abierta.');
     }
-    return;
+  } catch (err) { error(msg, err.message); }
+  finally { btn.disabled = false; }
+}
+
+/**
+ * Caso 14 del SQA: UN solo boton que toma todo lo que esta en la pantalla.
+ * 1) revisa lo que falta (diagnostico, observaciones, prescripcion a medio
+ *    llenar); 2) guarda notas, examen y prescripcion escritos; 3) pide el
+ *    cierre. Si falta algo, la visita queda INCOMPLETA (tambien en el
+ *    servidor) y se resaltan TODOS los campos a la vez con un resumen arriba.
+ */
+async function onFinalizarVisita() {
+  const msg = $('#msgCompletar'); limpiar(msg);
+  mostrarFaltantes([]);
+  const faltan = [];
+  if (!$('#vDiagnostico').value.trim()) faltan.push({ campo: 'diagnostico', texto: 'el diagnóstico' });
+  if (!$('#vObservaciones').value.trim()) faltan.push({ campo: 'observaciones', texto: 'las observaciones' });
+
+  if (!faltan.length && !pendientesEnPantalla().rxFaltan.length) {
+    const p = pendientesEnPantalla();
+    const extra = [p.examen ? `el examen «${p.examen}»` : null, p.rx ? `la prescripción de ${p.rx.medicamento}` : null].filter(Boolean);
+    const seguir = await confirmar($('#visitaTitulo').textContent,
+      'La visita y su solicitud quedarán completadas y ya no se podrán editar. Se genera el cargo al familiar.' +
+      (extra.length ? ` Antes se agregan ${extra.join(' y ')}.` : ''),
+      { eyebrow: 'Finalizar visita', textoConfirmar: 'Finalizar visita', textoCancelar: 'Volver' });
+    if (!seguir) return;
   }
-  const cg = resultado?.cargo;
-  ok(msg, cg
-    ? `Visita completada. Cargo #${cg.id} por ${money(cg.monto)} a la cuenta del familiar: ` +
-      CARGO_RUBROS.map(r => `${r} ${money(sumaRubro(cg, r))}`).join(', ') + ' (con descuento de la fundación).'
-    : 'Visita completada.');
-  cargarVisitasTab();
+
+  const btn = $('#btnFinalizarVisita'); btn.disabled = true;
+  try {
+    const problemas = await guardarTodoLoEscrito();
+    const todos = [...faltan, ...problemas];
+    let resultado = null;
+    try {
+      resultado = await api(API.pacientes, `/api/visitas/${state.visitaSeleccionada}/completar`, {
+        method: 'POST', body: { pendientes: problemas.map(x => x.texto) }
+      });
+    } catch (err) {
+      if (err.status !== 400) throw err;
+      // El servidor confirma lo que falta y deja la visita INCOMPLETA.
+      for (const c of err.body?.camposFaltantes || []) {
+        if (!todos.some(x => x.campo === c)) todos.push({ campo: c, texto: CAMPOS_VISITA[c]?.[2] || c });
+      }
+    }
+    const borrador = leerBorrador();
+    await cargarVisitasTab();               // listado + detalle con el estado nuevo
+    if (!resultado) {
+      restaurarBorrador(borrador);
+      mostrarFaltantes(todos);
+      warn(msg, 'La visita quedó INCOMPLETA: complete lo resaltado y vuelva a finalizarla.');
+      return;
+    }
+    limpiarBorrador();
+    const cg = resultado.cargo;
+    ok(msg, cg
+      ? `Visita completada. Cargo #${cg.id} por ${money(cg.monto)} a la cuenta del familiar: ` +
+        CARGO_RUBROS.map(r => `${r} ${money(sumaRubro(cg, r))}`).join(', ') + ' (con descuento de la fundación).'
+      : 'Visita completada.');
+  } catch (err) { error(msg, err.message); }
+  finally { btn.disabled = false; }
 }
 
 const CARGO_RUBROS = ['consulta', 'laboratorio', 'farmacia'];

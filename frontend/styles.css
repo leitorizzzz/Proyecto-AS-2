@@ -819,6 +819,31 @@ dialog.dialogo #dlgCuerpo table { margin-top: 8px; }
 tbody tr.fila-resaltada td { background: var(--accent-tint); }
 tbody tr.fila-resaltada td:first-child { box-shadow: inset 4px 0 0 var(--accent); }
 
+/* Visita (caso 14): resumen de faltantes arriba y barra unica para finalizar. */
+.resumen-faltantes {
+  margin-top: 12px; padding: 12px 16px;
+  background: var(--warn-tint); color: var(--warn-ink);
+  border: 1px solid var(--warn); border-left-width: 4px; border-radius: var(--radius);
+  font-size: var(--fs-meta); line-height: 1.5;
+}
+.resumen-faltantes .chip { margin-left: 6px; }
+.resumen-faltantes:focus { outline: none; box-shadow: var(--focus-ring); }
+.barra-finalizar {
+  margin-top: 18px; padding: 16px 18px;
+  border: 1px solid var(--line); border-top: 3px solid var(--accent);
+  border-radius: var(--radius-lg); background: var(--surface-raised);
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 20px; align-items: center;
+}
+.barra-finalizar h4 { margin-bottom: 4px; }
+.barra-finalizar-botones { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.barra-finalizar-botones .btn { margin-top: 0; }
+#detalleVisita > #msgCompletar { margin-top: 12px; }
+.barra-finalizar.hidden { display: none; }
+@media (max-width: 640px) {
+  .barra-finalizar { grid-template-columns: 1fr; }
+  .barra-finalizar-botones .btn { flex: 1 1 100%; }
+}
+
 /* Tabla "dato: valor" dentro de un dialogo. */
 table.tabla-dato { margin: 12px 0 4px; }
 table.tabla-dato th {

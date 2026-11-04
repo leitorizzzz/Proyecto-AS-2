@@ -153,7 +153,12 @@ class VisitaMedicaService {
    * error trae camposFaltantes para que la UI los resalte.
    * Al completar: la solicitud enlazada pasa a 'completada'.
    */
-  async completar(id) {
+  /**
+   * pendientes (caso 14 del SQA): lo que la pantalla ve escrito a medio
+   * llenar (p. ej. una prescripcion sin cantidad). Si hay alguno, la visita
+   * no se cierra y queda INCOMPLETA, igual que si falta un campo obligatorio.
+   */
+  async completar(id, { pendientes = [] } = {}) {
     const visita = await this._obtener(id);
     if (!visita.estaAbierta()) {
       throw Object.assign(
@@ -163,12 +168,14 @@ class VisitaMedicaService {
     }
     const camposFaltantes = VisitaMedica.CAMPOS_OBLIGATORIOS_CIERRE
       .filter(c => !visita[c] || String(visita[c]).trim() === '');
-    if (camposFaltantes.length) {
+    const otros = (Array.isArray(pendientes) ? pendientes : [])
+      .filter(p => typeof p === 'string' && p.trim()).slice(0, 10).map(p => p.trim().slice(0, 120));
+    if (camposFaltantes.length || otros.length) {
       await this.repo.marcarIncompleta(id);
-      const texto = camposFaltantes.map(c => (c === 'diagnostico' ? 'falta diagnostico' : 'faltan observaciones'));
+      const texto = [...camposFaltantes.map(c => (c === 'diagnostico' ? 'falta el diagnóstico' : 'faltan las observaciones')), ...otros];
       throw Object.assign(
-        new Error(`No se puede completar la visita: ${texto.join(' y ')}. La visita queda incompleta.`),
-        { status: 400, camposFaltantes, estadoVisita: VisitaMedica.ESTADOS.INCOMPLETA }
+        new Error(`No se puede completar la visita: ${texto.join('; ')}. La visita queda incompleta.`),
+        { status: 400, camposFaltantes, pendientes: otros, estadoVisita: VisitaMedica.ESTADOS.INCOMPLETA }
       );
     }
 
