@@ -2557,7 +2557,8 @@ function etiquetaCampo(k) {
 /** Campos que cambiaron entre datosAnteriores y datosNuevos (o los nuevos al crear). */
 function cambiosAuditoria(r) {
   const a = r.datosAnteriores, n = r.datosNuevos;
-  if (!a && !n) return '';
+  // Altas: los datos van en el bloque plegable "Datos nuevos (JSON)".
+  if (!a || !n) return '';
   const val = v => (v === null || v === undefined ? '∅' : typeof v === 'object' ? JSON.stringify(v) : String(v));
   const claves = [...new Set([...Object.keys(a || {}), ...Object.keys(n || {})])]
     .filter(k => !Array.isArray((n || {})[k]) && !Array.isArray((a || {})[k]))
@@ -2566,7 +2567,25 @@ function cambiosAuditoria(r) {
   const filas = claves.slice(0, 12).map(k => a
     ? `<li><strong>${esc(etiquetaCampo(k))}</strong>: ${esc(val(a[k]))} → ${esc(val((n || {})[k]))}</li>`
     : `<li><strong>${esc(etiquetaCampo(k))}</strong>: ${esc(val(n[k]))}</li>`).join('');
-  return `<details><summary>${a ? 'Cambios' : 'Datos nuevos'} (${claves.length})</summary><ul class="cambios">${filas}</ul></details>`;
+  return `<div class="cambios-titulo">${a ? 'Cambios' : 'Datos registrados'} (${claves.length})</div><ul class="cambios">${filas}</ul>`;
+}
+
+/**
+ * Caso 24 del SQA: datos_anteriores / datos_nuevos en JSON, legibles y
+ * rotulados (se abren con un clic), ademas del resumen de cambios.
+ */
+function jsonAuditoria(r) {
+  const bloque = (titulo, datos) => datos
+    ? `<details class="json-auditoria"><summary>${titulo} (JSON)</summary><pre>${esc(JSON.stringify(datos, null, 2))}</pre></details>`
+    : `<div class="tiny">${titulo}: —</div>`;
+  return bloque('Datos anteriores', r.datosAnteriores) + bloque('Datos nuevos', r.datosNuevos);
+}
+
+/** IP de la red interna de Docker: en Docker Desktop no llega la IP real. */
+function textoIp(ip) {
+  if (!ip) return '<span class="tiny">sin IP</span>';
+  const interna = /^172.(1[6-9]|2d|3[01])./.test(ip);
+  return `<span class="num">${esc(ip)}</span>${interna ? '<div class="tiny">red interna de Docker</div>' : ''}`;
 }
 
 async function consultarAuditoria() {
@@ -2584,11 +2603,12 @@ async function consultarAuditoria() {
     $('#tbodyAuditoria').innerHTML = filas.map(r => `
       <tr>
         <td class="tiny">${fechaHora(r.fecha)}</td>
-        <td class="tiny">${esc(r.usuario)}<div>${esc(r.ip || 'sin IP')}</div></td>
+        <td class="tiny">${esc(r.usuario)}</td>
+        <td class="tiny">${textoIp(r.ip)}</td>
         <td class="tiny">${esc(etiqueta(r.modulo))}</td>
         <td><span class="chip accion-${esc(r.accion)}">${esc(ETIQUETA_ACCION[r.accion] || r.accion)}</span></td>
         <td>${esc(etiqueta(r.entidad))}${r.idEntidad != null ? ` <span class="num tiny">#${r.idEntidad}</span>` : ''}</td>
-        <td class="tiny">${esc(r.detalle || '')}${cambiosAuditoria(r)}</td>
+        <td class="tiny">${esc(r.detalle || '')}${cambiosAuditoria(r)}${jsonAuditoria(r)}</td>
       </tr>`).join('');
     $('#vacioAuditoria').classList.toggle('hidden', filas.length > 0);
   } catch (err) { error(msg, err.message); }

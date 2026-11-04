@@ -866,6 +866,16 @@ tbody tr.fila-resaltada td:first-child { box-shadow: inset 4px 0 0 var(--accent)
 .fila-alerta-roja td:first-child { box-shadow: inset 4px 0 0 var(--err); }
 .fila-alerta-naranja td:first-child { box-shadow: inset 4px 0 0 var(--naranja); }
 
+/* Caso 24: JSON de datos anteriores / nuevos en la auditoria. */
+.cambios-titulo { margin-top: 6px; font-weight: 700; color: var(--text-soft); }
+.json-auditoria { margin-top: 6px; }
+.json-auditoria summary { cursor: pointer; color: var(--accent); font-weight: 600; min-height: 28px; }
+.json-auditoria pre {
+  margin: 4px 0 0; padding: 8px 10px; max-height: 260px; overflow: auto;
+  background: var(--surface-raised); border: 1px solid var(--line-weak); border-radius: var(--radius);
+  font-family: var(--font-mono); font-size: 11px; line-height: 1.45; white-space: pre-wrap; word-break: break-word;
+}
+
 /* Caso 19: lo cobrado por servicio y lo pendiente de cobrar al despachar. */
 .desglose-cuenta { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 18px; }
 .costos-visita { margin-top: 10px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }

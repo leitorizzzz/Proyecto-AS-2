@@ -67,9 +67,9 @@ const dpi = n => String(TS + n).slice(-13).padStart(13, '3');
 const diaGt = n => new Date(Date.now() - 6 * 3600e3 + n * 864e5).toISOString().slice(0, 10);
 
 /** Paciente con familiar completo (alta por API). */
-async function nuevoPaciente(etiqueta, n) {
+async function nuevoPaciente(etiqueta, n, extra = {}) {
   return exigirApi('POST', 'pacientes/api/pacientes', 'admin', {
-    nombres: 'UI', apellidos: `${etiqueta} ${TS}`, fechaNacimiento: '1942-03-03', genero: 'F', dpi: dpi(n),
+    nombres: 'UI', apellidos: `${etiqueta} ${TS}`, fechaNacimiento: '1942-03-03', genero: 'F', dpi: dpi(n), ...extra,
     familiar: { nombres: 'Ana', apellidos: `Familiar ${etiqueta}`, dpi: dpi(500 + n), parentesco: 'hija',
                 telefono: '55550000', email: `ui.familiar${n}@example.com`, direccion: 'Mazatenango' }
   }, 201);
@@ -587,7 +587,7 @@ CASO[22] = async () => {
 
 CASO[24] = async () => {
   const f = [], ev = [];
-  const p = await nuevoPaciente('Auditoria24', 24);
+  const p = await nuevoPaciente('Auditoria24', 24, { telefono: '55550000' });
   const page = await pagina();
   await entrar(page, 'admin');
   await seccion(page, 'pacientes');
@@ -603,10 +603,11 @@ CASO[24] = async () => {
   await page.waitForTimeout(1500);
   const filaAud = page.locator('#tbodyAuditoria tr', { hasText: '55557777' }).first();
   if (await filaAud.count()) {
-    await filaAud.locator('summary').first().click().catch(() => {});
+    for (const sm of await filaAud.locator('summary').all()) await sm.click().catch(() => {});
     await page.waitForTimeout(300);
   }
-  ev.push(await captura(page, 24, '1-auditoria'));
+  await filaAud.evaluate(el => el.scrollIntoView({ block: 'center' })).catch(() => {});
+  ev.push(await captura(page, 24, '1-auditoria', { completa: false }));
   const t = (await filaAud.innerText().catch(() => '')).replace(/\s+/g, ' ');
   if (!t) f.push('la modificación del paciente no aparece en la pantalla de auditoría');
   for (const [que, re] of [['usuario', /admin@asilo\.gt/], ['IP', /\d+\.\d+\.\d+\.\d+/], ['módulo', /pacientes/i], ['acción', /modific/i],

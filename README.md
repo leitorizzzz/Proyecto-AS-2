@@ -159,6 +159,21 @@ git pull origin main
 Accesible por Tailscale (`100.96.172.77`) o red local
 (`192.168.1.100`).
 
+### IP en la auditoría (caso 24)
+
+La auditoría guarda la IP del navegador: el nginx del frontend la envía en
+`X-Forwarded-For` / `X-Real-IP` y los servicios solo confían en ese nginx.
+
+- **En el servidor Debian** (Docker Engine en Linux) nginx recibe la IP
+  real del navegador (Tailscale `100.x.x.x` o LAN `192.168.1.x`), y esa es
+  la que queda en `auditoria.ip`.
+- **En Docker Desktop (Windows / macOS)** es inevitable ver `172.18.0.1`:
+  Docker Desktop reenvía el puerto 8090 desde el anfitrión a través de su
+  red virtual, y nginx recibe todas las conexiones desde el gateway de esa
+  red. No es un error del sistema. La pantalla de Auditoría lo marca como
+  "red interna de Docker". Para verificar la IP real, entre al sistema en
+  el Debian desde otro equipo de la red o de Tailscale.
+
 ## Licencia
 
 Proyecto académico. Uso interno de la universidad.
