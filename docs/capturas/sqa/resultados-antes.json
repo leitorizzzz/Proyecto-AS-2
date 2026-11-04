@@ -1,0 +1,166 @@
+[
+  {
+    "caso": 1,
+    "fase": "antes",
+    "cumple": false,
+    "fallas": [
+      "el correo sigue escrito en el formulario de acceso (\"admin@asilo.gt\")",
+      "la contraseña sigue en el formulario de acceso",
+      "el nombre del usuario sigue en la página oculta (\"admin@asilo.gt\")",
+      "el token de la sesión cerrada sigue sirviendo (GET pacientes -> 200)",
+      "tras la inactividad quedan datos (storage: —, correo: \"enfermeria@asilo.gt\")"
+    ],
+    "capturas": [
+      "docs/capturas/sqa/caso01-antes-1-sesion-abierta.png",
+      "docs/capturas/sqa/caso01-antes-2-tras-salir.png",
+      "docs/capturas/sqa/caso01-antes-3-boton-atras.png",
+      "docs/capturas/sqa/caso01-antes-4-inactividad.png"
+    ]
+  },
+  {
+    "caso": 9,
+    "fase": "antes",
+    "cumple": false,
+    "fallas": [
+      "la lista de pacientes de \"Nueva solicitud\" está vacía si no se visitó antes la sección Pacientes",
+      "no se despliega una alerta (diálogo) de duplicidad; solo hay un texto bajo el formulario: \"Este paciente ya tiene una solicitud activa en la especialidad \"neurologia\" (solicitud #15, pendiente de cita). Espere a\"",
+      "errores en consola: Failed to load resource: the server responded with a status of 409 (Conflict)"
+    ],
+    "capturas": [
+      "docs/capturas/sqa/caso09-antes-1-duplicada.png"
+    ]
+  },
+  {
+    "caso": 14,
+    "fase": "antes",
+    "cumple": false,
+    "fallas": [
+      "no hay un botón único \"Finalizar visita\"; la pantalla tiene: Guardar cambios / Marcar visita como completa / Agregar examen / Agregar prescripción",
+      "el diagnóstico escrito no se guardó al finalizar",
+      "el examen escrito pero no agregado se ignoró",
+      "el resumen no dice que faltan las observaciones (\"La visita quedó incompleta: complete los campos resaltados, guarde y vuelva a cerrarla.\")",
+      "no avisa de la prescripción a medio llenar",
+      "la cantidad de la prescripción a medio llenar no queda resaltada",
+      "el listado de visitas dice \"UI Visita14 1793758318859 — Geriatría — En atención\"",
+      "errores en consola: Failed to load resource: the server responded with a status of 400 (Bad Request)"
+    ],
+    "capturas": [
+      "docs/capturas/sqa/caso14-antes-1-antes-de-finalizar.png",
+      "docs/capturas/sqa/caso14-antes-2-rechazo.png",
+      "docs/capturas/sqa/caso14-antes-3-tras-finalizar.png"
+    ]
+  },
+  {
+    "caso": 15,
+    "fase": "antes",
+    "cumple": false,
+    "fallas": [
+      "al ordenar no se ve el precio base y el costo con descuento (\"\")",
+      "en la visita el examen no muestra precio base",
+      "en la visita el examen no muestra descuento 20 %",
+      "en Laboratorio la orden no muestra precio base (\"2 UI Lab15 1793758318859 1793758318874 Electrocardiograma de 12 derivaciones 3 nov 2026, 08:13 p. m. Seleccionar · Ver c\")",
+      "en Laboratorio la orden no muestra costo con descuento (\"2 UI Lab15 1793758318859 1793758318874 Electrocardiograma de 12 derivaciones 3 nov 2026, 08:13 p. m. Seleccionar · Ver c\")",
+      "en Laboratorio la orden no muestra estado (\"2 UI Lab15 1793758318859 1793758318874 Electrocardiograma de 12 derivaciones 3 nov 2026, 08:13 p. m. Seleccionar · Ver c\")",
+      "el reporte de exámenes no tiene la columna \"Precio base\" (ID, Fecha, Tipo de examen, Paciente, Resultado)",
+      "el reporte de exámenes no tiene la columna \"Descuento\" (ID, Fecha, Tipo de examen, Paciente, Resultado)",
+      "el reporte de exámenes no tiene la columna \"Costo\" (ID, Fecha, Tipo de examen, Paciente, Resultado)",
+      "el reporte de exámenes no tiene la columna \"Estado\" (ID, Fecha, Tipo de examen, Paciente, Resultado)",
+      "el reporte de exámenes no trae 200 / 160"
+    ],
+    "capturas": [
+      "docs/capturas/sqa/caso15-antes-1-al-ordenar.png",
+      "docs/capturas/sqa/caso15-antes-2-en-la-visita.png",
+      "docs/capturas/sqa/caso15-antes-3-laboratorio.png"
+    ]
+  },
+  {
+    "caso": 18,
+    "fase": "antes",
+    "cumple": false,
+    "fallas": [
+      "en Farmacia la prescripción no se ve \"Parcial · 4 de 10\" (\"Elegir… | UI Amlodipino18 1793758318859 · 5 mg cada 24 h · faltan 6 de 10 (parcial)\")",
+      "el historial no nombra el medicamento (\"3 nov 2026, 08:13 p. m. Medicamento #7 4 Q 8.00\")",
+      "el historial no muestra precio base y descuento del despacho"
+    ],
+    "capturas": [
+      "docs/capturas/sqa/caso18-antes-1-farmacia-tras-despacho.png",
+      "docs/capturas/sqa/caso18-antes-2-visita.png"
+    ]
+  },
+  {
+    "caso": 19,
+    "fase": "antes",
+    "cumple": false,
+    "fallas": [
+      "(A) la cuenta no muestra el desglose consulta / laboratorio / farmacia",
+      "(B) la cuenta no muestra el desglose consulta / laboratorio / farmacia",
+      "(C) la cuenta no muestra el desglose consulta / laboratorio / farmacia",
+      "(C) la cuenta no aclara lo que queda pendiente de cobrar al despachar",
+      "(D) la cuenta no muestra el desglose consulta / laboratorio / farmacia",
+      "(D) la cuenta no aclara lo que queda pendiente de cobrar al despachar",
+      "la visita no muestra el total cobrado"
+    ],
+    "capturas": [
+      "docs/capturas/sqa/caso19-antes-1-visita-D-cerrada.png",
+      "docs/capturas/sqa/caso19-antes-2-cuenta-A.png",
+      "docs/capturas/sqa/caso19-antes-2-cuenta-B.png",
+      "docs/capturas/sqa/caso19-antes-2-cuenta-C.png",
+      "docs/capturas/sqa/caso19-antes-2-cuenta-D.png",
+      "docs/capturas/sqa/caso19-antes-3-visita-A-completada.png"
+    ]
+  },
+  {
+    "caso": 21,
+    "fase": "antes",
+    "cumple": false,
+    "fallas": [
+      "la alerta por cuota no muestra familiar (\"roja UI Cuota21 1793758318859 saldo Q850.00 cerca del umbral (Q500.00 o mas); 1 cuota(s) vencida(s): 8/2026 (45 d) 1 45 d Q 850.00\")",
+      "la cuota quedó en estado \"pendiente\", no \"vencida\""
+    ],
+    "capturas": [
+      "docs/capturas/sqa/caso21-antes-1-panel-admin-al-entrar.png",
+      "docs/capturas/sqa/caso21-antes-2-emitir-cuota-vencida.png",
+      "docs/capturas/sqa/caso21-antes-3-panel-con-alerta.png"
+    ]
+  },
+  {
+    "caso": 22,
+    "fase": "antes",
+    "cumple": false,
+    "fallas": [
+      "PDF costos-por-paciente: los encabezados de columna no están en una misma línea (escalonados 83 pt)",
+      "PDF costos-por-paciente: 6 montos partidos (la \"Q\" quedó en otra línea)",
+      "PDF costos-por-paciente: los montos no están alineados por columna (11 bordes derechos para 5 columnas)",
+      "PDF analisis-medico: los encabezados de columna no están en una misma línea (escalonados 24 pt)",
+      "PDF analisis-medico: las cantidades no están alineadas por columna (17 bordes para 3 columnas)",
+      "PDF cobros-por-rango: los encabezados de columna no están en una misma línea (escalonados 12 pt)",
+      "PDF cobros-por-rango: 1 montos partidos (la \"Q\" quedó en otra línea)",
+      "PDF entradas: 2 montos partidos (la \"Q\" quedó en otra línea)",
+      "PDF examenes: los encabezados de columna no están en una misma línea (escalonados 24 pt)",
+      "PDF medicamentos-aplicados: los encabezados de columna no están en una misma línea (escalonados 77 pt)",
+      "PDF medicamentos-aplicados: 2 montos partidos (la \"Q\" quedó en otra línea)",
+      "PDF medicamentos-aplicados: las cantidades no están alineadas por columna (4 bordes para 1 columnas)"
+    ],
+    "capturas": [
+      "docs/capturas/sqa/caso22-antes-pdf-costos-por-paciente.png",
+      "docs/capturas/sqa/caso22-antes-pdf-analisis-medico.png",
+      "docs/capturas/sqa/caso22-antes-pdf-cobros-por-rango.png",
+      "docs/capturas/sqa/caso22-antes-pdf-pagos-fundacion.png",
+      "docs/capturas/sqa/caso22-antes-pdf-entradas.png",
+      "docs/capturas/sqa/caso22-antes-pdf-examenes.png",
+      "docs/capturas/sqa/caso22-antes-pdf-medicamentos-aplicados.png"
+    ]
+  },
+  {
+    "caso": 24,
+    "fase": "antes",
+    "cumple": false,
+    "fallas": [
+      "la fila de auditoría no muestra dato anterior",
+      "los JSON anterior / nuevo no se ven etiquetados como tales"
+    ],
+    "capturas": [
+      "docs/capturas/sqa/caso24-antes-1-auditoria.png"
+    ]
+  }
+]
