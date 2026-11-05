@@ -1,9 +1,9 @@
 # Manual de usuario — Sistema Asilo "Cabeza de Algodón"
 
-> Borrador para revisión de SQA. Los marcadores `[CAPTURA: ...]` indican
-> dónde deben insertarse pantallazos reales antes de la entrega final.
-> Los nombres de pantallas, tarjetas y botones aparecen en **negrita** y
-> están escritos tal como se ven en el sistema.
+> Versión **v1.0.0** (entrega final, 4 de noviembre de 2026). Las capturas
+> son reales: se tomaron del sistema con los datos de demostración. Los
+> nombres de pantallas, tarjetas y botones aparecen en **negrita** y están
+> escritos tal como se ven en el sistema.
 
 ---
 
@@ -23,12 +23,43 @@ requiere instalación en la computadora del usuario.
 
 ## 2. Antes de empezar
 
-### 2.1 Dirección del sistema
+### 2.1 Cómo acceder al sistema
 
-En la red del asilo: `http://192.168.1.100:8090`
-Fuera del asilo (vía Tailscale): `http://100.96.172.77:8090`
+**Servidor del asilo.** Abrir en el navegador (Chrome, Edge o Firefox):
 
-[CAPTURA: ventana del navegador con la URL del sistema]
+- En la red del asilo: `http://192.168.1.100:8090`
+- Fuera del asilo (vía Tailscale): `http://100.96.172.77:8090`
+
+**Instalación local (para revisar o probar en otra computadora).** Se
+necesita Docker Desktop encendido, Node.js 20 o superior y git:
+
+```powershell
+git clone https://github.com/leitorizzzz/Proyecto-AS-2.git
+cd Proyecto-AS-2
+.\scripts\bootstrap.ps1          # en Linux/macOS: ./scripts/bootstrap.sh
+```
+
+La primera vez tarda de 3 a 5 minutos (descarga SQL Server y arma los
+servicios). Al terminar, abrir `http://localhost:8090`. El script crea la
+base de datos desde cero con datos de demostración; para volver a una
+base limpia: `docker compose down -v` y de nuevo `bootstrap`.
+
+**Credenciales de demostración** (una por perfil):
+
+| Perfil | Correo | Contraseña |
+|---|---|---|
+| Administración | `admin@asilo.gt` | `Admin12345` |
+| Médico general | `medico.general@asilo.gt` | `Demo1234` |
+| Médico especialista | `especialista@asilo.gt` | `Demo1234` |
+| Coordinación de fundación | `coordinador@asilo.gt` | `Demo1234` |
+| Enfermería | `enfermeria@asilo.gt` | `Demo1234` |
+| Farmacia | `farmacia@asilo.gt` | `Demo1234` |
+| Laboratorio | `laboratorio@asilo.gt` | `Demo1234` |
+
+Son cuentas de prueba: en el servidor real administración debe crear las
+cuentas del personal (sección **Usuarios**) y no usar estas contraseñas.
+
+![Pantalla que abre la dirección del sistema: inicio de sesión](capturas/manual/01-login.png)
 
 ### 2.2 Perfiles y qué ve cada uno
 
@@ -54,7 +85,7 @@ Los perfiles antiguos sin sufijo (`medico`, `especialista`,
 cambio de nombres: ven las mismas secciones que su equivalente actual,
 pero solo consultan.
 
-[CAPTURA: menú lateral de un usuario farmacia, con solo Panel, Pacientes, Farmacia y Reportes]
+![Menú lateral del perfil farmacia: Panel, Pacientes, Farmacia y Reportes](capturas/manual/02-menu-farmacia.png)
 
 ### 2.3 Cómo leer la pantalla
 
@@ -87,9 +118,9 @@ pero solo consultan.
   dentro de la misma ventana como **Error —** y se puede corregir sin
   volver a empezar.
 
-[CAPTURA: ventana "Asignar cita" con fecha, hora y médico especialista]
+![Ventana Asignar cita con fecha, hora y médico especialista](capturas/manual/03-asignar-cita.png)
 
-[CAPTURA: detalle de las etiquetas de estado en la tabla "Solicitudes recientes"]
+![Etiquetas de estado en la tabla Solicitudes recientes](capturas/manual/04-etiquetas-estado.png)
 
 ---
 
@@ -101,7 +132,7 @@ pero solo consultan.
 2. Escribir **Correo** y **Contraseña**.
 3. Presionar **Entrar**.
 
-[CAPTURA: pantalla de inicio de sesión con los campos Correo y Contraseña y el botón Entrar]
+![Pantalla de inicio de sesión](capturas/manual/01-login.png)
 
 Si los datos no son correctos aparece un mensaje **Error —** bajo el
 botón. Tras **5 intentos fallidos** con el mismo correo en 15 minutos, el
@@ -128,7 +159,9 @@ recuperación seguidos). Si la cuenta fue desactivada por administración, el me
 Una cuenta desactivada no puede recuperar su contraseña: debe pedir a
 administración que la reactive.
 
-[CAPTURA: formularios "Recuperar contraseña" y "Nueva contraseña"]
+![Formulario Recuperar contraseña](capturas/manual/05-recuperar.png)
+
+![Formulario Nueva contraseña (al abrir el enlace del correo)](capturas/manual/06-nueva-contrasena.png)
 
 **Importante.** La sesión dura 8 horas. Pasado ese tiempo el sistema
 pide volver a iniciar sesión. Para salir antes, usar **Cerrar sesión**
@@ -150,7 +183,7 @@ continuar. Si se cierra, la pantalla de inicio muestra *Sesión cerrada
 por inactividad*. Cuenta la actividad en cualquier pestaña del sistema
 abierta en el mismo navegador.
 
-[CAPTURA: ventana "Su sesión está por cerrarse" con la cuenta regresiva]
+![Ventana Su sesión está por cerrarse con la cuenta regresiva](capturas/manual/07-inactividad.png)
 
 **Primer acceso al sistema recién desplegado.** Correr una sola vez
 desde el servidor:
@@ -213,7 +246,7 @@ leído** los quita del contador.
 Debajo, la tarjeta **Solicitudes recientes** lista las últimas ocho
 con paciente, especialidad, estado y fecha de creación.
 
-[CAPTURA: Panel con los cuatro indicadores, "Alertas de cobro" y "Mis avisos"]
+![Panel de administración: indicadores, alertas de cobro por cuota, Mis avisos y solicitudes recientes](capturas/manual/08-panel.png)
 
 ### 4.2 Pacientes
 
@@ -274,11 +307,11 @@ Para verlo de nuevo, marcar **Ver también desactivados** (solo
 administración) sobre la tabla: aparece con la etiqueta *desactivado*,
 la fila atenuada y la acción **Reactivar**.
 
-[CAPTURA: pantalla Pacientes con la tabla "Residentes" y el formulario "Registrar paciente"]
+![Pantalla Pacientes: tabla Residentes y formulario Registrar paciente](capturas/manual/09-pacientes.png)
 
-[CAPTURA: ventana "Editar expediente" de un paciente]
+![Ventana Editar expediente](capturas/manual/10-editar-expediente.png)
 
-[CAPTURA: tabla "Residentes" con "Ver también desactivados" marcado y un paciente desactivado]
+![Residentes con Ver también desactivados marcado y un paciente egresado](capturas/manual/11-desactivados.png)
 
 ### 4.3 Solicitudes médicas
 
@@ -328,9 +361,9 @@ su perfil puede usar):
   puede deshacer; el botón rojo **Cancelar solicitud** confirma y
   **Volver** sale sin cambios.
 
-[CAPTURA: pantalla Solicitudes médicas con la "Bandeja" en distintos estados y la tarjeta "Nueva solicitud"]
+![Pantalla Solicitudes médicas: bandeja y Nueva solicitud](capturas/manual/12-solicitudes.png)
 
-[CAPTURA: ventana "Cancelar solicitud" con el botón rojo]
+![Ventana Cancelar solicitud](capturas/manual/13-cancelar-solicitud.png)
 
 **RN-02.** Si se intenta crear una segunda solicitud activa para el
 mismo paciente y la misma especialidad, el sistema no la crea y abre la
@@ -339,7 +372,7 @@ impide: número, especialidad, estado, fecha, médico que refirió, cita y
 motivo. **Ver solicitud activa** cierra la ventana y la resalta en la
 bandeja (cada solicitud muestra su número).
 
-[CAPTURA: ventana "Ya existe una solicitud activa" con el botón "Ver solicitud activa"]
+![Ventana Ya existe una solicitud activa (RN-02)](capturas/manual/14-rn02.png)
 
 ### 4.4 Visitas médicas
 
@@ -394,11 +427,11 @@ bandeja (cada solicitud muestra su número).
    farmacia aún no entregó: se cobra solo, al despacharlo). Una visita
    no se puede cobrar dos veces.
 
-[CAPTURA: detalle de una visita en atención con Notas clínicas, Exámenes solicitados y Prescripciones]
+![Visita en atención: notas clínicas, exámenes, prescripciones y barra Finalizar visita](capturas/manual/15-visita.png)
 
-[CAPTURA: visita incompleta con los campos faltantes resaltados]
+![Visita incompleta: resumen de lo que falta y campo resaltado](capturas/manual/16-visita-incompleta.png)
 
-[CAPTURA: la misma visita ya completada, con los campos bloqueados y el cargo generado]
+![Visita completada: campos bloqueados y total cobrado al familiar](capturas/manual/17-visita-completada.png)
 
 ### 4.5 Farmacia
 
@@ -440,7 +473,7 @@ Abajo, **Despachos del paciente** lista cada despacho con medicamento,
 avance de la prescripción, cantidad, **precio base**, **descuento 20 %**
 y **costo con descuento**, y el total.
 
-[CAPTURA: pantalla Farmacia con "Inventario", "Dispensar contra prescripción" y el historial]
+![Pantalla Farmacia: inventario, dispensar contra prescripción, prescripciones pendientes y despachos](capturas/manual/18-farmacia.png)
 
 ### 4.6 Laboratorio
 
@@ -471,9 +504,9 @@ A la derecha, **Registrar resultado**:
 Cuando no queda nada por procesar la tabla muestra *No hay órdenes
 pendientes*.
 
-[CAPTURA: pantalla Laboratorio con una orden pendiente y el formulario "Registrar resultado"]
+![Pantalla Laboratorio: orden pendiente con precio base, descuento y costo, y Registrar resultado](capturas/manual/19-laboratorio.png)
 
-[CAPTURA: ventana "Costo del examen" con precio base, descuento y total]
+![Ventana Costo del examen](capturas/manual/20-costo-examen.png)
 
 **Precios de exámenes.** Abajo, la tabla **Precios de exámenes** muestra
 cada examen con su **Precio base** y el precio **Con descuento** que paga
@@ -488,7 +521,9 @@ El nombre del examen debe coincidir exactamente con el que el
 especialista pide en la visita; por eso la visita sugiere los nombres
 del catálogo.
 
-[CAPTURA: tabla "Precios de exámenes" y formulario "Nuevo precio"]
+![Tabla Precios de exámenes](capturas/manual/21-precios.png)
+
+![Formulario Nuevo precio](capturas/manual/21b-nuevo-precio.png)
 
 ### 4.7 Financiero
 
@@ -537,11 +572,17 @@ Los pagos a la fundación aparecen también en el reporte *Pagos a la
 fundación*. Los gastos operativos solo se consultan en esta tabla:
 ninguno de los siete reportes los incluye.
 
-[CAPTURA: "Estado de cuenta" de un paciente con saldo pendiente y las tablas Cargos y Cuotas]
+![Estado de cuenta: titular, saldo con alerta, total por servicio, pendiente de cobrar, cargos y cuotas](capturas/manual/22-estado-cuenta.png)
 
-[CAPTURA: formularios "Registrar cargo", "Emitir / pagar cuota" y "Nueva donación"]
+![Formulario Registrar cargo](capturas/manual/23a-registrar-cargo.png)
 
-[CAPTURA: tarjetas "Gastos operativos" y "Pagos a la fundación" con sus formularios]
+![Formulario Emitir / pagar cuota](capturas/manual/23b-cuota.png)
+
+![Formulario Nueva donación](capturas/manual/23c-donacion.png)
+
+![Gastos operativos](capturas/manual/24a-gastos.png)
+
+![Pagos a la fundación](capturas/manual/24b-pagos-fundacion.png)
 
 **Donantes.** La tarjeta **Donantes** lista a los donantes con teléfono,
 correo, fecha de registro y **Estado**. Administración puede
@@ -550,7 +591,7 @@ donación** y el sistema rechaza registrarle donaciones; las anteriores
 se conservan. Con **Ver también desactivados** se ve y se puede
 **Reactivar**.
 
-[CAPTURA: tarjeta "Donantes" con un donante desactivado]
+![Donantes con un donante desactivado](capturas/manual/25-donantes.png)
 
 ### 4.8 Reportes
 
@@ -580,9 +621,9 @@ ajustado dentro de su celda, encabezado repetido en cada página, fila
 de totales, *Página N de M* al pie y hoja horizontal cuando el reporte
 tiene más de cinco columnas.
 
-[CAPTURA: pantalla Reportes con "Entradas de dinero" en pantalla y su fila de total]
+![Pantalla Reportes con Costos por paciente en pantalla y su fila de total](capturas/manual/26-reportes.png)
 
-[CAPTURA: PDF descargado de un reporte]
+![PDF del reporte Costos por paciente](capturas/sqa/caso22-despues-pdf-costos-por-paciente.png)
 
 ---
 
@@ -604,7 +645,7 @@ cuenta puede seguir trabajando hasta que la sesión venza (8 horas) o
 la cierre; a partir de ahí ya no puede volver a entrar. (Cerrar sesión
 sí anula el acceso al instante; desactivar la cuenta todavía no.)
 
-[CAPTURA: pantalla Usuarios con la lista de cuentas y el formulario "Nueva cuenta"]
+![Pantalla Usuarios: cuentas y Nueva cuenta](capturas/manual/28-usuarios.png)
 
 ### 4.10 Auditoría
 
@@ -634,7 +675,7 @@ equipo de quien hizo el cambio. Se muestran como máximo 200 registros, del
 más reciente al más antiguo. Laboratorio (resultados y precios) y
 notificaciones no se registran en la auditoría.
 
-[CAPTURA: pantalla Auditoría con registros filtrados por entidad]
+![Pantalla Auditoría filtrada por Paciente](capturas/manual/29-auditoria.png)
 
 ---
 
@@ -668,12 +709,25 @@ Si el sistema rechaza una operación, muestra el motivo en un mensaje
 
 ---
 
-## 6. Diagrama de componentes del sistema
+## 6. Diagramas del sistema
 
-Ver [COMPONENTES.mmd](COMPONENTES.mmd) para el diagrama renderizable
-en Mermaid.
+### 6.1 Componentes
 
-[CAPTURA: diagrama de componentes renderizado]
+El navegador habla solo con nginx (puerto 8090), que sirve las pantallas
+y reenvía cada petición al microservicio que corresponde. Los siete
+servicios comparten la base de datos SQL Server. Fuente:
+[COMPONENTES.mmd](COMPONENTES.mmd).
+
+![Diagrama de componentes del sistema](COMPONENTES.png)
+
+### 6.2 Modelo entidad-relación
+
+Tablas de la base `AsiloCabezaAlgodon` y sus relaciones (abrir la imagen
+para ampliarla). Fuente: [ERD.mmd](ERD.mmd). Las vistas con los nombres
+del Análisis (`internos`, `log_auditoria`…) se describen en
+[EQUIVALENCIAS.md](EQUIVALENCIAS.md).
+
+![Modelo entidad-relación de la base AsiloCabezaAlgodon](ERD.png)
 
 ---
 
