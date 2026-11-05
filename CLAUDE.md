@@ -488,7 +488,8 @@ creado con `down -v` + `bootstrap.ps1`): **415/415** en 51 archivos (incluye
 `test:sqa` 23/23, `test:ui` 9/9 cumplen, `test:hostil` 370 sin problemas,
 `test:integridad` 20/20, `test:caso11` (con el override) fallida →
 fallida_definitiva, `test:carga` 50 usuarios máx. 830 ms; después la base se
-recreó con solo datos de demo.
+recreó con solo datos de demo. Repetida desde cero tras la depuración del
+mismo día: mismos resultados (carga máx. 1066 ms, p95 949 ms).
 **Interfaz (3 nov)**: `npm run test:ui [N]` — Playwright headless (devDeps
 `playwright`, `pdfjs-dist`) hace como usuario los casos 1, 9, 14, 15, 18,
 19, 21, 22 y 24; deja capturas en `docs/capturas/sqa/` y
@@ -527,17 +528,45 @@ con prescripción, examen y su cargo, donaciones y gastos. Documentado
 en [`scripts/README.md`](scripts/README.md).
 
 ### Documentación adicional
-- [`docs/ERD.mmd`](docs/ERD.mmd) — ERD completo de `AsiloCabezaAlgodon` (Mermaid).
-- [`docs/COMPONENTES.mmd`](docs/COMPONENTES.mmd) — diagrama de componentes.
-- [`docs/MANUAL_USUARIO.md`](docs/MANUAL_USUARIO.md) — borrador con marcadores `[CAPTURA: ...]`.
+- [`docs/ERD.mmd`](docs/ERD.mmd) / `ERD.png` — ERD completo de `AsiloCabezaAlgodon`.
+- [`docs/COMPONENTES.mmd`](docs/COMPONENTES.mmd) / `COMPONENTES.png` — diagrama de
+  componentes (navegador → nginx `/svc` → servicios). Los PNG se
+  renderizaron con mermaid 10.9.1 en Chromium; mermaid 10 falla con una
+  línea `%%` sola, así que al renderizar se quitan los comentarios. Si se
+  cambia un `.mmd`, volver a renderizar su PNG.
+- [`docs/MANUAL_USUARIO.md`](docs/MANUAL_USUARIO.md) — con 34 capturas reales
+  (`docs/capturas/manual/`, tomadas con Playwright sobre la base de demo).
+  Si cambia una pantalla, rehacer su captura.
+- [`docs/MANUAL_TECNICO.md`](docs/MANUAL_TECNICO.md) — arquitectura, variables,
+  base, seguridad, pruebas, despliegue en Debian.
+- [`docs/FALLAS_CONOCIDAS.md`](docs/FALLAS_CONOCIDAS.md) — qué hace y qué no,
+  desviaciones resumidas y mensajes de error con qué hacer.
 - [`docs/PLAN_PRUEBAS.md`](docs/PLAN_PRUEBAS.md) — plan de pruebas con tabla ID → test.
+- [`CHANGELOG.md`](CHANGELOG.md) — cambios por versión.
+
+### Versiones (desde el 4 nov 2026)
+Tags SemVer anotados locales; **v1.0.0** = entrega final. El SQA prueba
+siempre una versión con tag. Al entregar otra ronda: subir PARCHE (solo
+correcciones) o MENOR, anotarla en `CHANGELOG.md` y crear el tag. Regla
+del README, "Versiones y entregas al SQA". El push (de ramas y tags) lo
+hace Leo.
+
+### Depuración del 4 nov 2026
+Inventario completo (ESLint `no-unused-vars` temporal, dependencias,
+referencias en Dockerfiles/compose/nginx/docs): solo se quitaron un
+`require` sin uso (FarmaciaService) y `puede()` de `app.js`. Se dejaron a
+propósito: `farmacia-service/public/index.html` (pantalla antigua que
+`express.static` sigue sirviendo en el 3001), `farmacia-service/CONTEXT.md`
+(contexto histórico), `infra/01-crear-base-datos.sql` (equivalente manual
+de `db-init`), los `precioCatalogo` desestructurados en laboratorio y
+reportes (quitan el campo de la respuesta) y las capturas de
+`docs/capturas/sqa/` (evidencia). Sin secretos reales en el repo; los de
+`.env.example` son los valores de desarrollo documentados.
 
 ## Pendiente de implementar
 
-1. Insertar las capturas reales en `docs/MANUAL_USUARIO.md` (30
-   marcadores `[CAPTURA: ...]`).
-2. Renderizar los `.mmd` a PNG con mermaid-cli para la entrega impresa
-   (hoy sólo quedan como fuente .mmd).
+1. ~~Capturas reales en el manual~~ y 2. ~~diagramas en PNG~~: hechos el
+   4 nov 2026 (v1.0.0).
 3. Un JWT emitido antes de desactivar una cuenta sigue valiendo hasta su
    `exp` (8 h): los servicios no consultan `usuarios.activo` en cada
    request. Ya existe la lista de revocación (`tokens_revocados`, usada al
@@ -617,9 +646,8 @@ conocidos y aceptados para la entrega académica.
     scripts en la página; el 28 oct la vista móvil se revisó con capturas
     a 390 y 768 px. No hay pruebas visuales automáticas ni en un teléfono
     físico.
-12. **Entrega impresa incompleta**: el manual tiene 30 marcadores
-    `[CAPTURA: ...]` sin imagen y los diagramas `.mmd` no están
-    renderizados a PNG.
+12. ~~Entrega impresa incompleta~~: resuelto el 4 nov 2026 (manual con
+    capturas reales, ERD y componentes en PNG).
 13. **Dependencias sin lockfile** en laboratorio, financiero, reportes y
     notificaciones (el build resuelve versiones nuevas; aviso
     `EBADENGINE` con Node 20).

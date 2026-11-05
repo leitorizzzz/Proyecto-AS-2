@@ -25,7 +25,9 @@ npm run test:todo
 ```
 Ultima ejecucion (4 nov 2026, tras corregir los casos que el SQA reporto como no
 cumplidos, sobre un stack recien creado con `docker compose down -v` +
-`scripts/bootstrap.ps1`): **415 casos en 51 archivos, 415 OK, 0 fallas**.
+`scripts/bootstrap.ps1`): **415 casos en 51 archivos, 415 OK, 0 fallas**. Repetida desde cero tras la depuracion
+(v1.0.0, mismo dia): mismos resultados en todas las suites; carga max 1066 ms,
+p95 949 ms.
 
 **(2) Integracion end-to-end**: requieren el stack docker-compose
 arriba. Recorren el flujo completo de un paciente, con usuarios reales
