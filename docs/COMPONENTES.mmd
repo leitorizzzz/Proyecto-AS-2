@@ -31,17 +31,20 @@ graph LR
         BV[Brevo API]
     end
 
-    BR ==>|HTTP + JWT| NG
-    BR ==>|HTTP + JWT| AU
-    BR ==>|HTTP + JWT| PA
-    BR ==>|HTTP + JWT| FA
-    BR ==>|HTTP + JWT| LA
-    BR ==>|HTTP + JWT| FI
-    BR ==>|HTTP + JWT| RE
-    BR ==>|HTTP + JWT| NO
+    %% El navegador solo habla con nginx: paginas estaticas y /svc/<servicio>/...
+    %% (proxy con X-Real-IP / X-Forwarded-For). Los puertos 3000-3006 siguen
+    %% publicados en el host para el e2e y la carga, no los usa el navegador.
+    BR ==>|HTTP: paginas y /svc/servicio + JWT| NG
+    NG ==>|proxy /svc| AU
+    NG ==>|proxy /svc| PA
+    NG ==>|proxy /svc| FA
+    NG ==>|proxy /svc| LA
+    NG ==>|proxy /svc| FI
+    NG ==>|proxy /svc| RE
+    NG ==>|proxy /svc| NO
 
     %% Acceso de cada servicio a su subconjunto de la BD compartida.
-    AU -->|mssql: usuarios| DB
+    AU -->|mssql: usuarios, tokens_recuperacion,<br/>tokens_revocados| DB
     PA -->|mssql: pacientes, solicitudes_referencia,<br/>visitas_medicas, visita_examenes,<br/>visita_prescripciones| DB
     FA -->|mssql: medicamentos, dispensaciones| DB
     LA -->|mssql: resultados_examenes,<br/>examenes_precios| DB
@@ -51,11 +54,14 @@ graph LR
 
     %% COMUNICACION ENTRE SERVICIOS - canal HTTP
     PA ==>|HTTP POST /api/notificaciones/solicitud<br/>fire-and-forget con JWT del usuario| NO
+    AU ==>|HTTP POST /api/notificaciones/recuperacion<br/>JWT de servicio rol sistema| NO
 
     %% COMUNICACION ENTRE SERVICIOS - canal "lectura/escritura directa de la BD compartida"
     %% (dashed = cross-service via BD, no HTTP)
     FA -.->|lee + marca visita_prescripciones<br/>lectura BD compartida| DB
     LA -.->|lee + marca visita_examenes<br/>lectura BD compartida| DB
+    PA -.->|escribe cargos_servicio y cargos_detalle<br/>al cerrar la visita| DB
+    FI -.->|lee familiares, pacientes y prescripciones<br/>por cobrar| DB
     RE -.->|lee pacientes, solicitudes, visitas, dispensaciones,<br/>donaciones, cuotas, ...<br/>lectura BD compartida| DB
 
     %% Externo

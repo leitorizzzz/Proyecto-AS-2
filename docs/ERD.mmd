@@ -42,6 +42,12 @@ erDiagram
         DATETIME2 fechaCreacion
     }
 
+    tokens_revocados {
+        NVARCHAR jti PK "jti del JWT cerrado con logout"
+        DATETIME2 vence "exp del JWT; las vencidas se borran"
+        DATETIME2 fecha
+    }
+
     familiares {
         INT id PK
         INT idPaciente FK
@@ -218,7 +224,7 @@ erDiagram
         TINYINT mes
         SMALLINT anio
         DECIMAL monto
-        NVARCHAR estado
+        NVARCHAR estado "pendiente, vencida o pagada"
         DATETIME2 fechaPago
         DATE fechaVencimiento "alertas naranja/roja"
     }
