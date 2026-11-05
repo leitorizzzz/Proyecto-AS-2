@@ -89,7 +89,10 @@ class SolicitudService {
     const paciente = await asegurarPacienteActivo(this.pacienteRepo, idPaciente, 'crear solicitudes');
     await this._asegurarEnfermero(idEnfermero);
 
-    // RN-02
+    // RN-02: "activa" = pendiente_asignacion, cita_asignada o en_atencion.
+    // Una completada o cancelada no bloquea; la especialidad se compara tal
+    // como llega. El 409 lleva la solicitud que bloquea (solicitudActiva)
+    // para que la pantalla muestre su numero, estado, fecha y medico.
     const duplicada = await this.repo.existeSolicitudActiva(Number(idPaciente), especialidad);
     if (duplicada) {
       const ref = duplicada.id ? ` (solicitud #${duplicada.id}, ${SolicitudReferencia.etiquetaEstado(duplicada.estado)})` : '';
