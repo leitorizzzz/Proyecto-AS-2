@@ -156,6 +156,20 @@ recuperación seguidos). Si la cuenta fue desactivada por administración, el me
    pantalla de inicio con el aviso *Contraseña actualizada*.
 5. Si el enlace ya se usó o venció, el sistema lo indica: pedir uno nuevo.
 
+**En el prototipo el correo es simulado.** Mientras el envío por Brevo no
+esté configurado, el correo no llega a ningún buzón: el enlace queda
+registrado en el servidor. Para la demostración, quien administra el
+equipo donde corre el sistema lo obtiene con:
+
+```
+npm run enlace-recuperacion -- correo@asilo.gt
+```
+
+El comando imprime el enlace vigente de ese correo (no usado y no
+vencido), o dice que no hay ninguno; se abre en el navegador y se sigue
+desde el paso 4. Con Brevo configurado, la persona recibe el enlace en su
+correo y este comando no hace falta.
+
 Una cuenta desactivada no puede recuperar su contraseña: debe pedir a
 administración que la reactive.
 

@@ -218,6 +218,18 @@ docker cp asilo-sqlserver:/var/opt/mssql/data/asilo.bak ./asilo-$(date +%F).bak
    min, un uso). auth firma un JWT de servicio (rol `sistema`, 1 min) para
    pedir el correo a notificaciones. `POST /api/auth/restablecer` cambia
    la contraseña y consume el token en la misma transacción.
+   **Envío simulado en el prototipo:** con `MODO_SIMULACION=true` el
+   correo no sale; el enlace queda registrado en el servidor (cuerpo del
+   correo en `notificaciones`, que la API nunca devuelve). Para la demo,
+   `npm run enlace-recuperacion -- <correo>` ([scripts/enlace-recuperacion.js](../scripts/enlace-recuperacion.js))
+   lo lee con `docker exec` en el stack local: toma los enlaces de los
+   correos de recuperación de ese destinatario, calcula el SHA-256 de cada
+   token y solo imprime el que en `tokens_recuperacion` no está usado, no
+   venció y es de una cuenta activa (mismas condiciones que
+   `RecuperacionService`). Sale con 0 si imprime un enlace, 1 si no hay
+   vigente, 2 si no puede consultar la base. Es de solo lectura y no pasa
+   por ninguna API. Con Brevo configurado el usuario recibe el enlace por
+   correo y la herramienta no se usa.
 7. **Regla de contraseña** (`services/reglasPassword.js`): mínimo 8
    caracteres, una letra y un número, máximo 72 bytes.
 8. **Errores**: `middleware/manejoErrores.js` (copia en los 7) responde

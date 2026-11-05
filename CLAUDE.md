@@ -84,6 +84,12 @@ de servicio rol `sistema` firmado por auth, 1 min) con el enlace
 nunca devuelve ese cuerpo. Se audita la solicitud y el cambio. En el
 login, "¿Olvidaste tu contraseña?" abre el formulario; el enlace abre
 "Nueva contraseña" y borra el token de la barra de direcciones.
+**Demo con envío simulado**: `npm run enlace-recuperacion -- <correo>`
+(`scripts/enlace-recuperacion.js`, solo lectura, `docker exec` al stack
+local) imprime el enlace vigente: lo saca del cuerpo en `notificaciones` y
+lo valida por hash contra `tokens_recuperacion` (no usado, no vencido,
+cuenta activa). Ninguna API lo expone. Ojo con sqlcmd: `-y 0` no se
+combina con `-h` ni `-W`.
 
 ### `pacientes-service/` — ✅ funcional, agrupa 3 dominios
 **Importante:** Solicitudes y Visita Médica NO son microservicios aparte —

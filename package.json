@@ -14,7 +14,8 @@
     "test:hostil": "node scripts/pruebas-hostiles.js",
     "test:integridad": "node scripts/integridad-bd.js",
     "test:caso11": "node scripts/caso11-brevo-caido.js",
-    "test:ui": "node scripts/ui-sqa.js"
+    "test:ui": "node scripts/ui-sqa.js",
+    "enlace-recuperacion": "node scripts/enlace-recuperacion.js"
   },
   "devDependencies": {
     "bcryptjs": "^2.4.3",

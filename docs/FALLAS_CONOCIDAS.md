@@ -48,6 +48,7 @@ de esta versión; el detalle técnico de cada punto está en
 | HTTPS | Todo viaja en HTTP (puerto 8090 y 3000-3006). Por Tailscale el túnel va cifrado; en la red local no. |
 | Revocar las sesiones al **desactivar** una cuenta | La persona desactivada no puede volver a entrar, pero una sesión que ya tenía abierta sigue funcionando hasta 8 horas. Cerrar sesión sí revoca el token al instante. |
 | Enviar correos reales comprobados | Todo se probó en modo simulación (`MODO_SIMULACION=true`). El envío por Brevo real no se ejecutó nunca. |
+| Entregar por correo el enlace de recuperación de contraseña (en el prototipo) | El envío es simulado: el enlace queda registrado en el servidor y no llega a ningún buzón. Para la demo, quien administra el equipo lo obtiene con `npm run enlace-recuperacion -- <correo>` (solo en el stack local, con `docker exec`). Con Brevo configurado el usuario lo recibe por correo. |
 | Asociar un medicamento a una prescripción ya emitida sin él | El especialista debe emitir otra prescripción eligiendo el medicamento del inventario. |
 | Pantallas para el alta/edición de inventario, el log de notificaciones y su reintento manual | Existen solo por API (ver MANUAL_TECNICO). |
 | Mostrar los gastos operativos en un reporte | Se consultan en la tabla de Financiero; ningún reporte los incluye. |
