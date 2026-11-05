@@ -640,6 +640,10 @@ ul.cambios code { font-family: var(--font-mono); font-size: var(--fs-tiny); }
 /* Montos (Q 1,234.00): no deben partirse entre el simbolo y la cifra. */
 #estadoCuentaBox .kpi .kpi-value { white-space: nowrap; font-size: 26px; }
 #estadoCuentaBox .kpi.hero .kpi-value { font-size: 40px; }
+/* El motivo de la alerta es largo: sin este margen su primera linea pasa
+   por debajo del circulo magenta (::after, 120 px desde el borde derecho
+   menos 24 de padding y 1 de borde). */
+#estadoCuentaBox .kpi.hero .kpi-hint { padding-right: 96px; }
 
 .kpi.ok    { border-left: 3px solid var(--ok); }
 .kpi.warn  { border-left: 3px solid var(--warn); }
@@ -1057,6 +1061,7 @@ table.tabla-dato td { padding: 7px 0; border-bottom: 1px solid var(--line-weak);
   .kpi.hero .kpi-badge { right: 14px; top: 14px; }
   #estadoCuentaBox .kpi .kpi-value { font-size: 20px; }
   #estadoCuentaBox .kpi.hero .kpi-value { font-size: 32px; }
+  #estadoCuentaBox .kpi.hero .kpi-hint { padding-right: 60px; }  /* circulo de 110 px: entra 76 */
 
   /* Acceso: la presentacion se reduce a marca + titulo; el formulario
      queda a la vista sin desplazarse. */
