@@ -1,5 +1,4 @@
 const Medicamento = require('../models/Medicamento');
-const Prescripcion = require('../models/Prescripcion');
 
 /** Descuento que la fundacion otorga a los miembros del asilo (RN-09) */
 const DESCUENTO_FUNDACION = 0.20; // 20%

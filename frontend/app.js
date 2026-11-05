@@ -255,11 +255,6 @@ function avisar(titulo, cuerpo, opciones = {}) {
   return abrirDialogo({ titulo, cuerpo, soloAceptar: true, textoConfirmar: 'Cerrar', ...opciones });
 }
 
-function puede(...rolesPermitidos) {
-  if (!state.usuario) return false;
-  return rolesPermitidos.includes(state.usuario.rol);
-}
-
 /* ============ RBAC centralizado ============
    La UI oculta/deshabilita acciones que el backend ya rechaza, para
    que el personal no se tope con 403 en el flujo normal. El backend
