@@ -34,6 +34,9 @@ const CHEQUEOS = {
   'dos solicitudes activas misma especialidad y paciente (RN-02)':
     `SELECT idPaciente, especialidad, COUNT(*) FROM solicitudes_referencia WHERE estado IN ('pendiente_asignacion','cita_asignada','en_atencion') GROUP BY idPaciente, especialidad HAVING COUNT(*) > 1`,
   'cuota pagada sin fecha de pago': `SELECT id FROM cuotas_mensuales WHERE estado = 'pagada' AND fechaPago IS NULL`,
+  'cuota pendiente con vencimiento ya pasado (debería estar vencida)':
+    `SELECT id, fechaVencimiento FROM cuotas_mensuales WHERE estado = 'pendiente' AND fechaVencimiento < CAST(DATEADD(HOUR, -6, SYSUTCDATETIME()) AS DATE)`,
+  'cuota vencida con fecha de pago': `SELECT id FROM cuotas_mensuales WHERE estado = 'vencida' AND fechaPago IS NOT NULL`,
   'cargo sin familiar titular': `SELECT id, idPaciente FROM cargos_servicio WHERE idFamiliar IS NULL`,
   'paciente egresado sin motivo o con motivo estando activo':
     `SELECT id, activo, motivoEgreso FROM pacientes WHERE (activo = 0 AND (motivoEgreso IS NULL OR fechaEgreso IS NULL)) OR (activo = 1 AND motivoEgreso IS NOT NULL)`

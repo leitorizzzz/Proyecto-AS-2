@@ -251,6 +251,64 @@ También sirve **`GET /api/auditoria`** (solo admin, solo lectura):
 - Mensajes del backend con tildes; seed y e2e calculan la fecha de la cita
   (hoy + N días) en lugar de fechas fijas.
 
+### Revisión del SQA desde la interfaz (3-4 nov 2026)
+El SQA probó desde el navegador y marcó NO CUMPLIDOS los casos 1, 9, 14,
+15, 19, 21 y 22 (18 y 24 revisados sin comentario). El backend ya cumplía;
+fallaba lo que se ve en pantalla. `npm run test:ui` (`scripts/ui-sqa.js`,
+Playwright headless) reproduce los 9 casos como usuario, con capturas
+`casoNN-antes-*` / `casoNN-despues-*` en `docs/capturas/sqa/`. Un commit por
+caso ("Caso N (SQA): …").
+- **Caso 1 — cerrar sesión**: el login emite `jti`; `POST /api/auth/logout`
+  lo guarda en `tokens_revocados` (jti PK, `vence`; las vencidas se borran al
+  revocar otra). `authMiddleware` + `TokenRevocadoRepository` (copia idéntica
+  en los 7) responden 401 "Token revocado": lectura por PK y caché en memoria
+  de los revocados. Si la tabla no existe o la BD falla, **no bloquea** (solo
+  avisa en log). Tokens sin `jti` (los de servicio) no se consultan. La UI al
+  salir (manual o por inactividad) revoca, vacía localStorage/sessionStorage y
+  recarga: formulario vacío, sin correo precargado, `autocomplete`
+  username/current-password; Atrás no muestra pantallas protegidas; el aviso
+  de inactividad viaja en `#sesion=inactividad`.
+- **Caso 9 — RN-02**: el 409 trae `solicitudActiva` con especialidad,
+  estado, fecha, médicos, cita y motivo; la UI abre el diálogo "Ya existe una
+  solicitud activa" con "Ver solicitud activa" (la resalta en la bandeja).
+- **Caso 14 — visita**: una sola barra "Finalizar visita" (+ "Guardar sin
+  finalizar") que guarda la nota, agrega examen y prescripción escritos,
+  valida y cierra. Si falta algo resalta todos los campos, resumen "Faltan:
+  …" y la visita queda `incompleta` (en la visita y en el listado).
+  `POST /visitas/:id/completar` acepta `{ pendientes }` (lo que la pantalla
+  ve a medio llenar): no cierra y deja la visita incompleta.
+- **Caso 15**: precio base, descuento 20 % y costo con descuento al ordenar,
+  en la visita, en Laboratorio (el servicio calcula con el catálogo las
+  órdenes viejas sin precio congelado) y en el reporte de exámenes (PDF/Excel).
+- **Caso 18**: Farmacia lista "Prescripciones pendientes del paciente"
+  (entregado N de M) y "Despachos del paciente" con nombre, precio base,
+  descuento y costo.
+- **Caso 19**: `estadoCuenta` trae `desglose` (consulta/laboratorio/farmacia/
+  otros), `porCobrarFarmacia` y `totalPorCobrar`
+  (`PrescripcionPorCobrarRepository`); la visita cerrada muestra el total
+  cobrado y lo pendiente de cobrar al despachar.
+- **Caso 21**: `cuotas_mensuales.estado` pasa a `vencida` al consultar
+  cuentas/alertas, al arrancar financiero y cada
+  `CUOTAS_VENCIDAS_INTERVALO_MIN` (60); emitida con fecha pasada nace
+  vencida; pagada queda `pagada`. `GET /api/financiero/alertas/cuotas`
+  (admin, coordinador) = una alerta por cuota (roja si mora >
+  `DIAS_MORA_ROJA`, si no naranja). El panel la muestra por cuota con chip
+  "Roja"/"Naranja". El seed trae una cuota naranja (10 d) y una roja (45 d).
+- **Caso 22**: `exportarPDF` reescrito (anchos calculados, texto ajustado en
+  la celda, números a la derecha, encabezado repetido, filas sin cortar,
+  horizontal con > 5 columnas, totales, "Página N de M", fechas en día de
+  Guatemala). El Excel no se tocó. Prueba con 130 filas leída con pdf.js.
+- **Caso 24**: Auditoría con columnas Usuario, IP, Módulo, Acción y bloques
+  "Datos anteriores (JSON)" / "Datos nuevos (JSON)"; una IP 172.16-31.x se
+  marca como red interna de Docker (README).
+- **Vistas con nombres del Análisis** (solo lectura, `CREATE OR ALTER VIEW`,
+  sin renombrar tablas): `internos`, `familiares_responsables`,
+  `examenes_laboratorio`, `despachos_farmacia`, `cargos_servicios_medicos`,
+  `log_notificaciones` (sin el cuerpo del correo), `log_auditoria`. Las crea
+  reportes-service al arrancar (`VistasAnalisisRepository`, reintenta hasta
+  que existan las tablas) y bootstrap (`npm run vistas`). Si cambia una
+  columna de una tabla base, revisar su vista. Ver `docs/EQUIVALENCIAS.md`.
+
 ### Borrado lógico y auditoría (20 oct 2026)
 - `activo BIT NOT NULL DEFAULT 1` (ALTER idempotente) en `pacientes`,
   `usuarios`, `medicamentos`, `donantes`. No hay DELETE físico en ellas.
@@ -424,15 +482,22 @@ operativos (exámenes, medicamentos) → últimos 30 días; análisis
 
 ### Pruebas automatizadas — ✅
 Suite jest+supertest a nivel raíz. Comando: `npm run test:todo` o
-`scripts/run-all-tests.sh|.ps1`. Última ejecución (26 oct 2026, auditoría
-final, stack recién creado con `down -v` + `bootstrap.ps1`): **382/382** en
-44 archivos (incluye `frontend/__tests__/esc.test.js`, la primera prueba del
-frontend).
+`scripts/run-all-tests.sh|.ps1`. Última ejecución (4 nov 2026, stack recién
+creado con `down -v` + `bootstrap.ps1`): **415/415** en 51 archivos (incluye
+`frontend/__tests__/esc.test.js`). Ese mismo día, en orden: `test:e2e` 62/62,
+`test:sqa` 23/23, `test:ui` 9/9 cumplen, `test:hostil` 370 sin problemas,
+`test:integridad` 20/20, `test:caso11` (con el override) fallida →
+fallida_definitiva, `test:carga` 50 usuarios máx. 830 ms; después la base se
+recreó con solo datos de demo.
+**Interfaz (3 nov)**: `npm run test:ui [N]` — Playwright headless (devDeps
+`playwright`, `pdfjs-dist`) hace como usuario los casos 1, 9, 14, 15, 18,
+19, 21, 22 y 24; deja capturas en `docs/capturas/sqa/` y
+`resultados-<fase>.json`. Solo stack local (crea registros "UI …").
 **Auditoría SQA (26 oct)**: `npm run test:sqa` (23 casos del plan uno por
 uno contra el stack, evidencia en `docs/verificacion-plan-sqa.json`),
 `npm run test:caso11` (con `scripts/override-brevo-caido.yml`, Brevo en
 127.0.0.1:9), `npm run test:hostil` (matriz rol × escritura según §3.3 +
-validaciones: 363 comprobaciones) y `npm run test:integridad` (18 consultas
+validaciones: 370 comprobaciones) y `npm run test:integridad` (20 consultas
 de consistencia en la BD). Solo stack local: crean registros "SQA …" y usan
 `docker exec`. Última: todo en 0 fallas. `express`, `jsonwebtoken`, `bcryptjs`, `exceljs` y `pdfkit` son
 devDependencies de la raíz para que las pruebas no dependan de los
@@ -444,13 +509,15 @@ toca registros que crea** (pacientes "E2E …", medicamento "E2E
 medicamento <ts>", precio "E2E examen (no usar)", donantes y cuentas
 "e2e.*"); los datos existentes solo se leen.
 Carga (`npm run test:carga`, `USUARIOS=20..50`): login, listar pacientes,
-crear y listar solicitudes; falla si una petición supera 3 s. Última (26
-oct, desde cero): 50 usuarios, 600 peticiones, máx. 911 ms, p95 626 ms.
+crear y listar solicitudes; falla si una petición supera 3 s. Última (4
+nov, desde cero, con la consulta de tokens revocados): 50 usuarios, 600
+peticiones, máx. 830 ms, p95 620 ms.
 Resultado del plan oficial del SQA (25 casos):
 [`docs/RESULTADOS_PLAN_SQA.csv`](docs/RESULTADOS_PLAN_SQA.csv); nombres
 del plan ↔ código en [`docs/EQUIVALENCIAS.md`](docs/EQUIVALENCIAS.md).
 Mapa de casos ↔ pruebas en [`docs/PLAN_PRUEBAS.md`](docs/PLAN_PRUEBAS.md).
-Sin pruebas unitarias: el frontend.
+Frontend: solo `esc.test.js` como unitaria; el resto lo cubre `test:ui`
+(9 casos del SQA) y revisión en el navegador.
 
 ### Datos de demo — ✅
 `scripts/seed-demo.js` (`npm run seed:demo`). Idempotente, pobla
@@ -473,7 +540,9 @@ en [`scripts/README.md`](scripts/README.md).
    (hoy sólo quedan como fuente .mmd).
 3. Un JWT emitido antes de desactivar una cuenta sigue valiendo hasta su
    `exp` (8 h): los servicios no consultan `usuarios.activo` en cada
-   request. Cerrar ese hueco requiere lista de revocación o tokens cortos.
+   request. Ya existe la lista de revocación (`tokens_revocados`, usada al
+   cerrar sesión); faltaría que desactivar una cuenta revoque sus tokens
+   (hoy no se guarda qué `jti` tiene cada usuario).
 4. Flujo de "asociar medicamento del inventario a una prescripción ya
    emitida sin idMedicamento" (hoy hay que crear otra prescripción).
 5. Reportes extra o auto-paginación cuando una tabla supere N filas.
@@ -502,10 +571,12 @@ conocidos y aceptados para la entrega académica.
 1. **HTTP sin HTTPS.** nginx escucha en el 8090 en claro y los servicios
    en 3000-3006 también. Credenciales, JWT y enlaces de recuperación
    viajan sin cifrar en la red (Tailscale cifra el túnel, la LAN no).
-2. **Sesiones vigentes tras desactivar una cuenta.** El JWT dura 8 h y
-   los servicios solo verifican la firma: una sesión abierta sigue
-   funcionando hasta su `exp` aunque la cuenta se desactive (el login
-   nuevo sí se bloquea). Faltaría lista de revocación o tokens cortos.
+2. **Sesiones vigentes tras desactivar una cuenta.** El JWT dura 8 h: una
+   sesión abierta sigue funcionando hasta su `exp` aunque la cuenta se
+   desactive (el login nuevo sí se bloquea). Cerrar sesión sí revoca el
+   token en los 7 servicios desde el 3 nov; desactivar todavía no. Si la
+   BD no responde al consultar `tokens_revocados`, el middleware deja
+   pasar el token (firma y `exp` ya verificados).
 3. **Brevo real no verificado.** Todo correo se probó en
    `MODO_SIMULACION` (ID `sim-...`); la caída se probó con una URL
    inalcanzable. El envío y la entrega reales no se ejecutaron.
@@ -528,14 +599,19 @@ conocidos y aceptados para la entrega académica.
 8. **Nombres distintos al plan del SQA** (tabla en
    `docs/EQUIVALENCIAS.md`): `pacientes` en vez de internos, `activo = 0`
    en vez de `estado = 'inactivo'`, estados `fallida`/`fallida_definitiva`
-   en vez de "error", etc. El comportamiento es el pedido.
+   en vez de "error", etc. El comportamiento es el pedido. Desde el 3 nov
+   hay **vistas de solo lectura** con los nombres del Análisis
+   (`internos`, `log_notificaciones` con `estado_envio` enviado/error,
+   etc.) para que el SQA consulte la base con esos nombres.
 9. **Auditoría parcial.** Laboratorio (resultados y precios) y
    notificaciones no registran auditoría. El log de notificaciones lo
    puede leer cualquier usuario autenticado (salvo el cuerpo de los
    correos de recuperación, que se oculta).
 10. **Reportes**: los gastos operativos no aparecen en ninguno de los 7
     reportes; no hay paginación.
-11. **Frontend casi sin pruebas automatizadas** (solo `esc()`). El 26 oct
+11. **Frontend con pocas pruebas automatizadas**: `esc()` y, desde el 3 nov,
+    `npm run test:ui` (Playwright, 9 casos del SQA en Chromium headless;
+    no corre en otros navegadores ni en el CI). El 26 oct
     se recorrió en Chrome con los 7 roles (sin errores de consola) y se
     probaron el diálogo de egreso, recuperar y restablecer contraseña por
     scripts en la página; el 28 oct la vista móvil se revisó con capturas

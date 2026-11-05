@@ -27,19 +27,19 @@
     "id": 5,
     "nombre": "Alta de interno con familiar principal y ficha 1:1",
     "estado": "OK",
-    "evidencia": "sin familiar -> 400 camposFaltantes [nombres, apellidos, dpi, parentesco, telefono, email, direccion]; incompleto -> 400 (6 faltantes); completo -> 201 id 73; BD: 1 familiar principal y 1 ficha"
+    "evidencia": "sin familiar -> 400 camposFaltantes [nombres, apellidos, dpi, parentesco, telefono, email, direccion]; incompleto -> 400 (6 faltantes); completo -> 201 id 14; BD: 1 familiar principal y 1 ficha"
   },
   {
     "id": 6,
     "nombre": "Egreso: baja lógica, registro íntegro, sin DELETE físico",
     "estado": "OK con diferencia",
-    "evidencia": "sin motivo -> 400, fecha futura -> 400, con motivo -> 200; GET: activo=false, fechaEgreso 2026-10-26, motivo guardado; fuera del listado; fila en BD (1); solicitud nueva -> 409. Diferencia de nombre: activo BIT en vez de estado='inactivo'"
+    "evidencia": "sin motivo -> 400, fecha futura -> 400, con motivo -> 200; GET: activo=false, fechaEgreso 2026-11-04, motivo guardado; fuera del listado; fila en BD (1); solicitud nueva -> 409. Diferencia de nombre: activo BIT en vez de estado='inactivo'"
   },
   {
     "id": 7,
     "nombre": "Solicitud del Médico General con enfermero: pendiente_asignacion",
     "estado": "OK",
-    "evidencia": "sin enfermero -> 400; con usuario que no es enfermero -> 400; válida -> 201 id 164, estado pendiente_asignacion, idEnfermero 5"
+    "evidencia": "sin enfermero -> 400; con usuario que no es enfermero -> 400; válida -> 201 id 10, estado pendiente_asignacion, idEnfermero 5"
   },
   {
     "id": 8,
@@ -51,25 +51,25 @@
     "id": 9,
     "nombre": "RN-02: solicitud duplicada rechazada con la activa",
     "estado": "OK",
-    "evidencia": "misma especialidad -> 409 solicitudActiva {id 164, pendiente_asignacion}: \"Este paciente ya tiene una solicitud activa en la especialidad \"cardiologia\" (solicitud #164, pendiente de cita). Espere a que se complete o cancélela antes de crear otra.\"; otra especialidad -> 201"
+    "evidencia": "misma especialidad -> 409 solicitudActiva {id 10, pendiente_asignacion}: \"Este paciente ya tiene una solicitud activa en la especialidad \"cardiologia\" (solicitud #10, pendiente de cita). Espere a que se complete o cancélela antes de crear otra.\"; otra especialidad -> 201"
   },
   {
     "id": 10,
     "nombre": "Notificación por Brevo: log con estado e ID",
     "estado": "OK con diferencia",
-    "evidencia": "notificación #166 a sqa.familiar5@example.com: estado enviada, idMensajeProveedor sim-86ede07e-059c-4b1e-9583-69ea692c48d8; servicio en modoSimulacion=true. No se ejecutó Brevo real"
+    "evidencia": "notificación #12 a sqa.familiar5@example.com: estado enviada, idMensajeProveedor sim-f9ff88d6-103b-41ac-93a0-21e0a00df272; servicio en modoSimulacion=true. No se ejecutó Brevo real"
   },
   {
     "id": 12,
     "nombre": "Asignar cita: cita_asignada y aviso interno",
     "estado": "OK",
-    "evidencia": "enfermero -> 403; coordinador -> 200 cita_asignada; reasignar -> 409; aviso #17 para el médico general y #18 para el enfermero (\"Cita asignada: SQA Caso Cinco 1793054878531, cardiologia, 2026-12-01 10:00 con Dr. Rodrigo Especialista (solicitud #164)\"); aviso ajeno -> 404; marcar leído -> 200"
+    "evidencia": "enfermero -> 403; coordinador -> 200 cita_asignada; reasignar -> 409; aviso #13 para el médico general y #14 para el enfermero (\"Cita asignada: SQA Caso Cinco 1793845178646, cardiologia, 2026-12-01 10:00 con Dr. Rodrigo Especialista (solicitud #10)\"); aviso ajeno -> 404; marcar leído -> 200"
   },
   {
     "id": 13,
     "nombre": "Convertir a visita: en_atencion vinculada a la ficha",
     "estado": "OK",
-    "evidencia": "médico general -> 403; especialista -> 201 visita 8 en_atencion con idFichaMedica 72 = ficha del paciente; solicitud en_atencion; segunda conversión -> 409"
+    "evidencia": "médico general -> 403; especialista -> 201 visita 6 en_atencion con idFichaMedica 14 = ficha del paciente; solicitud en_atencion; segunda conversión -> 409"
   },
   {
     "id": 14,
@@ -105,13 +105,13 @@
     "id": 19,
     "nombre": "Cierre: completada y cargo atómico consulta+lab+farmacia",
     "estado": "OK",
-    "evidencia": "cierre -> 200 completada y solicitud completada; un solo cargo #7 Q288 al familiar #72: consulta Q120 (150 − 20 %), laboratorio Q160, farmacia Q8; segundo cierre -> 409; editar cerrada -> 409"
+    "evidencia": "cierre -> 200 completada y solicitud completada; un solo cargo #6 Q288 al familiar #14: consulta Q120 (150 − 20 %), laboratorio Q160, farmacia Q8; segundo cierre -> 409; editar cerrada -> 409"
   },
   {
     "id": 20,
     "nombre": "Saldos no negativos y familiar completo",
     "estado": "OK",
-    "evidencia": "abono mayor al saldo -> 409; abono 0/negativo/texto -> 400; abono Q100 -> saldo Q188 parcial; poner el saldo negativo directo en la BD -> CHECK CK_cargos_saldo_no_negativo lo rechaza; cargo y cuota a paciente sin familiar -> 409 (\"El paciente 75 no tiene familiar responsable registrado: no se pueden registrar movimientos en su cuenta\")"
+    "evidencia": "abono mayor al saldo -> 409; abono 0/negativo/texto -> 400; abono Q100 -> saldo Q188 parcial; poner el saldo negativo directo en la BD -> CHECK CK_cargos_saldo_no_negativo lo rechaza; cargo y cuota a paciente sin familiar -> 409 (\"El paciente 16 no tiene familiar responsable registrado: no se pueden registrar movimientos en su cuenta\")"
   },
   {
     "id": 21,
@@ -123,18 +123,18 @@
     "id": 22,
     "nombre": "Exportación PDF y Excel con diseño y fórmulas",
     "estado": "OK",
-    "evidencia": "7 reportes -> PDF (%PDF) y Excel (xlsx) 200; costos por paciente: total con SUM(H6:H11), fila con D11+E11+F11+G11, banda \"ASILO DE ANCIANOS \"CABEZA DE ALGODON\" - \"; el paciente del flujo suma Q288 (farmacia Q8, sin doble conteo)"
+    "evidencia": "7 reportes -> PDF (%PDF) y Excel (xlsx) 200; costos por paciente: total con SUM(H6:H10), fila con D10+E10+F10+G10, banda \"ASILO DE ANCIANOS \"CABEZA DE ALGODON\" - \"; el paciente del flujo suma Q288 (farmacia Q8, sin doble conteo)"
   },
   {
     "id": 23,
     "nombre": "SQL injection: entrada tratada como texto literal",
     "estado": "OK",
-    "evidencia": "login con ' OR 1=1 -> 401; paciente \"Robert'); DROP TABLE pacientes;--\" guardado y leído literal; id \"1 OR 1=1\" -> 404; filtros de reportes -> 400; DPI inyectado -> 404; la tabla pacientes sigue (78 filas)"
+    "evidencia": "login con ' OR 1=1 -> 401; paciente \"Robert'); DROP TABLE pacientes;--\" guardado y leído literal; id \"1 OR 1=1\" -> 404; filtros de reportes -> 400; DPI inyectado -> 404; la tabla pacientes sigue (19 filas)"
   },
   {
     "id": 24,
     "nombre": "Auditoría: usuario, IP, módulo, datos anteriores/nuevos",
     "estado": "OK con diferencia",
-    "evidencia": "egreso del paciente 74: usuario admin@asilo.gt, IP 172.18.0.1, módulo pacientes, antes activo=true → después activo=false, motivo \"Traslado con su familia\"; sin contraseñas en la bitácora; enfermero -> 403. En Docker Desktop la IP es la del gateway; la IP real del navegador solo se ve en el Debian (no verificado)"
+    "evidencia": "egreso del paciente 15: usuario admin@asilo.gt, IP 172.18.0.1, módulo pacientes, antes activo=true → después activo=false, motivo \"Traslado con su familia\"; sin contraseñas en la bitácora; enfermero -> 403. En Docker Desktop la IP es la del gateway; la IP real del navegador solo se ve en el Debian (no verificado)"
   }
 ]

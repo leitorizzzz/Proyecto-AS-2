@@ -134,6 +134,14 @@ administración que la reactive.
 pide volver a iniciar sesión. Para salir antes, usar **Cerrar sesión**
 al pie del menú lateral.
 
+**Qué pasa al cerrar sesión.** El sistema anula la sesión en el servidor
+(aunque alguien hubiera copiado el acceso, ya no sirve), borra todo lo
+que el navegador guardaba del usuario y vuelve a la pantalla de inicio
+con **Correo** y **Contraseña** vacíos. El botón **Atrás** del navegador
+ya no muestra ninguna pantalla interna: lleva al inicio de sesión. Si
+la sesión se cerró en otra pestaña, la siguiente acción en esta también
+lleva al inicio de sesión.
+
 **Cierre por inactividad.** Si durante **30 minutos** no se usa el
 teclado, el mouse ni la pantalla táctil, la sesión se cierra sola. Un
 minuto antes aparece la ventana *Su sesión está por cerrarse* con una
@@ -171,23 +179,30 @@ Cuatro indicadores:
   los activos.
 - **Solicitudes activas** — pendientes, con cita o en atención.
 - **Visitas abiertas** — solicitudes en atención.
-- **Alertas de cobro** — cuántas cuentas están en rojo, y debajo cuántas
-  en rojo (▲) y en naranja (◆). Solo lo ven administración y
+- **Alertas de cobro** — cuántas cuotas vencidas hay, y debajo cuántas
+  son rojas (▲) y naranjas (◆). Solo lo ven administración y
   coordinación de fundación; para los demás muestra *—*.
 
-Para administración y coordinación aparece la tarjeta **Alertas de
-cobro**: una fila por cuenta con alerta, primero las rojas, con
-**Nivel**, **Paciente**, **Motivo**, **Cuotas vencidas**, **Mora máx.**
-(días) y **Saldo**.
+Para administración y coordinación aparece, bajo los indicadores, la
+tarjeta **Alertas de cobro: cuotas vencidas**: **una fila por cuota**,
+primero las rojas, con **Nivel** (etiqueta *Roja* o *Naranja*, con su
+símbolo), **Familiar responsable** (parentesco y teléfono),
+**Paciente**, **Cuota** (mes/año, estado *vencida*), **Monto**,
+**Venció** y **Días de mora**.
 
-- ▲ **Roja**: el saldo llega al umbral (Q1000 por defecto) o una cuota
-  lleva más de 30 días vencida.
-- ◆ **Naranja**: el saldo pasa de la mitad del umbral o hay alguna
-  cuota vencida.
+- ▲ **Roja**: la cuota lleva más de 30 días vencida.
+- ◆ **Naranja**: la cuota está vencida desde hace 30 días o menos.
+
+Debajo, **Cuentas con saldo alto** lista las cuentas cuyo saldo total
+(cargos y cuotas sin pagar) llega al umbral: roja desde Q1000, naranja
+desde la mitad (valores por defecto).
 
 Una cuota vence el último día de su mes (o la fecha indicada al
-emitirla); desde el día siguiente cuenta la mora. Al pagarla, la alerta
-desaparece.
+emitirla). Al día siguiente su estado cambia a `vencida` (el sistema lo
+revisa al consultar cuentas y alertas y además cada hora) y desde ahí
+cuenta la mora. Al registrar el pago queda `pagada` y la alerta
+desaparece. Los datos de demostración traen una cuota roja y una
+naranja para verlas al entrar como administración.
 
 La tarjeta **Mis avisos** muestra las notificaciones internas para la
 persona que inició sesión, por ejemplo *Cita asignada* cuando la
@@ -318,8 +333,13 @@ su perfil puede usar):
 [CAPTURA: ventana "Cancelar solicitud" con el botón rojo]
 
 **RN-02.** Si se intenta crear una segunda solicitud activa para el
-mismo paciente y la misma especialidad, el sistema la rechaza e indica
-el número y el estado de la solicitud activa que lo impide.
+mismo paciente y la misma especialidad, el sistema no la crea y abre la
+ventana **Ya existe una solicitud activa** con los datos de la que lo
+impide: número, especialidad, estado, fecha, médico que refirió, cita y
+motivo. **Ver solicitud activa** cierra la ventana y la resalta en la
+bandeja (cada solicitud muestra su número).
+
+[CAPTURA: ventana "Ya existe una solicitud activa" con el botón "Ver solicitud activa"]
 
 ### 4.4 Visitas médicas
 
@@ -332,13 +352,14 @@ el número y el estado de la solicitud activa que lo impide.
    solicitudes.
 2. Aparece el detalle *Visita #N* con su etiqueta de estado y cuatro
    bloques:
-   - **Notas clínicas**: **Diagnóstico** y **Observaciones**, y el
-     botón **Guardar cambios**.
+   - **Notas clínicas**: **Diagnóstico** y **Observaciones**.
    - **Exámenes solicitados**: escribir el tipo en **Nuevo examen** y
      presionar **Agregar examen**. Laboratorio lo recibe de inmediato.
      El campo sugiere los exámenes del catálogo de precios: solo se
-     pueden pedir exámenes con precio, y el costo con el descuento de la
-     fundación queda registrado en ese momento (se ve bajo el examen).
+     pueden pedir exámenes con precio. Al escribirlo se ve el **precio
+     base**, el **descuento 20 %** de la fundación y el **costo con
+     descuento**; esos montos quedan registrados en ese momento y cada
+     examen de la lista los muestra junto a su estado (`pendiente`).
      Cuando laboratorio registra el resultado, el examen pasa a
      `disponible` y aparece **Ver resultado**.
    - **Prescripciones**: elegir **Medicamento del inventario** (el
@@ -347,18 +368,30 @@ el número y el estado de la solicitud activa que lo impide.
      presionar **Agregar prescripción**. Si no se elige un medicamento
      del inventario, farmacia no podrá dispensarla (RN-06). Cada
      prescripción indica cuánto se ha entregado (*entregado x de y*).
-   - **Cerrar visita**: botón **Marcar visita como completa**.
-3. Para cerrar, presionar **Marcar visita como completa** y confirmar
-   en la ventana *Cerrar visita* con **Marcar como completa**. El
-   sistema usa el diagnóstico y las observaciones **guardados**: si se
-   cambiaron, presionar antes **Guardar cambios**. Si alguno está vacío,
-   la visita queda `incompleta`, el campo que falta se marca con borde,
-   fondo y el texto *✕ Obligatorio para cerrar*; completarlo, guardar y
-   volver a cerrar. Al cerrar, la solicitud enlazada pasa a
-   `completada`, todos los campos de la visita quedan bloqueados y el
-   sistema genera **en el mismo paso** el cargo al familiar: consulta
-   del especialista, exámenes y medicamentos entregados, cada uno con el
-   20 % de descuento. El mensaje muestra el total por rubro. Una visita
+   - Al pie, la barra **Finalizar visita** con dos botones:
+     **Guardar sin finalizar** y **Finalizar visita**.
+3. **Finalizar visita** toma todo lo que está en pantalla, sin tener que
+   usar antes otros botones: guarda diagnóstico y observaciones, agrega
+   el examen y la prescripción que estén escritos sin agregar, revisa y
+   cierra (confirmar en la ventana *Finalizar visita*).
+   - Si falta algo, la visita **no** se cierra y queda `incompleta` (se
+     ve en la etiqueta de la visita y en la lista **Visita**). Arriba
+     aparece el resumen *No se finalizó la visita. Faltan: …* y **todos**
+     los campos que faltan se marcan a la vez con borde, fondo rojo y el
+     texto *✕ Obligatorio para finalizar*; la pantalla se desplaza al
+     primero. Una prescripción a medio llenar (sin cantidad o sin
+     medicamento) también se avisa (*✕ Falta la cantidad*) en vez de
+     ignorarse; lo escrito se conserva. Completar y volver a presionar
+     **Finalizar visita**.
+   - **Guardar sin finalizar** guarda la nota y lo escrito sin cerrar.
+4. Al finalizar, la visita y la solicitud enlazada pasan a
+   `completada`, todos los campos quedan bloqueados y el sistema genera
+   **en el mismo paso** el cargo al familiar: consulta del especialista,
+   exámenes y medicamentos ya entregados, cada uno con el 20 % de
+   descuento. La visita cerrada muestra el **total cobrado al familiar
+   por esta visita** (el cierre y los despachos posteriores) y lo que
+   queda **pendiente de cobrar al despachar** (medicamento prescrito que
+   farmacia aún no entregó: se cobra solo, al despacharlo). Una visita
    no se puede cobrar dos veces.
 
 [CAPTURA: detalle de una visita en atención con Notas clínicas, Exámenes solicitados y Prescripciones]
@@ -382,24 +415,30 @@ puede **Reactivarlos**.
 
 Debajo, **Dispensar contra prescripción**:
 
-1. Elegir **Paciente**.
+1. Elegir **Paciente**. Aparece **Prescripciones pendientes del
+   paciente**: cada una con su estado (`pendiente` o `parcial`) y
+   *Entregado N de M · faltan K*.
 2. En **Prescripción pendiente** aparecen las que emitió el médico en
-   una visita. Si no hay ninguna, el sistema lo indica y el botón
-   queda bloqueado. Una prescripción marcada *(sin medicamento de
-   inventario)* no se puede dispensar: el especialista debe emitir
-   otra eligiendo el medicamento del inventario.
-3. Escribir **Cantidad a entregar** (la lista indica *faltan N de M*)
-   y presionar **Dispensar**. Se puede entregar por partes.
-4. El sistema descuenta el inventario y muestra el costo con el 20 %
-   de descuento de la fundación (RN-09), que se suma a la visita. Si el
+   una visita (por ejemplo *Parcial · 4 de 10 entregadas (faltan 6)*).
+   Si no hay ninguna, el sistema lo indica y el botón queda bloqueado.
+   Una prescripción marcada *(sin medicamento de inventario)* no se
+   puede dispensar: el especialista debe emitir otra eligiendo el
+   medicamento del inventario.
+3. Escribir **Cantidad a entregar** y presionar **Dispensar**. Se puede
+   entregar por partes.
+4. El sistema descuenta el inventario, muestra el costo con el 20 %
+   de descuento de la fundación (RN-09) y avisa que se sumó al costo de
+   farmacia de la visita (se ve en la pantalla de la visita). Si el
    paciente o el medicamento están desactivados, o se pide más de lo
    que falta, rechaza la dispensación sin tocar el inventario.
 5. Mientras falte entregar, la prescripción queda `parcial`; al
    completar la cantidad pasa a `dispensada` y no admite más. Lo que se
-   entrega después de cerrada la visita genera un cargo aparte.
+   entrega después de cerrada la visita genera solo un cargo aparte en
+   la cuenta del familiar, sin ninguna acción manual.
 
-Abajo, **Historial del paciente seleccionado** muestra sus
-dispensaciones anteriores y el total.
+Abajo, **Despachos del paciente** lista cada despacho con medicamento,
+avance de la prescripción, cantidad, **precio base**, **descuento 20 %**
+y **costo con descuento**, y el total.
 
 [CAPTURA: pantalla Farmacia con "Inventario", "Dispensar contra prescripción" y el historial]
 
@@ -409,8 +448,9 @@ dispensaciones anteriores y el total.
 `admin`. **Quién registra resultados:** `laboratorio`, `admin`.
 **Quién cambia precios:** `admin`.
 
-A la izquierda, **Órdenes pendientes**: número, paciente, examen y
-fecha. Solo laboratorio y administración ven las órdenes; los demás
+A la izquierda, **Órdenes pendientes**: número, paciente, examen, fecha,
+**Estado**, **Precio base**, **Descuento 20 %** y **Costo con
+descuento**. Solo laboratorio y administración ven las órdenes; los demás
 perfiles ven un aviso en su lugar. Cada fila tiene dos acciones:
 
 - **Seleccionar** — copia el número al formulario de la derecha.
@@ -461,8 +501,13 @@ del catálogo.
   servicios**, **Cuotas pendientes** y **Último movimiento** — y las
   tablas **Cargos** (con el desglose de consulta, laboratorio y
   farmacia de cada visita) y **Cuotas** (con su vencimiento y, si
-  corresponde, *vencida N d*). La tarjeta de saldo muestra la alerta
-  ▲ roja o ◆ naranja con su motivo, o *Sin alertas*.
+  corresponde, *vencida N d*). **Total cobrado a la cuenta, por
+  servicio** suma consulta, laboratorio y farmacia (siempre los tres,
+  aunque alguno sea cero) y otros cargos. **Pendiente de cobrar al
+  despachar** lista el medicamento prescrito que farmacia aún no
+  entregó (visita, entregado de prescrito y monto con 20 %): no está en
+  el saldo y se carga solo al despacharlo. La tarjeta de saldo muestra
+  la alerta ▲ roja o ◆ naranja con su motivo, o *Sin alertas*.
 - **Abonar.** En la tabla **Cargos**, **Abonar** abre una ventana con
   el saldo del cargo; el sistema no acepta abonos mayores al saldo.
 - **Registrar cargo.** Paciente, **Concepto** y **Monto (Q)**; botón
@@ -471,7 +516,9 @@ del catálogo.
 - **Emitir / pagar cuota.** Paciente, **Mes**, **Año**, **Monto (Q)** y,
   opcional, **Vence**. **Emitir pendiente** crea la cuota sin pagarla
   (vence el último día del mes si no se indica otra fecha); si vence sin
-  pago entra a las alertas. **Registrar pago** la paga, y si no existía
+  pago pasa a `vencida` y entra a las alertas. Se acepta una fecha de
+  vencimiento ya pasada: la cuota nace `vencida` (útil para probar las
+  alertas). **Registrar pago** la paga, y si no existía
   la crea y la marca pagada en un solo paso.
 - **Donaciones.** Tabla con las donaciones registradas. En **Nueva
   donación**, guardar primero al donante con **Guardar donante** y
@@ -524,9 +571,14 @@ se conservan. Con **Ver también desactivados** se ve y se puede
 El resultado en pantalla aparece en una tarjeta con el título del
 reporte, el período, la cantidad de filas y, cuando aplica, una fila
 de totales. **Costos por paciente** muestra lo cobrado por rubro
-(consulta, laboratorio, farmacia y otros cargos). El Excel lleva la
-cabecera del asilo y los totales como fórmulas, de modo que se
-recalculan si se edita una celda.
+(consulta, laboratorio, farmacia y otros cargos). **Exámenes
+solicitados** trae por examen su estado, precio base, descuento y costo
+con descuento. El Excel lleva la cabecera del asilo y los totales como
+fórmulas, de modo que se recalculan si se edita una celda. El PDF es una
+tabla: columnas fijas, números alineados a la derecha, texto largo
+ajustado dentro de su celda, encabezado repetido en cada página, fila
+de totales, *Página N de M* al pie y hoja horizontal cuando el reporte
+tiene más de cinco columnas.
 
 [CAPTURA: pantalla Reportes con "Entradas de dinero" en pantalla y su fila de total]
 
@@ -549,7 +601,8 @@ recalculan si se edita una celda.
 
 Una persona que ya tenía la sesión abierta cuando se desactivó su
 cuenta puede seguir trabajando hasta que la sesión venza (8 horas) o
-la cierre; a partir de ahí ya no puede volver a entrar.
+la cierre; a partir de ahí ya no puede volver a entrar. (Cerrar sesión
+sí anula el acceso al instante; desactivar la cuenta todavía no.)
 
 [CAPTURA: pantalla Usuarios con la lista de cuentas y el formulario "Nueva cuenta"]
 
@@ -569,9 +622,15 @@ después del cambio.
    si se quiere, una **Entidad**.
 2. Presionar **Consultar**.
 
-La tabla **Registros** muestra fecha y hora, usuario e IP, módulo,
-acción (con su símbolo), entidad con su número, los cambios y un detalle (por ejemplo, la fecha y
-hora de la cita asignada). Se muestran como máximo 200 registros, del
+La tabla **Registros** muestra fecha y hora, **Usuario**, **IP**,
+**Módulo**, **Acción** (con su símbolo), **Entidad** con su número y
+**Detalle, datos anteriores y nuevos (JSON)**: en una modificación, el
+resumen *campo: antes → después*, y dos bloques que se despliegan,
+**Datos anteriores (JSON)** y **Datos nuevos (JSON)**, con el registro
+completo antes y después (nunca contraseñas). Una IP de la red interna
+de Docker se marca como tal: en una instalación de prueba con Docker
+Desktop todo llega con esa dirección; en el servidor se ve la del
+equipo de quien hizo el cambio. Se muestran como máximo 200 registros, del
 más reciente al más antiguo. Laboratorio (resultados y precios) y
 notificaciones no se registran en la auditoría.
 

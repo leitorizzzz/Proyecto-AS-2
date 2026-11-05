@@ -1,0 +1,105 @@
+[
+  {
+    "caso": 1,
+    "fase": "despues",
+    "cumple": true,
+    "fallas": [],
+    "capturas": [
+      "docs/capturas/sqa/caso01-despues-1-sesion-abierta.png",
+      "docs/capturas/sqa/caso01-despues-2-tras-salir.png",
+      "docs/capturas/sqa/caso01-despues-3-boton-atras.png",
+      "docs/capturas/sqa/caso01-despues-4-inactividad.png"
+    ]
+  },
+  {
+    "caso": 9,
+    "fase": "despues",
+    "cumple": true,
+    "fallas": [],
+    "capturas": [
+      "docs/capturas/sqa/caso09-despues-1-duplicada.png",
+      "docs/capturas/sqa/caso09-despues-2-ver-activa.png"
+    ]
+  },
+  {
+    "caso": 14,
+    "fase": "despues",
+    "cumple": true,
+    "fallas": [],
+    "capturas": [
+      "docs/capturas/sqa/caso14-despues-1-antes-de-finalizar.png",
+      "docs/capturas/sqa/caso14-despues-3-tras-finalizar.png",
+      "docs/capturas/sqa/caso14-despues-4-completada.png"
+    ]
+  },
+  {
+    "caso": 15,
+    "fase": "despues",
+    "cumple": true,
+    "fallas": [],
+    "capturas": [
+      "docs/capturas/sqa/caso15-despues-1-al-ordenar.png",
+      "docs/capturas/sqa/caso15-despues-2-en-la-visita.png",
+      "docs/capturas/sqa/caso15-despues-3-laboratorio.png"
+    ]
+  },
+  {
+    "caso": 18,
+    "fase": "despues",
+    "cumple": true,
+    "fallas": [],
+    "capturas": [
+      "docs/capturas/sqa/caso18-despues-1-farmacia-tras-despacho.png",
+      "docs/capturas/sqa/caso18-despues-2-visita.png"
+    ]
+  },
+  {
+    "caso": 19,
+    "fase": "despues",
+    "cumple": true,
+    "fallas": [],
+    "capturas": [
+      "docs/capturas/sqa/caso19-despues-1-visita-D-cerrada.png",
+      "docs/capturas/sqa/caso19-despues-2-cuenta-A.png",
+      "docs/capturas/sqa/caso19-despues-2-cuenta-B.png",
+      "docs/capturas/sqa/caso19-despues-2-cuenta-C.png",
+      "docs/capturas/sqa/caso19-despues-2-cuenta-D.png",
+      "docs/capturas/sqa/caso19-despues-3-visita-A-completada.png"
+    ]
+  },
+  {
+    "caso": 21,
+    "fase": "despues",
+    "cumple": true,
+    "fallas": [],
+    "capturas": [
+      "docs/capturas/sqa/caso21-despues-1-panel-admin-al-entrar.png",
+      "docs/capturas/sqa/caso21-despues-2-emitir-cuota-vencida.png",
+      "docs/capturas/sqa/caso21-despues-3-panel-con-alerta.png"
+    ]
+  },
+  {
+    "caso": 22,
+    "fase": "despues",
+    "cumple": true,
+    "fallas": [],
+    "capturas": [
+      "docs/capturas/sqa/caso22-despues-pdf-costos-por-paciente.png",
+      "docs/capturas/sqa/caso22-despues-pdf-analisis-medico.png",
+      "docs/capturas/sqa/caso22-despues-pdf-cobros-por-rango.png",
+      "docs/capturas/sqa/caso22-despues-pdf-pagos-fundacion.png",
+      "docs/capturas/sqa/caso22-despues-pdf-entradas.png",
+      "docs/capturas/sqa/caso22-despues-pdf-examenes.png",
+      "docs/capturas/sqa/caso22-despues-pdf-medicamentos-aplicados.png"
+    ]
+  },
+  {
+    "caso": 24,
+    "fase": "despues",
+    "cumple": true,
+    "fallas": [],
+    "capturas": [
+      "docs/capturas/sqa/caso24-despues-1-auditoria.png"
+    ]
+  }
+]

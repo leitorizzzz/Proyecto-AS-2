@@ -23,8 +23,9 @@ las pruebas corran en un clon limpio sin instalar cada servicio.
 ./scripts/run-all-tests.ps1        # PowerShell
 npm run test:todo
 ```
-Ultima ejecucion (26 oct 2026, auditoria final, sobre un stack recien creado con
-`docker compose down -v` + `scripts/bootstrap.ps1`): **382 casos en 44 archivos, 382 OK, 0 fallas**.
+Ultima ejecucion (4 nov 2026, tras corregir los casos que el SQA reporto como no
+cumplidos, sobre un stack recien creado con `docker compose down -v` +
+`scripts/bootstrap.ps1`): **415 casos en 51 archivos, 415 OK, 0 fallas**.
 
 **(2) Integracion end-to-end**: requieren el stack docker-compose
 arriba. Recorren el flujo completo de un paciente, con usuarios reales
@@ -33,7 +34,7 @@ y JWT, contra las APIs HTTP. Un paso por linea con [ OK ] / [FALLA].
 npm run test:e2e                         # localhost
 BASE_HOST=100.96.172.77 npm run test:e2e  # servidor Debian
 ```
-Ultima ejecucion (26 oct 2026, stack local recien creado): **62 pasos, 62 OK**. El
+Ultima ejecucion (4 nov 2026, stack local recien creado): **62 pasos, 62 OK**. El
 paso 58 verifica ademas que los abonos a cargos aparecen en "Cobros por rango"
 y "Entradas de dinero" por su monto exacto.
 El paso de RF-42 lee el enlace de recuperacion de la tabla `notificaciones`
@@ -43,20 +44,30 @@ verifica la parte de API.
 **(3) Carga** (caso 25): `npm run test:carga` (`USUARIOS=20..50`, `VUELTAS`,
 `LIMITE_MS`). Cada usuario virtual hace login, lista pacientes, crea y
 lista solicitudes; reporta p50/p95/max por operacion y falla si una
-peticion supera 3 s. Ultima ejecucion (26 oct, stack recien creado): 50 usuarios x 3 vueltas,
-600 peticiones, max 911 ms, p95 626 ms, 0 errores. Antes del arreglo (bcrypt en
+peticion supera 3 s. Ultima ejecucion (4 nov, stack recien creado, ya con la
+consulta de tokens revocados en cada peticion): 50 usuarios x 3 vueltas,
+600 peticiones, max 830 ms, p95 620 ms, 0 errores. Antes del arreglo (bcrypt en
 el hilo principal) el login llegaba a 7,1 s con 30 usuarios.
 
-**(4) Auditoria SQA** (26 oct 2026, solo stack local: crean registros "SQA ..."
+**(4) Auditoria SQA** (ultima corrida 4 nov 2026, solo stack local: crean registros "SQA ..."
 y usan `docker exec`):
 
 | Comando | Que hace | Ultima ejecucion |
 |---|---|---|
 | `npm run test:sqa` | Ejecuta 23 de los 25 casos del plan contra el stack, uno por uno, y guarda la evidencia en [verificacion-plan-sqa.json](verificacion-plan-sqa.json) | 23/23 OK (3 con diferencia de nombre) |
 | `npm run test:caso11` + [override-brevo-caido.yml](../scripts/override-brevo-caido.yml) | Caso 11 con Brevo inalcanzable (127.0.0.1:9; nunca el Brevo real) | solicitud 201; fallida -> fallida -> fallida_definitiva |
-| `npm run test:carga` (`USUARIOS=50`) | Caso 25 | max 911 ms |
-| `npm run test:hostil` | Matriz de permisos (cada escritura x 7 roles, segun `CONTEXT_SISTEMA.md` §3.3) y ~80 validaciones de entrada (DPI, correos, montos, fechas, textos largos, tildes, JSON roto) | 363 comprobaciones, 0 problemas |
-| `npm run test:integridad` | 18 consultas de consistencia en la BD (cargo = desglose, pagado = abonos, 20 % en todo, un cargo por visita, RN-02, stock >= 0...) | 18/18 limpias |
+| `npm run test:carga` (`USUARIOS=50`) | Caso 25 | max 830 ms |
+| `npm run test:hostil` | Matriz de permisos (cada escritura x 7 roles, segun `CONTEXT_SISTEMA.md` §3.3) y ~80 validaciones de entrada (DPI, correos, montos, fechas, textos largos, tildes, JSON roto) | 370 comprobaciones, 0 problemas |
+| `npm run test:integridad` | 20 consultas de consistencia en la BD (cargo = desglose, pagado = abonos, 20 % en todo, un cargo por visita, RN-02, stock >= 0, ninguna cuota `pendiente` con el vencimiento ya pasado, ninguna `vencida` con fecha de pago...) | 20/20 limpias |
+| `npm run test:ui` ([scripts/ui-sqa.js](../scripts/ui-sqa.js), Playwright headless) | Casos 1, 9, 14, 15, 18, 19, 21, 22 y 24 **desde la interfaz**, como los prueba el SQA: inicia sesion por la pantalla, hace la accion evaluada con clics y teclado y compara lo que se ve contra el "Resultado esperado". Los datos previos se preparan por API. Capturas en [docs/capturas/sqa/](capturas/sqa/) (`casoNN-antes-*` con el codigo sin arreglar, `casoNN-despues-*` ya corregido) y resultado en `resultados-<fase>.json`. El caso 22 dibuja cada PDF con pdf.js. Tras cada caso, un SELECT sobre su vista con nombre del Analisis debe devolver lo registrado. `npm run test:ui 14` corre uno solo | antes: 9/9 NO cumplen; despues: 9/9 cumplen |
+
+**Por que la verificacion del 26 oct no vio las fallas del SQA:** se hizo sobre
+todo por API, y el backend ya cumplia (409 con la solicitud activa, visita
+incompleta, montos congelados, cargo atomico...). Lo que fallaba era lo que el
+usuario ve: alertas que no aparecian o se perdian, botones que ignoraban lo
+escrito, montos guardados pero no mostrados, el PDF desordenado y la demo sin
+cuotas vencidas. Desde el 3 nov `npm run test:ui` cubre esos casos desde la
+pantalla.
 
 Ademas se recorrio el frontend en Chrome con los 7 roles (todas las secciones:
 sin errores de consola, sin pantallas en blanco, sin codigos internos) y a 390 px
@@ -80,7 +91,7 @@ cada caso:
 
 | Caso | Prueba unitaria | Paso e2e (texto del smoke) |
 |---|---|---|
-| 1 Login + JWT | AuthService.test.js | login admin |
+| 1 Login + JWT; salir revoca el token | AuthService.test.js, Revocacion.test.js; `test:ui 1` | login admin |
 | 2 RBAC 403 | rbac.test.js de cada servicio | RBAC backend: farmacia crea paciente... -> 403 |
 | 3 401 sin BD | rbac.test.js (repositorios simulados) | — |
 | 4 JWT en varios servicios | — | todo el smoke usa el mismo token en los 7 servicios |
@@ -88,26 +99,27 @@ cada caso:
 | 6 Egreso con fecha y motivo | Egreso.test.js, PacienteActivo.test.js | pacientes: DELETE /:id desactiva un paciente propio |
 | 7 Solicitud con enfermero | SolicitudService.test.js | caso 7 |
 | 8 No-MG no crea | rbacPacientes.test.js | caso 7 (enfermero y especialista 403) |
-| 9 RN-02 con la activa | SolicitudService.test.js | RN-02: segunda solicitud activa... -> 409 |
+| 9 RN-02 con la activa | SolicitudService.test.js; `test:ui 9` (dialogo) | RN-02: segunda solicitud activa... -> 409 |
 | 10 Brevo: enviada + ID | NotificacionesService.test.js | notificaciones: existe una para este paciente |
 | 11 Caida de Brevo | NotificacionesService.test.js | — (`npm run test:caso11` con el override; 26 oct) |
 | 12 Aviso interno al medico | SolicitudService.test.js | caso 12 |
 | 13 Visita vinculada a la ficha | VisitaMedicaService.test.js | caso 13 |
-| 14 Visita INCOMPLETA | VisitaIncompleta.test.js | caso 14 |
-| 15 Costo registrado al ordenar | CostoExamen.test.js, LaboratorioService.test.js | caso 15 |
+| 14 Visita INCOMPLETA | VisitaIncompleta.test.js; `test:ui 14` (un solo boton) | caso 14 |
+| 15 Costo registrado al ordenar | CostoExamen.test.js, LaboratorioService.test.js, PreciosOrden.test.js; `test:ui 15` | caso 15 |
 | 16 Resultado visible | — | caso 16 |
 | 17 RN-06 | FarmaciaService.test.js | farmacia: segundo intento de dispensar -> 409 |
-| 18 Despacho parcial | DespachoParcial.test.js | caso 18 (3 pasos) |
-| 19 Cargo atomico | CargoVisita.test.js | caso 19 (2 pasos), caso 18/19 |
+| 18 Despacho parcial | DespachoParcial.test.js, HistorialDespachos.test.js; `test:ui 18` | caso 18 (3 pasos) |
+| 19 Cargo atomico | CargoVisita.test.js, DesgloseCuenta.test.js; `test:ui 19` (ordenes A-D) | caso 19 (2 pasos), caso 18/19 |
 | 20 Saldos y familiar completo | AbonosCargo.test.js, TitularCuenta.test.js | caso 20 |
-| 21 Alertas naranja/roja | AlertasCobro.test.js | caso 21 |
-| 22 PDF/Excel con formulas | ReportesExport.test.js | caso 22, reportes en PDF y Excel |
+| 21 Alertas naranja/roja | AlertasCobro.test.js, CuotasVencidas.test.js; `test:ui 21` | caso 21 |
+| 22 PDF/Excel con formulas | ReportesExport.test.js, PdfTabla.test.js; `test:ui 22` (PDF dibujados) | caso 22, reportes en PDF y Excel |
 | 23 SQL injection | ReportesExport.test.js | caso 23 |
-| 24 Auditoria completa (IP real) | Auditoria.test.js, IpCliente.test.js | auditoria (2 pasos), caso 24 |
+| 24 Auditoria completa (IP real) | Auditoria.test.js, IpCliente.test.js; `test:ui 24` | auditoria (2 pasos), caso 24 |
 | 25 Rendimiento < 3 s | HashPool.test.js | `npm run test:carga` |
 | RF-42 Recuperacion de contrasena | Recuperacion.test.js, rbac.test.js (auth), NotificacionesService.test.js | RF-42 (recuperar) |
 | RF-42 Regla de contrasena (8+, letra y numero) | PasswordRegla.test.js | RF-42 (contrasena de 8+) |
 | Limite de intentos (5 por IP + usuario en 15 min) | LimitadorIntentos.test.js | limite |
+| Vistas con nombres del Analisis | VistasAnalisis.test.js; `test:ui` (SELECT por caso) | — |
 
 Rango de reportes (bloque 3): ReportesRango.test.js y el paso "reportes:
 rango hoy-a-hoy...". Los casos nuevos de esta ronda no tienen ID propio
@@ -288,7 +300,7 @@ verificar el mapeo abriendo cada archivo (ver "Mapa a archivos").
 | PV-xx | [pacientes-service/__tests__/PacienteActivo.test.js](../pacientes-service/__tests__/PacienteActivo.test.js) | 13 |
 | AW-xx | [pacientes-service/__tests__/Auditoria.test.js](../pacientes-service/__tests__/Auditoria.test.js) | 10 |
 | VM-xx | [pacientes-service/__tests__/VisitaMedicaService.test.js](../pacientes-service/__tests__/VisitaMedicaService.test.js) | 6 |
-| SQA 14 | [pacientes-service/__tests__/VisitaIncompleta.test.js](../pacientes-service/__tests__/VisitaIncompleta.test.js) | 4 |
+| SQA 14 | [pacientes-service/__tests__/VisitaIncompleta.test.js](../pacientes-service/__tests__/VisitaIncompleta.test.js) | 6 |
 | SQA 19 | [pacientes-service/__tests__/CargoVisita.test.js](../pacientes-service/__tests__/CargoVisita.test.js) | 10 |
 | SQA 15 | [pacientes-service/__tests__/CostoExamen.test.js](../pacientes-service/__tests__/CostoExamen.test.js) | 3 |
 | SQA 5 | [pacientes-service/__tests__/FamiliarFicha.test.js](../pacientes-service/__tests__/FamiliarFicha.test.js) | 8 |
@@ -327,7 +339,14 @@ verificar el mapeo abriendo cada archivo (ver "Mapa a archivos").
 | Auditoría | [notificaciones-service/__tests__/rbac.test.js](../notificaciones-service/__tests__/rbac.test.js) | 11 |
 | Auditoría | [auth-service/__tests__/ManejoErrores.test.js](../auth-service/__tests__/ManejoErrores.test.js) | 13 |
 | Auditoría | [frontend/__tests__/esc.test.js](../frontend/__tests__/esc.test.js) | 3 |
-| | **Total** | **382** |
+| SQA 1 | [auth-service/__tests__/Revocacion.test.js](../auth-service/__tests__/Revocacion.test.js) | 10 |
+| SQA 15 | [laboratorio-service/__tests__/PreciosOrden.test.js](../laboratorio-service/__tests__/PreciosOrden.test.js) | 3 |
+| SQA 18 | [farmacia-service/__tests__/HistorialDespachos.test.js](../farmacia-service/__tests__/HistorialDespachos.test.js) | 2 |
+| SQA 19 | [financiero-service/__tests__/DesgloseCuenta.test.js](../financiero-service/__tests__/DesgloseCuenta.test.js) | 2 |
+| SQA 21 | [financiero-service/__tests__/CuotasVencidas.test.js](../financiero-service/__tests__/CuotasVencidas.test.js) | 5 |
+| SQA 22 | [reportes-service/__tests__/PdfTabla.test.js](../reportes-service/__tests__/PdfTabla.test.js) | 6 |
+| Vistas | [reportes-service/__tests__/VistasAnalisis.test.js](../reportes-service/__tests__/VistasAnalisis.test.js) | 3 |
+| | **Total** | **415** |
 
 ## Lo que todavia NO esta automatizado
 
@@ -335,12 +354,10 @@ verificar el mapeo abriendo cada archivo (ver "Mapa a archivos").
   prueban el armado, las formulas del Excel, la validacion de filtros y el
   rango de fechas con un repositorio simulado; las consultas SQL de cada
   reporte solo las ejercita el e2e.
-- **Cierre de sesion por inactividad** (frontend): probado a mano en el
-  navegador con limites cortos (iniciarControlInactividad({ limiteMs,
-  avisoMs })), sin prueba automatizada.
 - **Token vigente tras desactivar una cuenta**: se bloquea el login, pero
   un JWT ya emitido sigue valido hasta su exp (8 h) en los demas
-  servicios. Es una limitacion conocida, no un caso de prueba.
+  servicios (cerrar sesion si lo revoca desde el 3 nov). Es una
+  limitacion conocida, no un caso de prueba.
 - **RBAC de visitas** (`PATCH /api/visitas/:id`, examenes, prescripciones,
   completar: solo `medico_especialista`) no tiene prueba unitaria de
   rechazo; desde el 26 oct lo cubre `npm run test:hostil` contra el stack.
@@ -348,8 +365,10 @@ verificar el mapeo abriendo cada archivo (ver "Mapa a archivos").
   (incluido el `messageId` de Brevo) y el e2e corre en simulacion
   (`idMensajeProveedor = sim-...`). Nunca se envio un correo real; el procedimiento manual esta en
   [notificaciones-service/README.md](../notificaciones-service/README.md).
-- **Frontend**: una sola prueba automatizada (`frontend/__tests__/esc.test.js`,
-  el escape de HTML). Lo demas se verifica en el navegador por rol: el 26 oct
+- **Frontend**: una prueba unitaria (`frontend/__tests__/esc.test.js`, el
+  escape de HTML) y, desde el 3 nov, `npm run test:ui` (Playwright) para los
+  9 casos del SQA de arriba, incluido el cierre por inactividad con limites
+  cortos. Lo demas se verifica en el navegador por rol: el 26 oct
   con Chrome y scripts en la pagina (secciones, consola, textos, 390 px,
   dialogo de egreso, recuperar y restablecer contrasena). La **vista movil**
   (28 oct) se reviso con capturas en Chrome a 390 x 844 y 768 x 1024 en las
